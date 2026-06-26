@@ -23,11 +23,21 @@ The core value of this extension is **eliminating the need to manually modify co
 
 ---
 
-## 🛠️ Quick Start
+## 🛠️ How to Use (Quick Start)
 
-1. **Enable the Extension:** Toggle the RPG Tracker checkbox in SillyTavern's extension list.
-2. **Setup and Edit via UI:** Use the floating toggle button to open the React panel. Easily set up your characters, stats, and world context via the interactive fields.
-3. **Chat Normally:** The extension automatically packages your UI settings into a cohesive system prompt, and seamlessly parses LLM updates in the background.
+1. **Enable the Extension:** Toggle the **RPG Tracker** checkbox in SillyTavern's extension list.
+2. **Connect to Your Chat:** 
+   * Enter the chatroom where you want to apply the tracker.
+   * Click the tracker toggle button. *(Default position is top-left. You can right-click the button to drag and adjust its position.)*
+   * Go to the **Settings** tab in the panel and click **Connect**.
+   * Choose your preferred update mode:
+     * **Merged Mode:** Automatically handles updates during normal chat generation.
+     * **Separated Mode:** Separates the logic. You can manually trigger a standalone API call by clicking the **Update Profile** button at the very top of the sidebar.
+3. **Setup and Customize:** 
+   * Create your desired characters and adjust stats using the interactive UI fields.
+   * Click the **Pen Icon** to edit your prompt templates.
+   * *(Optional AI Generation)* In the prompt editor under the **Add-ons** tab, you can generate characters via API. **Note that AI generation is never perfect.** We highly recommend manually fixing the results or building your character from scratch.
+4. **Chat Normally:** Enjoy your roleplay! The extension will run in the background. If you encounter any bugs, please leave your feedback.
 
 ---
 
