@@ -23,7 +23,7 @@ The core value of this extension is **eliminating the need to manually modify co
 
 ---
 
-## 🛠️ How to Use (Quick Start)
+## 🛠️ How to Use
 
 1. **Enable the Extension:** Toggle the **RPG Tracker** checkbox in SillyTavern's extension list.
 2. **Connect to Your Chat:** 
@@ -38,6 +38,7 @@ The core value of this extension is **eliminating the need to manually modify co
    * Click the **Pen Icon** to edit your prompt templates.
    * *(Optional AI Generation)* In the prompt editor under the **Add-ons** tab, you can generate characters via API. **Note that AI generation is never perfect.** We highly recommend manually fixing the results or building your character from scratch.
 4. **Chat Normally:** Enjoy your roleplay! The extension will run in the background. If you encounter any bugs, please leave your feedback.
+<img width="1680" height="1360" alt="rtfs" src="https://github.com/user-attachments/assets/0fc7c5a8-6eb2-4b44-9f0f-93e589e558d8" />
 
 ---
 
