@@ -23,12 +23,12 @@ The core value of this extension is **eliminating the need to manually modify co
 
 ---
 
-## 🛠️ How to Use (Quick Start)
+## 🛠️ How to Use
 
-1. **Enable the Extension:** Toggle the **RPG Tracker** checkbox in SillyTavern's extension list.
+1. **Download and Enable the Extension:** Launch SillyTavern, go to the Extensions menu, click 'Install Extension', enter the link and install. Toggle the **RPG Tracker** checkbox in SillyTavern's extension list.
 2. **Connect to Your Chat:** 
-   * Enter the chatroom where you want to apply the tracker. It will automatically connect. You can check the connection status via the indicator light next to the RPG Tracker header.
    * Click the tracker toggle button to open the panel. (Default position is top-left. You can right-click the button to drag and adjust its position.)
+   * Enter the chatroom where you want to apply the tracker. It will automatically connect. You can check the connection status via the indicator light next to the RPG Tracker header.
    * Choose your preferred update mode:
      * **Merged Mode:** Automatically handles updates during normal chat generation.
      * **Separated Mode:** Separates the logic. You can manually trigger a standalone API call by clicking the **Update Profile** button at the very top of the sidebar.
@@ -37,7 +37,7 @@ The core value of this extension is **eliminating the need to manually modify co
    * Click the **Pen Icon** to edit your prompt templates.
    * *(Optional AI Generation)* In the prompt editor under the **Add-ons** tab, you can generate characters via API. **Note that AI generation is never perfect.** We highly recommend manually fixing the results or building your character from scratch.
 4. **Chat Normally:** Enjoy your roleplay! The extension will run in the background. If you encounter any bugs, please leave your feedback.
-<img width="1680" height="1180" alt="rtfs" src="https://github.com/user-attachments/assets/b48b05cf-d93f-43c9-871f-8f79c9447884" />
+<img width="1600" height="1100" alt="rtfs" src="https://github.com/user-attachments/assets/0b85ea77-b919-41a7-aa60-70d968bff9f8" />
 
 ---
 
