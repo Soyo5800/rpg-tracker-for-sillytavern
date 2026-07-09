@@ -138,21 +138,71 @@
   flex-direction: column;
 }
 
+/* 개별 프리셋 컨테이너 행 - Flex 정렬로 수직 중앙 정렬 배치 */
 .presetDropdownItem {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 8px 12px;
-  cursor: pointer;
-  border-bottom: 1px solid rgba(255,255,255,0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  background: transparent;
+  min-height: 38px;
 }
 
 .presetDropdownItem:last-child {
   border-bottom: none;
 }
 
-.presetDropdownItem:hover {
-  background: rgba(255, 255, 255, 0.1);
+/* 프리셋 로드 영역 (클릭 범위 분리) */
+.presetDropdownItemLoadArea {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: 1;
+  padding: 8px 12px;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.presetDropdownItemLoadArea:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.presetItemName {
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  margin-right: 8px;
+}
+
+.presetItemBadges {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+/* 개별 프리셋 다이렉트 삭제를 위한 전용 우측 버튼 스타일링 */
+.presetItemDeleteBtn {
+  background: transparent;
+  border: none;
+  color: #e74c3c;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  width: 32px;
+  height: 38px; /* 행 높이와 완전히 일치하도록 통일 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-left: 1px solid rgba(255, 255, 255, 0.05);
+  transition: background 0.15s, color 0.15s;
+}
+
+.presetItemDeleteBtn:hover {
+  background: rgba(231, 76, 60, 0.12);
+  color: #ff6b6b;
 }
 
 .presetDropdownEmpty {

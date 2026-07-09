@@ -141,7 +141,7 @@ export default function InventoryTab({
     if (!scrollParent) return;
 
     const rect = scrollParent.getBoundingClientRect();
-    const threshold = 50; 
+    const threshold = 50;
     const speed = 10;
 
     if (clientY < rect.top + threshold) {
@@ -195,11 +195,11 @@ export default function InventoryTab({
             const slotsList = Object.entries(targetChar.inventory?.equipment || {});
             const totalSlots = slotsList.length;
             return slotsList.map(([slotKey, item], slotIdx) => (
-              <div 
-                key={slotKey} 
-                className={styles.invSlotCard} 
+              <div
+                key={slotKey}
+                className={styles.invSlotCard}
                 onDragEnter={handleDragOver}
-                onDragOver={handleDragOver} 
+                onDragOver={handleDragOver}
                 onDrop={e => handleDrop(e, 'equipment', slotKey)}
               >
                 <div className={styles.slotHeader}>
@@ -227,15 +227,17 @@ export default function InventoryTab({
                     <button type="button" className={`${styles.sortBtn} ${styles.miniSortBtn}`} disabled={slotIdx === totalSlots - 1} onClick={() => handleReorderEquipmentSlot(slotKey, "down")}>▼</button>
                     <button type="button" className={styles.removeInlineBtn} onClick={() => {
                       const equip = { ...(targetChar.inventory?.equipment || {}) };
+                      // 아이템이 장착되어 있으면 경고
+                      if (equip[slotKey] && !window.confirm(`"${slotKey}" slot has an item. Delete anyway?`)) return;
                       delete equip[slotKey]; handleUpdateNestedField("inventory", "equipment", equip);
                     }}>X</button>
                   </div>
                 </div>
 
                 {item ? (
-                  <div 
-                    className={styles.equippedItem} 
-                    draggable={true} 
+                  <div
+                    className={styles.equippedItem}
+                    draggable={true}
                     onDragStart={e => handleDragStart(e, 'equipment', slotKey, null, item)}
                     onDragEnd={stopAutoScroll}
                   >
@@ -289,11 +291,11 @@ export default function InventoryTab({
             return storagesList.map(([storageKey, items], sIdx) => {
               const itemList = Array.isArray(items) ? items : [];
               return (
-                <div 
-                  key={storageKey} 
-                  className={styles.invStorageBox} 
+                <div
+                  key={storageKey}
+                  className={styles.invStorageBox}
                   onDragEnter={handleDragOver}
-                  onDragOver={handleDragOver} 
+                  onDragOver={handleDragOver}
                   onDrop={e => handleDrop(e, 'storage', storageKey)}
                 >
                   <div className={styles.slotHeader}>
@@ -326,6 +328,8 @@ export default function InventoryTab({
                       <button type="button" className={`${styles.sortBtn} ${styles.miniSortBtn}`} disabled={sIdx === totalStorages - 1} onClick={() => handleReorderStorage(storageKey, 'down')}>▼</button>
                       <button type="button" className={styles.removeInlineBtn} onClick={() => {
                         const storage = { ...(targetChar.inventory?.storage || {}) };
+                        // 아이템이 들어있으면 경고
+                        if (storage[storageKey]?.length > 0 && !window.confirm(`"${storageKey}" contains items. Delete anyway?`)) return;
                         delete storage[storageKey]; handleUpdateNestedField('inventory', 'storage', storage);
                       }}>X</button>
                     </div>
@@ -335,14 +339,14 @@ export default function InventoryTab({
                     <div className={styles.invStorageItemsList}>
                       {itemList.length === 0 ? <span className={styles.emptyText}>Empty container</span> : (
                         itemList.map((item, idx) => (
-                          <div 
-                            key={item.id || idx} 
-                            className={styles.invItemRow} 
-                            draggable={true} 
-                            onDragStart={e => handleDragStart(e, 'storage', storageKey, idx, item)} 
+                          <div
+                            key={item.id || idx}
+                            className={styles.invItemRow}
+                            draggable={true}
+                            onDragStart={e => handleDragStart(e, 'storage', storageKey, idx, item)}
                             onDragEnd={stopAutoScroll}
                             onDragEnter={handleDragOver}
-                            onDragOver={handleDragOver} 
+                            onDragOver={handleDragOver}
                             onDrop={e => { e.stopPropagation(); handleDrop(e, 'storage', storageKey, idx); }}
                           >
                             <div className={styles.flexColumnFull}>

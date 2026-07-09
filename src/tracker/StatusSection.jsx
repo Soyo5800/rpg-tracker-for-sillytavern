@@ -1,26 +1,26 @@
 // src/tracker/StatusSection.jsx
+
 import React, { useState } from 'react';
 import { useRPG } from '../core/RPGControl';
 import styles from './StatusSection.module.css';
 import StatusComponent from './StatusComponent';
 import PlayerComponent from './PlayerComponent';
 import CharListEditor from '../editor/CharListEditor';
-import { getDefaultCharacters } from '../core/PromptSchema';
+import { DEFAULT_STATUS_SCHEMAS, DEFAULT_STATUS, getDefaultCharacters } from '../core/PromptSchema';
 import { LockIcon, GearIcon, ProfileTabIcon, RelationsTabIcon, InventoryTabIcon, QuestsTabIcon } from '../Icons';
 import { AutoGrowingTextArea } from '../utils';
 
 export default function StatusSection({ onOpenEditor }) {
-  // RPGControl 전역 컨텍스트에서 상태 및 패치 메소드 구독
-  const { trackerData, updateTrackerData, settings, patchCharacterField } = useRPG();
-  
+  // UI 보존 상태를 불러오기 위해 uiState, updateUiState 추가 구독
+  const { trackerData, updateTrackerData, settings, patchCharacterField, uiState, updateUiState } = useRPG();
+
   const characters = (trackerData.characters && trackerData.characters.length > 0)
     ? trackerData.characters
     : getDefaultCharacters();
-  const globalRelationSchema = settings.statusSchema?.filter(s => s.type === 'relation_schema') || [];
 
-  const [collapsedChars, setCollapsedChars] = useState({});
-  const [activeInlineTabs, setActiveInlineTabs] = useState({});
-  const [activeEdit, setActiveEdit] = useState({ charId: null, statId: null });
+  // 로컬 useState 상태 대신 전역 uiState 바인딩
+  const collapsedChars = uiState.collapsedChars || {};
+  const activeInlineTabs = uiState.activeInlineTabs || {};
   const [showCharList, setShowCharList] = useState(false);
 
   // 캐릭터 배열 전체를 교체할 때 사용되는 내부 도우미 함수
@@ -47,31 +47,34 @@ export default function StatusSection({ onOpenEditor }) {
     patchCharacterField(charId, ['status', statId], finalVal);
   };
 
+  // 접기 상태 토글 시 전역 상태 업데이트 함수 호출 (지정 값이 없으면 기본 접힘 상태)
   const toggleCollapse = (charId) => {
-    setCollapsedChars(prev => ({ ...prev, [charId]: !prev[charId] }));
+    const currentCollapsed = collapsedChars[charId] !== false;
+    updateUiState({
+      collapsedChars: {
+        ...collapsedChars,
+        [charId]: !currentCollapsed
+      }
+    });
   };
 
-  // 다중 탭 활성화 지원 (토글 형식)
+  // 다중 서브 탭 변경 시 전역 상태 업데이트 함수 호출
   const handleToggleInlineTab = (charId, tabName) => {
-    setActiveInlineTabs(prev => {
-      const charTabs = prev[charId] || {
-        profile: false,
-        relations: false,
-        inventory: false,
-        quests: false
-      };
-      return {
-        ...prev,
+    const charTabs = activeInlineTabs[charId] || {
+      profile: false,
+      relations: false,
+      inventory: false,
+      quests: false
+    };
+    updateUiState({
+      activeInlineTabs: {
+        ...activeInlineTabs,
         [charId]: {
           ...charTabs,
           [tabName]: !charTabs[tabName]
         }
-      };
+      }
     });
-  };
-
-  const closeEditMode = () => {
-    setActiveEdit({ charId: null, statId: null });
   };
 
   return (
@@ -81,7 +84,15 @@ export default function StatusSection({ onOpenEditor }) {
         <button
           className={styles.topActionBtn}
           onClick={() => {
-            const newChar = { id: `char_${Date.now()}`, name: "New Character", activePlayer: false, activeInjection: true, statusSchema: [], status: {}, relations: {} };
+            const newChar = {
+              id: `char_${Date.now()}`,
+              name: "New Character",
+              activePlayer: false,
+              activeInjection: true,
+              statusSchema: JSON.parse(JSON.stringify(DEFAULT_STATUS_SCHEMAS)),
+              status: JSON.parse(JSON.stringify(DEFAULT_STATUS)),
+              relations: {}
+            };
             let nextChars;
             if (characters.length === 1 && characters[0].id === 'char_user' && characters[0].name === 'New') {
               nextChars = [newChar];
@@ -110,7 +121,8 @@ export default function StatusSection({ onOpenEditor }) {
         const integerFields = schema.filter(item => item.type === 'integer');
         const textFields = schema.filter(item => item.type === 'text');
 
-        const isCollapsed = collapsedChars[char.id];
+        // 상태 기록이 등록되지 않았거나 값이 없으면 기본값을 접힘(true) 상태로 설정
+        const isCollapsed = collapsedChars[char.id] !== false;
         const charTabs = activeInlineTabs[char.id] || {};
         const isPlayerActive = char.activePlayer === true;
         const isInjectionActive = char.activeInjection !== false;
@@ -227,17 +239,16 @@ export default function StatusSection({ onOpenEditor }) {
                   )}
                 </div>
 
-                {/* 자식 서브 탭 뷰 (두 개의 컴포넌트로 완벽 분할) */}
+                {/* 자식 서브 탭 뷰 */}
                 <div className={`${styles.statusComponentContainer} ${hasActiveTab ? styles.tabActive : ''}`}>
                   {/* StatusComponent는 Profile과 Relations 담당 */}
                   <StatusComponent
                     char={char}
                     characters={characters}
                     activeTabs={charTabs}
-                    globalRelationSchema={globalRelationSchema}
                     onOpenEditor={(tab) => onOpenEditor && onOpenEditor(char.id, tab)}
                   />
-                  
+
                   {/* PlayerComponent는 Inventory와 Quests 담당 */}
                   {isPlayerActive && (
                     <PlayerComponent
@@ -268,7 +279,6 @@ export default function StatusSection({ onOpenEditor }) {
                               <LockIcon
                                 isLocked={item.isLocked}
                                 onClick={() => {
-                                  // patchCharacterField 헬퍼를 활용해 이중 스프레드 콜백 없는 직관적 락 토글 구현
                                   const newSchema = (char.statusSchema || []).map(s =>
                                     s.id === item.id ? { ...s, isLocked: !s.isLocked } : s
                                   );

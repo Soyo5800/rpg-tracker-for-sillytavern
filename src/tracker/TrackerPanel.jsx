@@ -1,4 +1,5 @@
 // src/tracker/TrackerPanel.jsx
+
 import React, { useState } from 'react';
 import { useRPG } from '../core/RPGControl';
 import styles from './TrackerPanel.module.css';
@@ -11,17 +12,20 @@ import SettingsEditor from '../editor/SettingsEditor';
 import WorldSection from './WorldSection';
 
 export default function TrackerPanel() {
-  const { 
-    settings, 
-    updateSettings, 
-    trackerData, 
-    isGenerating, 
-    setIsGenerating, 
+  const {
+    settings,
+    updateSettings,
+    trackerData,
     isChatConnected,
-    revertToOriginalTurnState 
+    revertToOriginalTurnState,
+    uiState,          // UI 보존 전역 상태 참조
+    updateUiState     // UI 전역 상태 업데이트 함수 참조
   } = useRPG();
-  
-  const [activeTab, setActiveTab] = useState('status');
+
+  // 글로벌 uiState 바인딩
+  const activeTab = uiState.activeTab || 'status';
+  const setActiveTab = (tab) => updateUiState({ activeTab: tab });
+
   const [editorCharId, setEditorCharId] = useState(null);
   const [editorTab, setEditorTab] = useState('status');
   const [showPromptEditor, setShowPromptEditor] = useState(false);
@@ -38,16 +42,6 @@ export default function TrackerPanel() {
     updateSettings({ isPanelOpen: false });
   };
 
-  const handleBlockedClick = (e) => {
-    if (isGenerating) {
-      e.stopPropagation();
-      e.preventDefault();
-      if (window.RPGBridge && typeof window.RPGBridge.triggerGenerationWarning === 'function') {
-        window.RPGBridge.triggerGenerationWarning();
-      }
-    }
-  };
-
   return (
     <div className={`${styles.panelContainer} ${styles[panelPosition]}`}>
       <button
@@ -62,14 +56,11 @@ export default function TrackerPanel() {
       </button>
 
       <div
-        onClickCapture={handleBlockedClick}
-        className={isGenerating ? styles.generatingLocked : ''}
         style={{
           display: 'flex',
           flexDirection: 'column',
           flex: 1,
-          minHeight: 0,
-          ...(isGenerating ? { opacity: 0.65, cursor: 'not-allowed' } : {})
+          minHeight: 0
         }}
       >
         <header className={styles.panelHeader}>
@@ -89,18 +80,16 @@ export default function TrackerPanel() {
           <div className={styles.headerRightArea}>
             {/* 첫 번째 줄 버튼 그룹 */}
             <div className={styles.headerButtonRow}>
-              <button 
-                className={styles.headerBtn} 
+              <button
+                className={styles.headerBtn}
                 onClick={() => setShowPromptEditor(true)}
-                disabled={isGenerating}
               >
                 <PenIcon className={styles.headerBtnIcon} />
                 <span>Prompt</span>
               </button>
-              <button 
-                className={styles.headerBtn} 
+              <button
+                className={styles.headerBtn}
                 onClick={() => setShowSettings(true)}
-                disabled={isGenerating}
               >
                 <GearIcon className={styles.headerBtnIcon} />
                 <span>Settings</span>
@@ -109,7 +98,7 @@ export default function TrackerPanel() {
 
             {/* 두 번째 줄 버튼 그룹 */}
             <div className={styles.headerButtonRow}>
-              {settings.updateMode === 'separated' && (
+              {(settings.updateMode === 'isolated' || settings.updateMode === 'separated') && (
                 <button
                   className={styles.headerBtn}
                   onClick={async () => {
@@ -118,21 +107,15 @@ export default function TrackerPanel() {
                       return;
                     }
                     if (window.RPGBridge && typeof window.RPGBridge.triggerManualUpdate === 'function') {
-                      setIsGenerating(true);
                       try {
                         await window.RPGBridge.triggerManualUpdate();
                       } catch (e) {
                         console.error('[RPG Tracker] Manual update failed', e);
-                      } finally {
-                        setIsGenerating(false);
                       }
                     }
                   }}
-                  disabled={isGenerating}
                 >
-                  <PlayIcon
-                    className={`${styles.headerBtnIcon} ${isGenerating ? styles.spin : ''}`}
-                  />
+                  <PlayIcon className={styles.headerBtnIcon} />
                   <span>Update</span>
                 </button>
               )}
@@ -140,7 +123,6 @@ export default function TrackerPanel() {
                 className={styles.headerBtn}
                 title="Revert to Original Turn State"
                 onClick={revertToOriginalTurnState}
-                disabled={isGenerating}
               >
                 <ResetArrowIcon className={styles.headerBtnIcon} />
                 <span>Turn Back</span>

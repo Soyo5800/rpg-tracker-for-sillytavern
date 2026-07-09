@@ -36,8 +36,40 @@ const getDefaultTrackerData = () => {
 export function RPGControlProvider({ children }) {
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [trackerData, setTrackerData] = useState(getDefaultTrackerData);
-  const [isGenerating, setIsGenerating] = useState(false);
   const [isChatConnected, setIsChatConnected] = useState(false);
+
+  // 스냅샷 모달
+  const [snapshotModalData, setSnapshotModalData] = useState({ isOpen: false, mesId: null, historicalData: null });
+
+  // 로컬스토리지에서 이전 UI 상태를 복구하거나 기본값으로 초기화
+  const [uiState, setUiState] = useState(() => {
+    try {
+      const cached = localStorage.getItem('rpg_tracker_ui_state');
+      if (cached) {
+        return JSON.parse(cached);
+      }
+    } catch (e) {
+      console.warn("[RPG Tracker] Failed to load UI state from localStorage:", e);
+    }
+    return {
+      activeTab: 'status',
+      collapsedChars: {},
+      activeInlineTabs: {}
+    };
+  });
+
+  // UI 상태가 변경될 때마다 로컬스토리지에 저장하여 새로고침 시에도 기억
+  const updateUiState = useCallback((updates) => {
+    setUiState((prev) => {
+      const next = { ...prev, ...updates };
+      try {
+        localStorage.setItem('rpg_tracker_ui_state', JSON.stringify(next));
+      } catch (e) {
+        console.warn("[RPG Tracker] Failed to save UI state to localStorage:", e);
+      }
+      return next;
+    });
+  }, []);
 
   const saveSettingsToST = useCallback((updatedSettings) => {
     if (window.RPGBridge && typeof window.RPGBridge.saveSettings === 'function') {
@@ -137,7 +169,7 @@ export function RPGControlProvider({ children }) {
         if (!Array.isArray(chat) || chat.length === 0) return;
 
         const originalState = await reconstructTurnState(chat, getDefaultTrackerData());
-        
+
         if (originalState) {
           setTrackerData(originalState);
           if (window.RPGBridge && typeof window.RPGBridge.saveChatData === 'function') {
@@ -192,9 +224,6 @@ export function RPGControlProvider({ children }) {
       setChatConnectionStatus: (status) => {
         setIsChatConnected(status);
       },
-      setGenerationState: (generating) => {
-        setIsGenerating(generating);
-      },
       triggerHistoryRollback: () => {
         if (window.RPGBridge && typeof window.RPGBridge.rehydrateFromHistory === 'function') {
           const recovered = window.RPGBridge.rehydrateFromHistory();
@@ -215,21 +244,26 @@ export function RPGControlProvider({ children }) {
       },
       handleManualUpdate: async () => {
         if (window.RPGBridge && typeof window.RPGBridge.triggerManualUpdate === 'function') {
-          setIsGenerating(true);
           try {
             await window.RPGBridge.triggerManualUpdate();
           } catch (e) {
             console.error('[RPG Tracker] Manual update failed:', e);
-          } finally {
-            setIsGenerating(false);
           }
         }
       },
-      handleFullRequestUpdate: async () => {
-        console.log("[RPG Tracker] Full Overwrite Update is deprecated.");
-      },
       resetToDefault: () => {
         setTrackerData(getDefaultTrackerData());
+      },
+      //스냅샷
+      openSnapshotModal: (mesId, histData, existingPayload = null) => {
+        setSnapshotModalData({ isOpen: true, mesId, historicalData: histData, existingPayload });
+      },
+      closeSnapshotModal: () => {
+        setSnapshotModalData({ isOpen: false, mesId: null, historicalData: null, existingPayload: null });
+      },
+      triggerSnapshotRender: () => {
+        const chatContainer = document.getElementById('chat');
+        if (chatContainer) chatContainer.dispatchEvent(new Event('DOMSubtreeModified'));
       }
     };
 
@@ -253,11 +287,12 @@ export function RPGControlProvider({ children }) {
     isEnabled,
     settings,
     trackerData,
-    isGenerating,
     isChatConnected,
+    snapshotModalData,
+    uiState,          // 글로벌 보관 중인 UI 접힘 상태 전달
+    updateUiState,    // 상태 업데이트 트리거 전달
     updateSettings,
     updateTrackerData,
-    setIsGenerating,
     patchCharacterField,
     deleteCharacterField,
     patchWorldField,

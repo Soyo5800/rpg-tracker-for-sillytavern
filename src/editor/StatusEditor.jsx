@@ -58,7 +58,7 @@ export default function StatusEditor({ charId, initialTab = 'status', onClose, c
       activePlayer: false,
       activeInjection: true,
       statusSchema: JSON.parse(JSON.stringify(DEFAULT_STATUS_SCHEMAS)),
-      status: { ...DEFAULT_STATUS },
+      status: JSON.parse(JSON.stringify(DEFAULT_STATUS)),
       relations: {}
     };
 

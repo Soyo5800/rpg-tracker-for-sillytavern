@@ -130,8 +130,9 @@ export default function SettingsEditor({ onClose }) {
               onChange={e => setLocalUpdateMode(e.target.value)}
               className={styles.settingsSelect}
             >
-              <option value="merged">Merged (Update alongside chat messages)</option>
-              <option value="separated">Separated (Manual background update)</option>
+              <option value="merged">Merged (Inject status & Auto-update every turn)</option>
+              <option value="separated">Separated (Inject status for context, Manual update)</option>
+              <option value="isolated">Isolated (No injection, Manual update only)</option>
             </select>
           </div>
 

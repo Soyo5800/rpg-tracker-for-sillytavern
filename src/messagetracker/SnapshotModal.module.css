@@ -1,0 +1,331 @@
+/* src/messagetracker/SnapshotModal.module.css */
+
+.overlay {
+  position: fixed; 
+  top: 0; 
+  left: 0; 
+  width: 100vw; 
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.75); 
+  z-index: 4000 !important;
+  display: flex; 
+  align-items: center; 
+  justify-content: center;
+}
+
+.modal {
+  background: var(--rpg-bg); 
+  border: 1px solid var(--rpg-border);
+  border-radius: 10px; 
+  width: 540px; 
+  height: 680px; 
+  max-width: 100%; 
+  max-height: 90vh;
+  display: flex; 
+  flex-direction: column; 
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.65);
+  color: var(--rpg-text);
+  overflow: hidden;
+}
+
+.header {
+  display: flex; 
+  justify-content: space-between; 
+  align-items: center;
+  padding: 0 20px; 
+  border-bottom: 1px solid var(--rpg-border);
+  flex-shrink: 0;
+  height: 54px;
+  box-sizing: border-box;
+}
+
+.header h4 { 
+  margin: 0; 
+  font-size: 15px; 
+  color: var(--rpg-highlight); 
+}
+
+.closeBtn { 
+  background: transparent; 
+  border: none; 
+  font-size: 24px; 
+  color: var(--rpg-text); 
+  cursor: pointer; 
+  opacity: 0.6; 
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  line-height: 1;
+  outline: none;
+  transition: opacity 0.15s ease;
+}
+
+.closeBtn:hover { 
+  opacity: 1; 
+}
+
+.body { 
+  padding: 16px; 
+  overflow-y: auto;
+  display: flex; 
+  flex-direction: column; 
+  gap: 14px; 
+  flex: 1;
+}
+
+.section {
+  background: rgba(0,0,0,0.15); 
+  border: 1px solid var(--rpg-border);
+  border-radius: 6px; 
+  padding: 12px;
+}
+
+.sectionTitleRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.sectionTitle { 
+  font-size: 13px; 
+  font-weight: bold; 
+  color: var(--rpg-highlight); 
+}
+
+/* 원클릭 선택 해제 버튼 정렬 및 쏠림 보정 */
+.deselectAllBtn {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--rpg-border);
+  color: var(--rpg-text);
+  font-size: 10.5px;
+  font-weight: bold;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  box-sizing: border-box;
+  outline: none;
+  transition: all 0.15s ease-out;
+}
+
+.deselectAllBtn:hover {
+  background: rgba(231, 76, 60, 0.08);
+  border-color: #e74c3c;
+  color: #ff6b6b;
+}
+
+/* 캐릭터 및 월드 상태 정렬 레이아웃 */
+.charRow {
+  display: flex;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.05);
+}
+
+.charRow:last-child {
+  border-bottom: none;
+}
+
+.worldRow {
+  align-items: flex-start;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 10px;
+  margin-bottom: 6px;
+}
+
+.charNameLabel {
+  font-weight: bold;
+  width: 110px;
+  display: inline-block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--rpg-text);
+}
+
+.charOptions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  transition: opacity 0.2s;
+  flex: 1;
+}
+
+/* 월드 정렬 컨테이너 */
+.worldOptionsContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: opacity 0.2s;
+  flex: 1;
+}
+
+.worldOptionsRow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.activeOps {
+  opacity: 1;
+}
+
+.disabledOps {
+  opacity: 0.25;
+  pointer-events: none;
+}
+
+.checkboxItem { 
+  display: flex; 
+  align-items: center; 
+  gap: 6px; 
+  font-size: 12px; 
+  cursor: pointer; 
+}
+
+.textarea {
+  width: 100%; 
+  background: rgba(0,0,0,0.2); 
+  border: 1px solid var(--rpg-border);
+  border-radius: 4px; 
+  padding: 8px; 
+  color: var(--rpg-text); 
+  font-size: 12px;
+  resize: vertical; 
+  min-height: 50px; 
+  outline: none; 
+  box-sizing: border-box;
+}
+
+.textarea:focus:not(:disabled) { 
+  border-color: var(--rpg-highlight); 
+}
+
+.textarea:disabled { 
+  opacity: 0.4; 
+  cursor: not-allowed; 
+}
+
+/* 뷰 모드 및 잠금 토글 버튼 쏠림 정밀 보정 */
+.viewBtn {
+  background: rgba(255, 255, 255, 0.05); 
+  border: 1px solid var(--rpg-border);
+  color: var(--rpg-text); 
+  font-size: 11px; 
+  height: 24px;
+  padding: 0 10px; 
+  border-radius: 4px; 
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  box-sizing: border-box;
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+.viewBtn:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.viewBtnActive {
+  background: var(--rpg-highlight-bg); 
+  border: 1px solid var(--rpg-highlight);
+  color: var(--rpg-highlight); 
+  font-size: 11px; 
+  height: 24px;
+  padding: 0 10px; 
+  border-radius: 4px; 
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  box-sizing: border-box;
+  outline: none;
+  box-shadow: 0 0 8px rgba(0,0,0,0.2);
+}
+
+/* 고정식 JSON 에디터 스타일 */
+.jsonEditor {
+  width: 100%; 
+  height: 160px; 
+  background: rgba(0, 0, 0, 0.35); 
+  color: #8892b0; 
+  border: 1px solid rgba(255, 255, 255, 0.1); 
+  border-radius: 4px;
+  padding: 10px; 
+  font-family: monospace; 
+  font-size: 11.5px; 
+  resize: vertical; 
+  outline: none; 
+  box-sizing: border-box;
+  transition: all 0.2s ease;
+}
+
+.jsonEditorWritable {
+  background: #111216 !important;
+  color: #e6ebf5 !important;
+  border-color: var(--rpg-highlight) !important;
+  box-shadow: inset 0 0 6px rgba(0,0,0,0.5);
+}
+
+/* 하단 푸터 바 및 버튼 레이아웃 완전 교정 */
+.footer {
+  display: flex; 
+  justify-content: flex-end; 
+  align-items: center;
+  gap: 10px; 
+  padding: 0 20px;
+  border-top: 1px solid var(--rpg-border); 
+  background: rgba(0,0,0,0.2);
+  flex-shrink: 0;
+  height: 54px;
+  box-sizing: border-box;
+}
+
+.cancelBtn, .saveBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 0 16px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: bold;
+  line-height: 1;
+  box-sizing: border-box;
+  outline: none;
+  transition: all 0.15s ease-out;
+}
+
+.cancelBtn { 
+  background: rgba(255,255,255,0.05); 
+  border: 1px solid var(--rpg-border); 
+  color: var(--rpg-text); 
+}
+
+.cancelBtn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: var(--rpg-highlight);
+}
+
+.saveBtn { 
+  background: var(--rpg-highlight-bg); 
+  border: 1px solid var(--rpg-highlight); 
+  color: var(--rpg-highlight); 
+}
+
+.saveBtn:hover {
+  opacity: 0.9;
+}

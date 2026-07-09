@@ -3,7 +3,6 @@
 export function getDeltaLog(msg) {
     if (!msg) return null;
 
-    // 1. Try to get from msg.mes using regex first (Highest priority for system messages as metadata can be lost)
     if (typeof msg.mes === 'string') {
         const match = msg.mes.match(/<!--RPG_DELTA:([\s\S]*?)-->/);
         if (match && match[1]) {
@@ -15,7 +14,6 @@ export function getDeltaLog(msg) {
         }
     }
 
-    // 2. Try to get from swipe_info first (swipe-aware)
     let swipeId = msg.swipe_id || 0;
     if (msg.swipes && msg.swipes.length > 0 && typeof msg.mes === 'string') {
         const foundIdx = msg.swipes.findIndex(s => s === msg.mes);
@@ -26,7 +24,6 @@ export function getDeltaLog(msg) {
         return msg.swipe_info[swipeId].extra.rpgTrackerDelta;
     }
 
-    // 2. Fallback to msg.extra
     if (msg.extra && msg.extra.rpgTrackerDelta) {
         return msg.extra.rpgTrackerDelta;
     }
@@ -37,11 +34,9 @@ export function getDeltaLog(msg) {
 export function setDeltaLog(msg, patch) {
     if (!msg || !patch || Object.keys(patch).length === 0) return;
 
-    // 1. Save to msg.extra for fallback/legacy compatibility
     msg.extra = msg.extra || {};
     msg.extra.rpgTrackerDelta = patch;
 
-    // 2. Save to swipe_info for persistent, swipe-aware storage
     let swipeId = msg.swipe_id || 0;
     if (msg.swipes && msg.swipes.length > 0 && typeof msg.mes === 'string') {
         const foundIdx = msg.swipes.findIndex(s => s === msg.mes);
@@ -70,7 +65,10 @@ export const deltaStyles = `
     border-radius: 6px;
     background: var(--rpg-bg, rgba(0,0,0,0.2));
     font-family: inherit;
-    font-size: 12px;
+    
+    /* 실리터번 글자 크기 설정을 유연하게 상속 (기존 12px 대체) */
+    font-size: 0.95em; 
+    
     width: calc(100% - 40px);
     max-width: calc(100% - 40px);
     box-sizing: border-box;
@@ -92,7 +90,7 @@ export const deltaStyles = `
     transition: background 0.2s, border-color 0.2s;
 }
 .rpg-delta-header:hover {
-    background: rgba(255,255,255,0.05);
+    background: rgba(255, 255, 255, 0.05);
 }
 .rpg-delta-header.active {
     border-color: var(--rpg-border, rgba(255,255,255,0.15));
@@ -100,7 +98,7 @@ export const deltaStyles = `
 }
 .rpg-delta-header-icon::after {
     content: '▼';
-    font-size: 9px;
+    font-size: 0.75em; /* em 단위 조절 */
     opacity: 0.7;
     transition: transform 0.15s;
     display: inline-block;
@@ -123,7 +121,10 @@ export const deltaStyles = `
 .rpg-delta-char-header {
     font-weight: bold;
     color: var(--rpg-highlight, var(--rpg-text, inherit));
-    font-size: 12.5px;
+    
+    /* 비례 확장 적용 (기존 12.5px 대체) */
+    font-size: 1.05em; 
+    
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
@@ -138,7 +139,9 @@ export const deltaStyles = `
     gap: 3px;
 }
 .rpg-delta-section-title {
-    font-size: 11px;
+    /* 하위 헤더 상대크기 축소 정의 (기존 11px 대체) */
+    font-size: 0.9em; 
+    
     text-transform: uppercase;
     opacity: 0.5;
     font-weight: bold;
@@ -174,7 +177,6 @@ export function buildDeltaLogHtml(delta) {
 
         let charChanges = [];
 
-        // 1. Status Changes
         let statusUpdates = updates.status || updates.stats || null;
         if (!statusUpdates && !updates.profile && !updates.relations && !updates.inventory && !updates.quests && charName.toLowerCase() !== 'world') {
             statusUpdates = updates;
@@ -199,7 +201,6 @@ export function buildDeltaLogHtml(delta) {
             }
         }
 
-        // 2. Profile Changes
         if (updates.profile && typeof updates.profile === 'object') {
             const items = [];
             Object.entries(updates.profile).forEach(([key, val]) => {
@@ -215,7 +216,6 @@ export function buildDeltaLogHtml(delta) {
             }
         }
 
-        // 3. Inventory Changes
         if (updates.inventory && typeof updates.inventory === 'object') {
             const items = [];
             if (updates.inventory.equipment && typeof updates.inventory.equipment === 'object') {
@@ -242,7 +242,6 @@ export function buildDeltaLogHtml(delta) {
             }
         }
 
-        // 4. Quest Changes
         if (updates.quests && typeof updates.quests === 'object') {
             const items = [];
             if (updates.quests.main) {
@@ -266,7 +265,6 @@ export function buildDeltaLogHtml(delta) {
             }
         }
 
-        // 5. Relations Changes
         if (updates.relations && typeof updates.relations === 'object') {
             const items = [];
             Object.entries(updates.relations).forEach(([target, rData]) => {
@@ -292,7 +290,6 @@ export function buildDeltaLogHtml(delta) {
             }
         }
 
-        // 6. World State Updates
         if (charName.toLowerCase() === 'world' && updates && typeof updates === 'object') {
             const items = [];
             if (updates.date) items.push(`<li><span class="rpg-delta-key">Date:</span> <span class="rpg-delta-val">${updates.date}</span></li>`);
@@ -330,7 +327,7 @@ export function buildDeltaLogHtml(delta) {
 
     return `
         <div class="rpg-delta-log-container">
-            <div class="rpg-delta-header" onclick="$(this).next('.rpg-delta-content').slideToggle(150); $(this).toggleClass('active');">
+            <div class="rpg-delta-header">
                 <span class="rpg-delta-header-title">Tracker Changes</span>
                 <span class="rpg-delta-header-icon"></span>
             </div>
@@ -401,4 +398,12 @@ export function injectAllDeltaLogs(extension_settings, extensionName, getContext
             }
         }
     }
+}
+
+export function registerDeltaLogClickEvent() {
+    $(document).off('click', '#chat .rpg-delta-header').on('click', '#chat .rpg-delta-header', function() {
+        const $header = $(this);
+        $header.next('.rpg-delta-content').slideToggle(150);
+        $header.toggleClass('active');
+    });
 }

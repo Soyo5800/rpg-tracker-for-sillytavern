@@ -98,6 +98,7 @@ export const getInitialTrackerData = () => {
     globalDefinitions: {},
     systemPromptHeader_merged: DEFAULT_PROMPT_HEADER_MERGED,
     systemPromptFooter_merged: DEFAULT_PROMPT_FOOTER_MERGED,
+    systemPrompt_readonly: DEFAULT_READONLY_CONTEXT_HEADER,
     systemPromptHeader_separated: DEFAULT_PROMPT_HEADER_SEP,
     systemPromptFooter_separated: DEFAULT_PROMPT_FOOTER_SEP,
     addons: { weather: false, worldEvents: false, cyoa: false },
@@ -154,3 +155,12 @@ export const DEFAULT_PROMPT_FOOTER_SEP = `[SYSTEM RULES & GUIDELINES]
 5. OUTPUT LIMIT (STRICT):
    - Output ONLY the JSON HTML comment block.
    - Absolutely NO normal roleplay response, prefixes, conversational filler, or commentary is allowed.`;
+
+export const DEFAULT_READONLY_CONTEXT_HEADER = `[CURRENT RPG STATUS CONTEXT]
+Understand the current situation, parameters, and relationship metrics from the live status data below.
+This data is provided for your narrative and contextual reference only.
+
+CRITICAL CONSTRAINT:
+- Do NOT output any JSON, HTML comments (such as <!--RPG_TRACKER...-->), or code blocks in your response.
+- Do NOT attempt to update these stats in your output.
+- Write your normal story roleplay response only, naturally reflecting the status provided.`;

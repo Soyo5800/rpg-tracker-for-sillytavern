@@ -3,6 +3,7 @@ import { RPGControlProvider, useRPG } from './core/RPGControl';
 import TrackerPanelToggle from './tracker/TrackerPanelToggle';
 import TrackerPanel from './tracker/TrackerPanel';
 import { ErrorBoundary } from './core/ErrorBoundary';
+import SnapshotModal from './messagetracker/SnapshotModal';
 
 function RPGTrackerContainer() {
   const { isEnabled, settings } = useRPG();
@@ -71,6 +72,13 @@ function RPGTrackerContainer() {
       <div style={{ pointerEvents: 'auto' }}>
         <ErrorBoundary>
           <TrackerPanel />
+        </ErrorBoundary>
+      </div>
+
+      {/* 모달 렌더링 추가 */}
+      <div style={{ pointerEvents: 'auto' }}>
+        <ErrorBoundary>
+          <SnapshotModal />
         </ErrorBoundary>
       </div>
     </div>

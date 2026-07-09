@@ -103,10 +103,6 @@ export default function WorldSection() {
     }
 
     const updatedEvt = { ...newEvents[index], [key]: value };
-    if (key === 'name') {
-      const cleanName = value.replace(/[^\p{L}\p{N}_]/gu, '_').replace(/_+/g, '_').replace(/^_+|_+$/g, '');
-      updatedEvt.id = cleanName ? `event_${cleanName}` : `event_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-    }
 
     newEvents[index] = updatedEvt;
     handleUpdate({ events: newEvents });

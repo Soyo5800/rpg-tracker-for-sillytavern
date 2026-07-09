@@ -2,12 +2,13 @@
 import React, { useState, useEffect } from 'react';
 import { useRPG } from '../core/RPGControl';
 import styles from './PromptEditor.module.css';
-import { 
-  DEFAULT_PROMPT_HEADER_MERGED, 
-  DEFAULT_PROMPT_FOOTER_MERGED, 
-  DEFAULT_PROMPT_HEADER_SEP, 
-  DEFAULT_PROMPT_FOOTER_SEP, 
-  getDefaultCharacters, 
+import {
+  DEFAULT_PROMPT_HEADER_MERGED,
+  DEFAULT_PROMPT_FOOTER_MERGED,
+  DEFAULT_PROMPT_HEADER_SEP,
+  DEFAULT_PROMPT_FOOTER_SEP,
+  DEFAULT_READONLY_CONTEXT_HEADER,
+  getDefaultCharacters,
   DEFAULT_GUIDE_PROMPTS,
   DEFAULT_ADD_CHAR_PROMPT,
   DEFAULT_ADD_PLAYER_CHAR_PROMPT
@@ -17,9 +18,10 @@ import { getDynamicSchemaExample } from '../core/ActivePrompt';
 export default function PromptEditor({ onClose }) {
   const { trackerData, updateTrackerData, isChatConnected } = useRPG();
   const [activeTab, setActiveTab] = useState('system'); // 'system', 'addons', 'definitions'
-  
+
   const [localMergedHeader, setLocalMergedHeader] = useState('');
   const [localMergedFooter, setLocalMergedFooter] = useState('');
+  const [localReadOnlyPrompt, setLocalReadOnlyPrompt] = useState('');
   const [localSepHeader, setLocalSepHeader] = useState('');
   const [localSepFooter, setLocalSepFooter] = useState('');
 
@@ -30,12 +32,16 @@ export default function PromptEditor({ onClose }) {
   const [playerCharNameInput, setPlayerCharNameInput] = useState('');
 
   const [isEditMerged, setIsEditMerged] = useState(false);
+  const [isEditReadOnly, setIsEditReadOnly] = useState(false);
   const [isEditSep, setIsEditSep] = useState(false);
   const [isEditAddChar, setIsEditAddChar] = useState(false);
   const [isEditAddPlayerChar, setIsEditAddPlayerChar] = useState(false);
 
-  const [isMergedOpen, setIsMergedOpen] = useState(true);
+  // 시스템 프롬프트 에디터 아코디언 기본 상태를 전부 닫힘(false)으로 수정
+  const [isMergedOpen, setIsMergedOpen] = useState(false);
+  const [isReadOnlyOpen, setIsReadOnlyOpen] = useState(false);
   const [isSepOpen, setIsSepOpen] = useState(false);
+
   const [isSchemaOpen, setIsSchemaOpen] = useState(true);
   const [isAddCharOpen, setIsAddCharOpen] = useState(false);
   const [isAddPlayerCharOpen, setIsAddPlayerCharOpen] = useState(false);
@@ -57,11 +63,11 @@ export default function PromptEditor({ onClose }) {
       (char.statusSchema || []).forEach(s => {
         if (s.name) status.add(s.name);
       });
-      
+
       if (char.profile) {
         Object.keys(char.profile).forEach(k => profiles.add(k));
       }
-      
+
       if (char.relations) {
         Object.values(char.relations).forEach(rel => {
           if (rel.values) {
@@ -81,18 +87,17 @@ export default function PromptEditor({ onClose }) {
   const uniqueFields = getUniqueFields();
 
   useEffect(() => {
-    // Migration logic for old systemPrompt to header/footer
     setLocalMergedHeader(trackerData.systemPromptHeader_merged ?? DEFAULT_PROMPT_HEADER_MERGED);
     setLocalMergedFooter(trackerData.systemPromptFooter_merged ?? DEFAULT_PROMPT_FOOTER_MERGED);
+    setLocalReadOnlyPrompt(trackerData.systemPrompt_readonly ?? DEFAULT_READONLY_CONTEXT_HEADER);
     setLocalSepHeader(trackerData.systemPromptHeader_separated ?? DEFAULT_PROMPT_HEADER_SEP);
     setLocalSepFooter(trackerData.systemPromptFooter_separated ?? DEFAULT_PROMPT_FOOTER_SEP);
-    
+
     setLocalAddCharPrompt(trackerData.addCharPrompt ?? DEFAULT_ADD_CHAR_PROMPT);
     setLocalAddPlayerCharPrompt(trackerData.addPlayerCharPrompt ?? DEFAULT_ADD_PLAYER_CHAR_PROMPT);
-    
-    // Migration for guide prompts (ensure new 'status' and 'world' exist)
+
     let savedGuides = trackerData.guidePrompts ? [...trackerData.guidePrompts] : JSON.parse(JSON.stringify(DEFAULT_GUIDE_PROMPTS));
-    
+
     DEFAULT_GUIDE_PROMPTS.forEach(defaultGuide => {
       if (!savedGuides.find(g => g.id === defaultGuide.id)) {
         savedGuides.push(defaultGuide);
@@ -150,6 +155,7 @@ export default function PromptEditor({ onClose }) {
       ...trackerData,
       systemPromptHeader_merged: localMergedHeader,
       systemPromptFooter_merged: localMergedFooter,
+      systemPrompt_readonly: localReadOnlyPrompt,
       systemPromptHeader_separated: localSepHeader,
       systemPromptFooter_separated: localSepFooter,
       guidePrompts: localGuidePrompts,
@@ -166,6 +172,7 @@ export default function PromptEditor({ onClose }) {
     const exportData = {
       systemPromptHeader_merged: localMergedHeader,
       systemPromptFooter_merged: localMergedFooter,
+      systemPrompt_readonly: localReadOnlyPrompt,
       systemPromptHeader_separated: localSepHeader,
       systemPromptFooter_separated: localSepFooter,
       guidePrompts: localGuidePrompts,
@@ -201,6 +208,7 @@ export default function PromptEditor({ onClose }) {
         if (importedData && typeof importedData === 'object') {
           if (importedData.systemPromptHeader_merged !== undefined) setLocalMergedHeader(importedData.systemPromptHeader_merged);
           if (importedData.systemPromptFooter_merged !== undefined) setLocalMergedFooter(importedData.systemPromptFooter_merged);
+          if (importedData.systemPrompt_readonly !== undefined) setLocalReadOnlyPrompt(importedData.systemPrompt_readonly);
           if (importedData.systemPromptHeader_separated !== undefined) setLocalSepHeader(importedData.systemPromptHeader_separated);
           if (importedData.systemPromptFooter_separated !== undefined) setLocalSepFooter(importedData.systemPromptFooter_separated);
           if (Array.isArray(importedData.guidePrompts)) setLocalGuidePrompts(importedData.guidePrompts);
@@ -208,7 +216,7 @@ export default function PromptEditor({ onClose }) {
           if (importedData.worldSchema && typeof importedData.worldSchema === 'object') setLocalWorldSchema(importedData.worldSchema);
           if (importedData.addCharPrompt !== undefined) setLocalAddCharPrompt(importedData.addCharPrompt);
           if (importedData.addPlayerCharPrompt !== undefined) setLocalAddPlayerCharPrompt(importedData.addPlayerCharPrompt);
-          
+
           alert("Prompt configurations imported successfully. Click 'Save Changes' to apply.");
         } else {
           alert("Invalid file format. Please import a valid RPG Tracker prompt settings JSON file.");
@@ -231,18 +239,15 @@ export default function PromptEditor({ onClose }) {
     const name = isPlayer ? playerCharNameInput.trim() : charNameInput.trim();
     const basePrompt = isPlayer ? localAddPlayerCharPrompt : localAddCharPrompt;
 
-    // 1. SillyTavern 컨텍스트에서 캐릭터 카드 일치 여부 확인 및 설명문(Description) 확보
     let cardDescription = "";
     try {
       const stContext = window.SillyTavern?.getContext?.();
       if (stContext && name) {
-        // 등록된 모든 캐릭터 카드 목록에서 이름 검색 (대소문자 무시)
         const matchedCard = stContext.characters?.find(
           c => c.name?.toLowerCase() === name.toLowerCase()
         );
-        
+
         if (matchedCard) {
-          // 캐릭터 카드의 핵심 묘사(Description) 및 성격(Personality) 추출
           cardDescription = `\n\n[ORIGINAL CHARACTER CARD DETAILS FOR '${name}']`;
           if (matchedCard.description) cardDescription += `\nDescription:\n${matchedCard.description}`;
           if (matchedCard.personality) cardDescription += `\nPersonality:\n${matchedCard.personality}`;
@@ -252,22 +257,19 @@ export default function PromptEditor({ onClose }) {
       console.warn("SillyTavern context is not fully available or character search failed:", err);
     }
 
-    // 2. 동적 JSON 스키마 예시 빌드
     const schemaExample = getDynamicSchemaExample({ guidePrompts: localGuidePrompts, characters }, isPlayer);
 
-    // 3. 프롬프트 조합 (확보한 카드 설명문이 존재하면 본문에 주입)
     let finalPrompt = "";
     if (name) {
       finalPrompt = `Based on the chat log, create a profile for '${name}' following these guidelines:\n${basePrompt}`;
       if (cardDescription) {
-        finalPrompt += cardDescription; // 캐릭터 카드 원본 정보 주입
+        finalPrompt += cardDescription;
       }
       finalPrompt += `\n\nStrictly output the JSON block following this exact schema layout:\n${schemaExample.trim()}`;
     } else {
       finalPrompt = `Based on the recent chat log, identify a new or existing character that needs a profile and generate one. Guidelines:\n${basePrompt}\n\nStrictly output the JSON block following this exact schema layout:\n${schemaExample.trim()}`;
     }
 
-    // 4. SillyTavern API 브릿지 호출
     if (window.RPGBridge && typeof window.RPGBridge.triggerCharacterGeneration === 'function') {
       alert(`Requesting to add ${isPlayer ? 'Player Character' : 'Character'} '${name || 'Auto-Detect'}'... This may take a moment.`);
       try {
@@ -289,31 +291,30 @@ export default function PromptEditor({ onClose }) {
     }
   };
 
-  // Schema Preview (Dynamic)
   const previewSchema = getDynamicSchemaExample({ guidePrompts: localGuidePrompts, characters });
 
   return (
     <div className={styles.overlay}>
-      <div className={styles.modal} onClick={e => e.stopPropagation()} style={{ width: '600px', maxWidth: '95vw', maxHeight: '90vh' }}>
+      <div className={styles.modal} onClick={e => e.stopPropagation()}>
         <header className={styles.header}>
           <h4>Prompt Editor</h4>
           <button className={styles.closeBtn} onClick={onClose}>×</button>
         </header>
 
         <div className={styles.editorTabs}>
-          <button 
+          <button
             className={`${styles.tabBtn} ${activeTab === 'system' ? styles.tabBtnActive : ''}`}
             onClick={() => setActiveTab('system')}
           >
             System Prompt
           </button>
-          <button 
+          <button
             className={`${styles.tabBtn} ${activeTab === 'addons' ? styles.tabBtnActive : ''}`}
             onClick={() => setActiveTab('addons')}
           >
             Add-ons
           </button>
-          <button 
+          <button
             className={`${styles.tabBtn} ${activeTab === 'definitions' ? styles.tabBtnActive : ''}`}
             onClick={() => setActiveTab('definitions')}
           >
@@ -324,8 +325,8 @@ export default function PromptEditor({ onClose }) {
         <div className={styles.body} style={{ padding: '16px', overflowY: 'auto' }}>
           {activeTab === 'system' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              
-              {/* MERGED MODE */}
+
+              {/* 1. MERGED MODE */}
               <div style={{ border: '1px solid var(--rpg-border)', borderRadius: '4px', padding: '12px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                   <div style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => setIsMergedOpen(!isMergedOpen)}>
@@ -339,7 +340,7 @@ export default function PromptEditor({ onClose }) {
                 </div>
                 {isMergedOpen && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <textarea 
+                    <textarea
                       className={styles.textarea}
                       style={{ minHeight: '140px', opacity: isEditMerged ? 1 : 0.7 }}
                       value={localMergedHeader}
@@ -347,7 +348,7 @@ export default function PromptEditor({ onClose }) {
                       readOnly={!isEditMerged}
                     />
                     <div style={{ fontSize: '11px', textAlign: 'center', opacity: 0.5, color: 'var(--rpg-text)' }}>[Schema Block will be injected here]</div>
-                    <textarea 
+                    <textarea
                       className={styles.textarea}
                       style={{ minHeight: '140px', opacity: isEditMerged ? 1 : 0.7 }}
                       value={localMergedFooter}
@@ -358,12 +359,38 @@ export default function PromptEditor({ onClose }) {
                 )}
               </div>
 
-              {/* SEPARATED MODE */}
+              {/* 2. SEPARATED MODE (매턴 상태값 참조 주입 헤더 설정) */}
+              <div style={{ border: '1px solid var(--rpg-border)', borderRadius: '4px', padding: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <div style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => setIsReadOnlyOpen(!isReadOnlyOpen)}>
+                    <span style={{ color: 'var(--rpg-highlight)' }}>{isReadOnlyOpen ? '▼' : '▶'}</span>
+                    <strong style={{ color: 'var(--rpg-highlight)' }}>System Prompt (Separated Mode)</strong>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button className={styles.cancelBtn} style={{ fontSize: '11px', padding: '4px 10px' }} onClick={() => setLocalReadOnlyPrompt(DEFAULT_READONLY_CONTEXT_HEADER)}>reset</button>
+                    <button className={isEditReadOnly ? styles.saveBtn : styles.cancelBtn} style={{ fontSize: '11px', padding: '4px 10px' }} onClick={() => setIsEditReadOnly(!isEditReadOnly)}>edit</button>
+                  </div>
+                </div>
+                {isReadOnlyOpen && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <textarea
+                      className={styles.textarea}
+                      style={{ minHeight: '160px', opacity: isEditReadOnly ? 1 : 0.7 }}
+                      value={localReadOnlyPrompt}
+                      onChange={e => setLocalReadOnlyPrompt(e.target.value)}
+                      readOnly={!isEditReadOnly}
+                    />
+                    <div style={{ fontSize: '11px', textAlign: 'center', opacity: 0.5, color: 'var(--rpg-text)' }}>[Live RPG Status & Static Definitions will be appended here]</div>
+                  </div>
+                )}
+              </div>
+
+              {/* 3. MANUAL UPDATE MODE (Separated & Isolated 모드용 수동 갱신 프롬프트) */}
               <div style={{ border: '1px solid var(--rpg-border)', borderRadius: '4px', padding: '12px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                   <div style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => setIsSepOpen(!isSepOpen)}>
                     <span style={{ color: 'var(--rpg-highlight)' }}>{isSepOpen ? '▼' : '▶'}</span>
-                    <strong style={{ color: 'var(--rpg-highlight)' }}>System Prompt (Separated Mode)</strong>
+                    <strong style={{ color: 'var(--rpg-highlight)' }}>System Prompt (Manual Update Mode)</strong>
                   </div>
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button className={styles.cancelBtn} style={{ fontSize: '11px', padding: '4px 10px' }} onClick={() => { setLocalSepHeader(DEFAULT_PROMPT_HEADER_SEP); setLocalSepFooter(DEFAULT_PROMPT_FOOTER_SEP); }}>reset</button>
@@ -372,7 +399,7 @@ export default function PromptEditor({ onClose }) {
                 </div>
                 {isSepOpen && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <textarea 
+                    <textarea
                       className={styles.textarea}
                       style={{ minHeight: '140px', opacity: isEditSep ? 1 : 0.7 }}
                       value={localSepHeader}
@@ -380,7 +407,7 @@ export default function PromptEditor({ onClose }) {
                       readOnly={!isEditSep}
                     />
                     <div style={{ fontSize: '11px', textAlign: 'center', opacity: 0.5, color: 'var(--rpg-text)' }}>[Schema Block will be injected here]</div>
-                    <textarea 
+                    <textarea
                       className={styles.textarea}
                       style={{ minHeight: '140px', opacity: isEditSep ? 1 : 0.7 }}
                       value={localSepFooter}
@@ -391,7 +418,7 @@ export default function PromptEditor({ onClose }) {
                 )}
               </div>
 
-              {/* SCHEMA PROMPT */}
+              {/* SCHEMA PROMPT PREVIEW */}
               <div style={{ border: '1px solid var(--rpg-border)', borderRadius: '4px', padding: '12px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                   <div style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => setIsSchemaOpen(!isSchemaOpen)}>
@@ -401,7 +428,7 @@ export default function PromptEditor({ onClose }) {
                 </div>
                 {isSchemaOpen && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <textarea 
+                    <textarea
                       className={styles.textarea}
                       style={{ minHeight: '180px', opacity: 0.8, fontFamily: 'monospace', fontSize: '11px' }}
                       value={previewSchema.trim()}
@@ -409,10 +436,9 @@ export default function PromptEditor({ onClose }) {
                     />
                   </div>
                 )}
-                
-                {/* SWITCHES (Outside the accordion fold but inside Schema block) */}
+
+                {/* SWITCHES */}
                 <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {/* 1. Stats and Profile */}
                   {['status', 'profile'].map(guideId => {
                     const guide = localGuidePrompts.find(g => g.id === guideId);
                     if (!guide) return null;
@@ -420,9 +446,9 @@ export default function PromptEditor({ onClose }) {
                       <div key={guideId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: 'var(--rpg-bg)', border: '1px solid var(--rpg-border)', borderRadius: '4px' }}>
                         <span style={{ fontSize: '13px', color: 'var(--rpg-text)' }}>Update {guideId.charAt(0).toUpperCase() + guideId.slice(1)}</span>
                         <label className={styles.switch} style={{ margin: 0 }}>
-                          <input 
-                            type="checkbox" 
-                            checked={guide.enabled} 
+                          <input
+                            type="checkbox"
+                            checked={guide.enabled}
                             onChange={(e) => handleGuideToggle(guideId, e.target.checked)}
                           />
                           <span className={styles.slider}></span>
@@ -430,8 +456,7 @@ export default function PromptEditor({ onClose }) {
                       </div>
                     );
                   })}
-                  
-                  {/* 2. Relations (Moved to between Profile and Inventory + 2-row layout restored + styling fixed) */}
+
                   {(() => {
                     const guide = localGuidePrompts.find(g => g.id === 'relations');
                     if (!guide) return null;
@@ -440,9 +465,9 @@ export default function PromptEditor({ onClose }) {
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <span style={{ fontSize: '13px', color: 'var(--rpg-text)' }}>Update Relations</span>
                           <label className={styles.switch} style={{ margin: 0 }}>
-                            <input 
-                              type="checkbox" 
-                              checked={guide.enabled} 
+                            <input
+                              type="checkbox"
+                              checked={guide.enabled}
                               onChange={(e) => handleGuideToggle('relations', e.target.checked)}
                             />
                             <span className={styles.slider}></span>
@@ -450,7 +475,7 @@ export default function PromptEditor({ onClose }) {
                         </div>
                         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                           <span style={{ fontSize: '11px', color: 'var(--rpg-text)', opacity: 0.8, whiteSpace: 'nowrap' }}>Field type</span>
-                          <select 
+                          <select
                             style={{ flex: 1, height: '28px', boxSizing: 'border-box', margin: 0, verticalAlign: 'middle', lineHeight: 'normal', background: 'rgba(0,0,0,0.2)', color: 'var(--rpg-text)', border: '1px solid var(--rpg-border)', borderRadius: '4px', fontSize: '11px', padding: '0 6px', outline: 'none' }}
                             value={localWorldSchema.relationsFieldType || 'integer'}
                             onChange={e => handleWorldSchemaChange('relationsFieldType', e.target.value)}
@@ -464,7 +489,6 @@ export default function PromptEditor({ onClose }) {
                     );
                   })()}
 
-                  {/* 3. Inventory and Quests */}
                   {['inventory', 'quests'].map(guideId => {
                     const guide = localGuidePrompts.find(g => g.id === guideId);
                     if (!guide) return null;
@@ -472,9 +496,9 @@ export default function PromptEditor({ onClose }) {
                       <div key={guideId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: 'var(--rpg-bg)', border: '1px solid var(--rpg-border)', borderRadius: '4px' }}>
                         <span style={{ fontSize: '13px', color: 'var(--rpg-text)' }}>Update {guideId.charAt(0).toUpperCase() + guideId.slice(1)}</span>
                         <label className={styles.switch} style={{ margin: 0 }}>
-                          <input 
-                            type="checkbox" 
-                            checked={guide.enabled} 
+                          <input
+                            type="checkbox"
+                            checked={guide.enabled}
                             onChange={(e) => handleGuideToggle(guideId, e.target.checked)}
                           />
                           <span className={styles.slider}></span>
@@ -482,11 +506,10 @@ export default function PromptEditor({ onClose }) {
                       </div>
                     );
                   })}
-                  
-                  {/* 4. World Splitted Rows (2-row format restored, heights and alignment matched) */}
+
                   <div style={{ padding: '12px', background: 'var(--rpg-bg)', border: '1px solid var(--rpg-border)', borderRadius: '4px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     <div style={{ fontWeight: 'bold', fontSize: '13px', color: 'var(--rpg-highlight)', marginBottom: '4px' }}>World State</div>
-                    
+
                     {[
                       { id: 'world_date', name: 'Update Date', selectKey: 'dateSelect', customKey: 'dateCustom', opts: DATE_OPTS },
                       { id: 'world_time', name: 'Update Time', selectKey: 'timeSelect', customKey: 'timeCustom', opts: TIME_OPTS },
@@ -496,28 +519,26 @@ export default function PromptEditor({ onClose }) {
                       if (!guide) return null;
                       return (
                         <div key={f.id} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                          {/* Row 1: Label & Switch */}
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <span style={{ fontSize: '13px', color: 'var(--rpg-text)' }}>{f.name}</span>
                             <label className={styles.switch} style={{ margin: 0 }}>
-                              <input 
-                                type="checkbox" 
-                                checked={guide.enabled} 
+                              <input
+                                type="checkbox"
+                                checked={guide.enabled}
                                 onChange={(e) => handleGuideToggle(f.id, e.target.checked)}
                               />
                               <span className={styles.slider}></span>
                             </label>
                           </div>
-                          {/* Row 2: Dropdown & Input (With matched heights and box-sizing) */}
                           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                            <select 
+                            <select
                               style={{ flex: 1, height: '28px', boxSizing: 'border-box', margin: 0, verticalAlign: 'middle', lineHeight: 'normal', background: 'rgba(0,0,0,0.2)', color: 'var(--rpg-text)', border: '1px solid var(--rpg-border)', borderRadius: '4px', fontSize: '11px', padding: '0 6px', outline: 'none' }}
                               value={localWorldSchema[f.selectKey] || '1'}
                               onChange={e => handleWorldSchemaChange(f.selectKey, e.target.value, f.opts)}
                             >
                               {f.opts.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
                             </select>
-                            <input 
+                            <input
                               style={{ flex: 2, height: '28px', boxSizing: 'border-box', margin: 0, verticalAlign: 'middle', lineHeight: 'normal', background: 'rgba(0,0,0,0.2)', color: 'var(--rpg-text)', border: '1px solid var(--rpg-border)', borderRadius: '4px', fontSize: '11px', padding: '0 8px', outline: 'none' }}
                               value={localWorldSchema[f.customKey] || ''}
                               onChange={e => handleWorldSchemaChange(f.customKey, e.target.value)}
@@ -529,7 +550,6 @@ export default function PromptEditor({ onClose }) {
                       );
                     })}
 
-                    {/* Location Row (No Format) */}
                     {(() => {
                       const guide = localGuidePrompts.find(g => g.id === 'world_location');
                       if (!guide) return null;
@@ -537,9 +557,9 @@ export default function PromptEditor({ onClose }) {
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <span style={{ fontSize: '13px', color: 'var(--rpg-text)' }}>Update Location</span>
                           <label className={styles.switch} style={{ margin: 0 }}>
-                            <input 
-                              type="checkbox" 
-                              checked={guide.enabled} 
+                            <input
+                              type="checkbox"
+                              checked={guide.enabled}
                               onChange={(e) => handleGuideToggle('world_location', e.target.checked)}
                             />
                             <span className={styles.slider}></span>
@@ -548,7 +568,6 @@ export default function PromptEditor({ onClose }) {
                       );
                     })()}
 
-                    {/* Events Row */}
                     {(() => {
                       const guide = localGuidePrompts.find(g => g.id === 'world_events');
                       if (!guide) return null;
@@ -556,9 +575,9 @@ export default function PromptEditor({ onClose }) {
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <span style={{ fontSize: '13px', color: 'var(--rpg-text)' }}>Update Events</span>
                           <label className={styles.switch} style={{ margin: 0 }}>
-                            <input 
-                              type="checkbox" 
-                              checked={guide.enabled} 
+                            <input
+                              type="checkbox"
+                              checked={guide.enabled}
                               onChange={(e) => handleGuideToggle('world_events', e.target.checked)}
                             />
                             <span className={styles.slider}></span>
@@ -576,7 +595,7 @@ export default function PromptEditor({ onClose }) {
           {activeTab === 'addons' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <p style={{ fontSize: '13px', opacity: 0.8, color: 'var(--rpg-text)' }}>Character Generation</p>
-              
+
               {/* ADD CHARACTER */}
               <div style={{ border: '1px solid var(--rpg-border)', borderRadius: '4px', padding: '12px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
@@ -594,8 +613,8 @@ export default function PromptEditor({ onClose }) {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       <span style={{ fontSize: '12px', color: 'var(--rpg-text)' }}>Target Name (Optional)</span>
-                      <input 
-                        className={styles.defInput} 
+                      <input
+                        className={styles.defInput}
                         style={{ padding: '6px' }}
                         value={charNameInput}
                         onChange={e => setCharNameInput(e.target.value)}
@@ -604,7 +623,7 @@ export default function PromptEditor({ onClose }) {
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       <span style={{ fontSize: '12px', color: 'var(--rpg-text)' }}>Base Prompt</span>
-                      <textarea 
+                      <textarea
                         className={styles.textarea}
                         style={{ minHeight: '80px', opacity: isEditAddChar ? 1 : 0.7 }}
                         value={localAddCharPrompt}
@@ -633,8 +652,8 @@ export default function PromptEditor({ onClose }) {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       <span style={{ fontSize: '12px', color: 'var(--rpg-text)' }}>Target Name (Optional)</span>
-                      <input 
-                        className={styles.defInput} 
+                      <input
+                        className={styles.defInput}
                         style={{ padding: '6px' }}
                         value={playerCharNameInput}
                         onChange={e => setPlayerCharNameInput(e.target.value)}
@@ -643,7 +662,7 @@ export default function PromptEditor({ onClose }) {
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       <span style={{ fontSize: '12px', color: 'var(--rpg-text)' }}>Base Prompt</span>
-                      <textarea 
+                      <textarea
                         className={styles.textarea}
                         style={{ minHeight: '80px', opacity: isEditAddPlayerChar ? 1 : 0.7 }}
                         value={localAddPlayerCharPrompt}
@@ -658,10 +677,10 @@ export default function PromptEditor({ onClose }) {
           )}
 
           {activeTab === 'definitions' && (
-              <div className={styles.section} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', marginTop: '8px' }}>
+            <div className={styles.section} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', marginTop: '8px' }}>
                 <label className={styles.label} style={{ margin: 0 }}>Field Definitions</label>
-                <button 
+                <button
                   onClick={clearDefinitions}
                   style={{ background: 'transparent', border: 'none', color: 'var(--rpg-highlight)', fontSize: '11px', cursor: 'pointer', fontWeight: 'bold' }}
                 >
@@ -672,14 +691,14 @@ export default function PromptEditor({ onClose }) {
 
               {uniqueFields.status.length > 0 && (
                 <div className={styles.defGroup}>
-                   <h5 className={styles.defGroupTitle}>Stat</h5>
-                   {uniqueFields.status.map(f => (
+                  <h5 className={styles.defGroupTitle}>Stat</h5>
+                  {uniqueFields.status.map(f => (
                     <div key={`status_${f}`} className={styles.defRow}>
                       <span className={styles.defLabel}>{f}</span>
-                      <input 
-                        className={styles.defInput} 
-                        value={localDefObj[`status_${f}`] || ''} 
-                        onChange={e => setLocalDefObj({...localDefObj, [`status_${f}`]: e.target.value})} 
+                      <input
+                        className={styles.defInput}
+                        value={localDefObj[`status_${f}`] || ''}
+                        onChange={e => setLocalDefObj({ ...localDefObj, [`status_${f}`]: e.target.value })}
                         placeholder={`Guide for ${f}...`}
                       />
                     </div>
@@ -693,10 +712,10 @@ export default function PromptEditor({ onClose }) {
                   {uniqueFields.profiles.map(f => (
                     <div key={`profile_${f}`} className={styles.defRow}>
                       <span className={styles.defLabel}>{f}</span>
-                      <input 
-                        className={styles.defInput} 
-                        value={localDefObj[`profile_${f}`] || ''} 
-                        onChange={e => setLocalDefObj({...localDefObj, [`profile_${f}`]: e.target.value})} 
+                      <input
+                        className={styles.defInput}
+                        value={localDefObj[`profile_${f}`] || ''}
+                        onChange={e => setLocalDefObj({ ...localDefObj, [`profile_${f}`]: e.target.value })}
                         placeholder={`Guide for ${f}...`}
                       />
                     </div>
@@ -710,10 +729,10 @@ export default function PromptEditor({ onClose }) {
                   {uniqueFields.relations.map(f => (
                     <div key={`relation_${f}`} className={styles.defRow}>
                       <span className={styles.defLabel}>{f}</span>
-                      <input 
-                        className={styles.defInput} 
-                        value={localDefObj[`relation_${f}`] || ''} 
-                        onChange={e => setLocalDefObj({...localDefObj, [`relation_${f}`]: e.target.value})} 
+                      <input
+                        className={styles.defInput}
+                        value={localDefObj[`relation_${f}`] || ''}
+                        onChange={e => setLocalDefObj({ ...localDefObj, [`relation_${f}`]: e.target.value })}
                         placeholder={`Guide for ${f}...`}
                       />
                     </div>
@@ -728,12 +747,12 @@ export default function PromptEditor({ onClose }) {
           <div style={{ display: 'flex', gap: '8px' }}>
             <button className={styles.cancelBtn} style={{ fontSize: '11px', padding: '6px 12px' }} onClick={handleExport}>Export</button>
             <button className={styles.cancelBtn} style={{ fontSize: '11px', padding: '6px 12px' }} onClick={handleImportClick}>Import</button>
-            <input 
-              type="file" 
-              id="prompt-import-file" 
-              accept=".json" 
-              style={{ display: 'none' }} 
-              onChange={handleImportFile} 
+            <input
+              type="file"
+              id="prompt-import-file"
+              accept=".json"
+              style={{ display: 'none' }}
+              onChange={handleImportFile}
             />
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>

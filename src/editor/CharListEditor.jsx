@@ -36,7 +36,6 @@ export default function CharListEditor({ onClose, onOpenStatusEditor }) {
     loadPackagedPresets();
   }, []);
 
-  // Browser localStorage 용량 한계 도달 시 예외를 방지하는 헬퍼 함수
   const safeSaveToLocalStorage = (id, data) => {
     try {
       localStorage.setItem(`rpg_tracker_preset_${id}`, JSON.stringify(data));
@@ -158,7 +157,6 @@ export default function CharListEditor({ onClose, onOpenStatusEditor }) {
 
     if (duplicate) {
       savedId = duplicate.id;
-      // 안전 저장 처리 적용
       if (!safeSaveToLocalStorage(savedId, presetData)) return;
       
       newPresets = currentPresets.map(p =>
@@ -166,7 +164,6 @@ export default function CharListEditor({ onClose, onOpenStatusEditor }) {
       );
     } else {
       savedId = getNextAvailableId(currentPresets.map(p => p.id));
-      // 안전 저장 처리 적용
       if (!safeSaveToLocalStorage(savedId, presetData)) return;
       
       newPresets = [...currentPresets, { id: savedId, name: currentPresetName, type: 'cache' }];
@@ -211,7 +208,6 @@ export default function CharListEditor({ onClose, onOpenStatusEditor }) {
 
         if (preset.data) {
           loadedChars = JSON.parse(JSON.stringify(preset.data));
-          // 안전 저장 처리 적용
           if (!safeSaveToLocalStorage(preset.id, loadedChars)) return;
           
           const currentPresets = settings.presets || [];
@@ -258,29 +254,32 @@ export default function CharListEditor({ onClose, onOpenStatusEditor }) {
     }
   };
 
-  const handleDeletePreset = () => {
-    if (!currentPresetId) {
-      alert("No preset is currently active to delete.");
-      return;
+  // 단독 다이렉트 삭제 및 자동 대체(Fallback) 처리기
+  const handleDeletePresetById = (presetId, presetName, e) => {
+    if (e) {
+      e.stopPropagation(); // 클릭 전파를 막아 뒤에 있는 로드 트리거를 차단
     }
-    const currentPresets = settings.presets || [];
-    const preset = currentPresets.find(p => p.id === currentPresetId);
-    if (!preset) return;
 
-    if (window.confirm(`Are you sure you want to delete preset "${preset.name}"?`)) {
-      localStorage.removeItem(`rpg_tracker_preset_${currentPresetId}`);
+    if (window.confirm(`Are you sure you want to delete preset "${presetName}"?`)) {
+      localStorage.removeItem(`rpg_tracker_preset_${presetId}`);
 
-      const newPresets = currentPresets.filter(p => p.id !== currentPresetId);
+      const currentPresets = settings.presets || [];
+      const newPresets = currentPresets.filter(p => p.id !== presetId);
       updateSettings({ presets: newPresets });
 
-      if (newPresets.length === 0) {
-        const defaultChars = getDefaultCharacters();
-        setCurrentPresetId('');
-        setCurrentPresetName('New Preset');
-        setLocalCharacters(defaultChars);
-      } else {
-        const fallbackPreset = newPresets[0];
-        handleLoadPreset(fallbackPreset.id);
+      // 삭제한 프리셋이 현재 활성 상태인 경우의 대응 처리
+      if (currentPresetId === presetId) {
+        if (newPresets.length === 0) {
+          // 남은 대안 프리셋이 아예 없는 경우 완전히 초기화
+          const defaultChars = getDefaultCharacters();
+          setCurrentPresetId('');
+          setCurrentPresetName('New Preset');
+          setLocalCharacters(defaultChars);
+        } else {
+          // 남은 캐시 목록 중 최상단 프리셋을 즉시 대체 로드
+          const fallbackPreset = newPresets[0];
+          handleLoadPreset(fallbackPreset);
+        }
       }
     }
   };
@@ -312,7 +311,6 @@ export default function CharListEditor({ onClose, onOpenStatusEditor }) {
             type: 'cache'
           };
 
-          // 안전 저장 처리 적용
           if (!safeSaveToLocalStorage(newPresetId, importedData)) return;
 
           const updatedPresets = [...currentPresets, newPresetItem];
@@ -409,17 +407,32 @@ export default function CharListEditor({ onClose, onOpenStatusEditor }) {
                 ) : (
                   totalPresets.map(preset => {
                     const presetType = preset.type === 'file' || preset.type === 'server' ? 'File' : 'Cache';
+                    const isDeletable = preset.type !== 'file' && preset.type !== 'server';
                     return (
-                      <div key={preset.id} className={styles.presetDropdownItem} onClick={() => handleLoadPreset(preset)}>
-                        <span style={{ fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{preset.name}</span>
-                        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                          <span className={styles.charIdBadge} style={{ transform: 'scale(0.85)', margin: 0, flexShrink: 0 }}>
-                            {presetType}
-                          </span>
-                          <span className={styles.charIdBadge} style={{ transform: 'scale(0.85)', margin: 0, flexShrink: 0, opacity: 0.6 }}>
-                            {preset.id}
-                          </span>
+                      <div key={preset.id} className={styles.presetDropdownItem}>
+                        {/* 왼쪽: 로드 클릭 구역 */}
+                        <div className={styles.presetDropdownItemLoadArea} onClick={() => handleLoadPreset(preset)}>
+                          <span className={styles.presetItemName}>{preset.name}</span>
+                          <div className={styles.presetItemBadges}>
+                            <span className={styles.charIdBadge} style={{ transform: 'scale(0.85)', margin: 0, flexShrink: 0 }}>
+                              {presetType}
+                            </span>
+                            <span className={styles.charIdBadge} style={{ transform: 'scale(0.85)', margin: 0, flexShrink: 0, opacity: 0.6 }}>
+                              {preset.id}
+                            </span>
+                          </div>
                         </div>
+                        {/* 오른쪽: 캐시 프리셋 개별 삭제 단추 */}
+                        {isDeletable && (
+                          <button
+                            type="button"
+                            className={styles.presetItemDeleteBtn}
+                            title="Delete Preset"
+                            onClick={(e) => handleDeletePresetById(preset.id, preset.name, e)}
+                          >
+                            ×
+                          </button>
+                        )}
                       </div>
                     );
                   })
@@ -442,14 +455,6 @@ export default function CharListEditor({ onClose, onOpenStatusEditor }) {
             onClick={() => setShowDropdown(!showDropdown)}
           >
             <PresetLoadIcon />
-          </button>
-          <button
-            type="button"
-            className={`${styles.iconBtn} ${styles.deleteBtn}`}
-            title="Delete Preset"
-            onClick={handleDeletePreset}
-          >
-            ×
           </button>
         </div>
 
