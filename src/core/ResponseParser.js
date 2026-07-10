@@ -92,7 +92,7 @@ export function parseResponse(text) {
   const decodedText = decodeHtmlEntities(text);
 
   // 1순위: 마크다운 코드 블록 + 핵심 키워드가 포함된 경우 (인사말 무시, 텍스트 내 어디서든 추출)
-  const jsonBlockRegex = /(?:\s*<!--(?:RPG_TRACKER)?\s*)?```(?:json|markdown)?\s*\n?(\{[\s\S]*?(?:"status"|"statusSchema"|"stats"|"profile"|"inventory"|"quests"|"Character Name"|"World")[\s\S]*?\})\s*\n?```(?:\s*-->)?/i;
+  const jsonBlockRegex = /(?:\s*<!--(?:RPG_TRACKER)?\s*)?```(?:json|markdown)?\s*\n?(\{[\s\S]*?(?:"status"|"statusSchema"|"stats"|"profile"|"inventory"|"quests"|"Character Name"|"World"|"relations"|"events")[\s\S]*?\})\s*\n?```(?:\s*-->)?/i;
   const match = decodedText.match(jsonBlockRegex);
 
   if (match && match[1]) {
@@ -109,28 +109,28 @@ export function parseResponse(text) {
   // 2순위: 마크다운 없이 <!--RPG_TRACKER...--> HTML 주석으로만 감싸진 객체 (어디서든 추출)
   const commentRegex = /<!--(?:RPG_TRACKER)?\s*(\{[\s\S]*?\})\s*-->/i;
   const commentMatch = decodedText.match(commentRegex);
-  
+
   if (commentMatch && commentMatch[1]) {
     try {
-        const repairedString = repairJson(commentMatch[1]);
-        const patch = JSON.parse(repairedString);
-        const cleanedText = decodedText.replace(commentMatch[0], '').trim();
-        return { cleanedText, patch };
+      const repairedString = repairJson(commentMatch[1]);
+      const patch = JSON.parse(repairedString);
+      const cleanedText = decodedText.replace(commentMatch[0], '').trim();
+      return { cleanedText, patch };
     } catch (e) {
-        console.error("[RPG Tracker] Failed to parse JSON patch from comment:", e);
+      console.error("[RPG Tracker] Failed to parse JSON patch from comment:", e);
     }
   }
 
   // 3순위: 마크다운도 주석도 없는 순수 객체 (매우 보수적으로 문장 맨 앞에 있을 때만 캐치)
   const rawJsonRegex = /^\s*(\{[\s\S]*?\})\s*(?=\n|$)/;
   const rawMatch = decodedText.match(rawJsonRegex);
-  
+
   if (rawMatch && rawMatch[1]) {
     try {
-        const repairedString = repairJson(rawMatch[1]);
-        const patch = JSON.parse(repairedString);
-        const cleanedText = decodedText.replace(rawMatch[0], '').trim();
-        return { cleanedText, patch };
+      const repairedString = repairJson(rawMatch[1]);
+      const patch = JSON.parse(repairedString);
+      const cleanedText = decodedText.replace(rawMatch[0], '').trim();
+      return { cleanedText, patch };
     } catch (e) { }
   }
 

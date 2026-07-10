@@ -11,7 +11,7 @@ export default function CharListEditor({ onClose, onOpenStatusEditor }) {
       ? JSON.parse(JSON.stringify(trackerData.characters))
       : getDefaultCharacters()
   );
-  
+
   const characters = localCharacters;
   const [showDropdown, setShowDropdown] = useState(false);
   const [packagedPresets, setPackagedPresets] = useState([]);
@@ -158,14 +158,14 @@ export default function CharListEditor({ onClose, onOpenStatusEditor }) {
     if (duplicate) {
       savedId = duplicate.id;
       if (!safeSaveToLocalStorage(savedId, presetData)) return;
-      
+
       newPresets = currentPresets.map(p =>
         p.id === duplicate.id ? { id: p.id, name: currentPresetName, type: 'cache' } : p
       );
     } else {
       savedId = getNextAvailableId(currentPresets.map(p => p.id));
       if (!safeSaveToLocalStorage(savedId, presetData)) return;
-      
+
       newPresets = [...currentPresets, { id: savedId, name: currentPresetName, type: 'cache' }];
     }
 
@@ -209,7 +209,7 @@ export default function CharListEditor({ onClose, onOpenStatusEditor }) {
         if (preset.data) {
           loadedChars = JSON.parse(JSON.stringify(preset.data));
           if (!safeSaveToLocalStorage(preset.id, loadedChars)) return;
-          
+
           const currentPresets = settings.presets || [];
           const updatedPresets = currentPresets.map(p => {
             if (p.id === preset.id) {
@@ -230,7 +230,7 @@ export default function CharListEditor({ onClose, onOpenStatusEditor }) {
           }
         } else if (preset.type === 'file' || preset.type === 'server') {
           const fileName = preset.file || `${preset.id}.json`;
-          const response = await fetch(`/scripts/extensions/third-party/rpg-traker-sillytavern/presets/${fileName}`);
+          const response = await fetch(`/scripts/extensions/third-party/rpg-tracker-for-sillytavern/presets/${fileName}`);
           if (response.ok) {
             loadedChars = await response.json();
           } else {
@@ -303,7 +303,7 @@ export default function CharListEditor({ onClose, onOpenStatusEditor }) {
         if (Array.isArray(importedData)) {
           const importedName = file.name.replace(/\.[^/.]+$/, "");
           const currentPresets = settings.presets || [];
-          
+
           const newPresetId = getNextAvailableId(currentPresets.map(p => p.id));
           const newPresetItem = {
             id: newPresetId,
@@ -319,7 +319,7 @@ export default function CharListEditor({ onClose, onOpenStatusEditor }) {
           setLocalCharacters(importedData);
           setCurrentPresetName(importedName);
           setCurrentPresetId(newPresetId);
-          
+
           alert(`Preset "${importedName}" imported and saved to browser cache.`);
         } else {
           alert("Invalid character list structure.");
@@ -336,11 +336,11 @@ export default function CharListEditor({ onClose, onOpenStatusEditor }) {
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(localCharacters, null, 2));
     const downloadAnchor = document.createElement('a');
     downloadAnchor.setAttribute("href", dataStr);
-    
+
     const fileName = `${currentPresetName.trim().replace(/[/\\?%*:|"<>. ]/g, '_') || 'rpg_preset'}.json`;
     downloadAnchor.setAttribute("download", fileName);
     document.body.appendChild(downloadAnchor);
-    
+
     downloadAnchor.click();
     downloadAnchor.remove();
   };
@@ -500,22 +500,22 @@ export default function CharListEditor({ onClose, onOpenStatusEditor }) {
               Reset
             </button>
           </div>
-          
-          <input 
-            type="file" 
-            id="hidden-preset-file-picker" 
-            accept=".json" 
-            style={{ display: 'none' }} 
-            onChange={handleImportLocalFile} 
+
+          <input
+            type="file"
+            id="hidden-preset-file-picker"
+            accept=".json"
+            style={{ display: 'none' }}
+            onChange={handleImportLocalFile}
           />
 
           <div className={styles.footerRight}>
             <button type="button" className={styles.footerBtn} onClick={handleExportLocalFile}>
               Export
             </button>
-            <button 
-              type="button" 
-              className={styles.footerBtn} 
+            <button
+              type="button"
+              className={styles.footerBtn}
               style={{ margin: '0 6px' }}
               onClick={() => document.getElementById('hidden-preset-file-picker').click()}
             >

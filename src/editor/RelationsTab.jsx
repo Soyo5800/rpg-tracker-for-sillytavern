@@ -1,4 +1,4 @@
-// src/editor/tabs/RelationsTab.jsx
+// src/editor/RelationsTab.jsx
 import React, { useState } from 'react';
 import styles from './StatusEditor.module.css';
 
@@ -10,7 +10,6 @@ export default function RelationsTab({
   const [relationMin, setRelationMin] = useState(-100);
   const [relationMax, setRelationMax] = useState(100);
 
-  // [1] 내 관점 수정 핸들러 (내 데이터를 갱신)
   const handleUpdateRelations = (targetName, action, data) => {
     setLocalCharacters(localCharacters.map(c => {
       if (c.id !== charId) return c;
@@ -63,13 +62,11 @@ export default function RelationsTab({
     }));
   };
 
-  // [2] 상대방 관점 수정 핸들러 (실제 상대 캐릭터 카드 혹은 나의 targetText 갱신)
   const handleUpdateTargetRelation = (targetName, action, data) => {
     const targetCharObj = localCharacters.find(c => (c.name || '').trim().toLowerCase() === targetName.trim().toLowerCase());
     const myName = targetChar.name || 'New Character';
 
     setLocalCharacters(localCharacters.map(c => {
-      // 케이스 A: 상대방이 실존하는 캐릭터인 경우 -> 상대방 캐릭터 카드의 관계 객체에 직접 기록
       if (targetCharObj && c.id === targetCharObj.id) {
         const nextRelations = { ...(c.relations || {}) };
         const myDataInTarget = nextRelations[myName] 
@@ -105,7 +102,6 @@ export default function RelationsTab({
         return { ...c, relations: nextRelations };
       }
 
-      // 케이스 B: 상대가 카드가 없는 가상의 단역 NPC인 경우 -> 내 카드에 임시 예비 저장 (targetText/targetValues)
       if (!targetCharObj && c.id === charId) {
         const nextRelations = { ...(c.relations || {}) };
         const targetData = nextRelations[targetName] 
@@ -181,7 +177,7 @@ export default function RelationsTab({
   return (
     <div className={styles.relationsTabBody}>
       <div className={styles.tabHeaderRow}>
-        <span>Relations Schema & Values</span>
+        <span>Relations</span>
         <div className={styles.flexCenterGroup}>
           <select
             value={relationPreset}
@@ -218,7 +214,6 @@ export default function RelationsTab({
         <p className={styles.emptySectionText}>No relations recorded.</p>
       ) : (
         relationsList.map(([targetName, data], rIdx) => {
-          // 초기 진입 시 기본적으로 모두 접혀있도록(falsy 평가 시 collapsed 처리) 수정
           const isExpanded = !!expandedIds[`relation_${targetName}`];
           const existingCharNames = localCharacters.map(c => c.name?.trim().toLowerCase());
           const isRealCharacter = existingCharNames.includes(targetName?.trim().toLowerCase());
@@ -291,7 +286,7 @@ export default function RelationsTab({
 
               {isExpanded && (
                 <>
-                  {/* 주체 ➔ 대상 수정 영역 */}
+                  {/* 주체 ➔ 대상 영역 */}
                   <div className={styles.sectionWrapper} style={{ borderLeft: '3px solid var(--rpg-text)', marginBottom: '10px' }}>
                     <div className={styles.sectionHeaderLine}>
                       <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--rpg-text)' }}>{targetChar.name} ➔ {targetName}</span>
@@ -313,41 +308,66 @@ export default function RelationsTab({
 
                     {Object.entries(data.values || {}).map(([mName, mVal]) => {
                       const isObj = typeof mVal === 'object' && mVal !== null;
+                      const mValue = isObj ? mVal.value : mVal;
                       const mMin = isObj && mVal.min !== undefined ? mVal.min : -100;
                       const mMax = isObj && mVal.max !== undefined ? mVal.max : 100;
                       const mColorNegative = isObj && mVal.colorNegative ? mVal.colorNegative : '#e74c3c';
                       const mColorPositive = isObj && mVal.colorPositive ? mVal.colorPositive : '#2ecc71';
 
                       return (
-                        <div key={mName} className={styles.relationInputRow} style={{ marginTop: '4px' }}>
-                          <input
-                            type="text"
-                            defaultValue={mName}
-                            onBlur={e => {
-                              const trimmed = e.target.value.trim();
-                              if (!trimmed) { e.target.value = mName; return; }
-                              const cleanId = trimmed.replace(/[^\p{L}\p{N}_]/gu, '_').replace(/_+/g, '_').replace(/^_+|_+$/g, '');
-                              const newId = cleanId || `NewMetric_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-                              if (newId !== mName) {
-                                if ((data.values || {})[newId] !== undefined) { alert(`Metric "${trimmed}" exists.`); e.target.value = mName; return; }
-                                handleUpdateRelations(targetName, 'renameMetric', { oldKey: mName, newKey: newId });
-                              }
-                            }}
-                            className={styles.metricNameInput}
-                          />
-                          <div className={styles.flexItemLine}>
-                            <div className={styles.flexCenterGroupSmall}><span className={styles.metricLimitLabel}>Min:</span><input type="number" value={mMin} onChange={e => handleUpdateRelations(targetName, 'updateMetricConfig', { metric: mName, config: { min: Number(e.target.value) } })} className={styles.metricLimitInput} /></div>
-                            <div className={styles.flexCenterGroupSmall}><span className={styles.metricLimitLabel}>Max:</span><input type="number" value={mMax} onChange={e => handleUpdateRelations(targetName, 'updateMetricConfig', { metric: mName, config: { max: Number(e.target.value) } })} className={styles.metricLimitInput} /></div>
-                            <div className={styles.flexCenterGroupSmall} title="Negative Color"><span className={styles.metricLimitLabel}>Col(-):</span><input type="color" value={mColorNegative} onChange={e => handleUpdateRelations(targetName, 'updateMetricConfig', { metric: mName, config: { colorNegative: e.target.value } })} className={styles.colorPickerInput} /></div>
-                            <div className={styles.flexCenterGroupSmall} title="Positive Color"><span className={styles.metricLimitLabel}>Col(+):</span><input type="color" value={mColorPositive} onChange={e => handleUpdateRelations(targetName, 'updateMetricConfig', { metric: mName, config: { colorPositive: e.target.value } })} className={styles.colorPickerInput} /></div>
+                        <div key={mName} className={styles.metricBlock} style={{ marginTop: '6px' }}>
+                          {/* Row 1: 명칭 (왼쪽 정렬) / 현재값 + 삭제버튼 (오른쪽 끝 정렬) */}
+                          <div className={styles.metricHeaderRow}>
+                            <input
+                              type="text"
+                              defaultValue={mName}
+                              onBlur={e => {
+                                const trimmed = e.target.value.trim();
+                                if (!trimmed) { e.target.value = mName; return; }
+                                const cleanId = trimmed.replace(/[^\p{L}\p{N}_]/gu, '_').replace(/_+/g, '_').replace(/^_+|_+$/g, '');
+                                const newId = cleanId || `NewMetric_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+                                if (newId !== mName) {
+                                  if ((data.values || {})[newId] !== undefined) { alert(`Metric "${trimmed}" exists.`); e.target.value = mName; return; }
+                                  handleUpdateRelations(targetName, 'renameMetric', { oldKey: mName, newKey: newId });
+                                }
+                              }}
+                              className={styles.metricNameInput}
+                            />
+                            <div className={styles.metricValueGroup}>
+                              <input
+                                type="number"
+                                value={mValue !== undefined ? mValue : 0}
+                                onChange={e => handleUpdateRelations(targetName, 'updateMetricValue', { field: mName, value: Number(e.target.value) })}
+                                className={styles.metricValueInput}
+                              />
+                              <button type="button" className={styles.removeInlineBtn} onClick={() => handleUpdateRelations(targetName, 'removeMetric', { metric: mName })} style={{ padding: '2px 5px', fontSize: '9px' }}>×</button>
+                            </div>
                           </div>
-                          <button type="button" className={styles.removeInlineBtn} onClick={() => handleUpdateRelations(targetName, 'removeMetric', { metric: mName })}>X</button>
+                          {/* Row 2: 색상 선택기 및 Min, Max 범위 입력 */}
+                          <div className={styles.metricConfigRow}>
+                            <div className={styles.flexCenterGroupSmall} title="Negative Color">
+                              <span className={styles.metricLimitLabel}>Col(-):</span>
+                              <input type="color" value={mColorNegative} onChange={e => handleUpdateRelations(targetName, 'updateMetricConfig', { metric: mName, config: { colorNegative: e.target.value } })} className={styles.colorPickerInput} />
+                            </div>
+                            <div className={styles.flexCenterGroupSmall} title="Positive Color">
+                              <span className={styles.metricLimitLabel}>Col(+):</span>
+                              <input type="color" value={mColorPositive} onChange={e => handleUpdateRelations(targetName, 'updateMetricConfig', { metric: mName, config: { colorPositive: e.target.value } })} className={styles.colorPickerInput} />
+                            </div>
+                            <div className={styles.flexCenterGroupSmall}>
+                              <span className={styles.metricLimitLabel}>Min:</span>
+                              <input type="number" value={mMin} onChange={e => handleUpdateRelations(targetName, 'updateMetricConfig', { metric: mName, config: { min: Number(e.target.value) } })} className={styles.metricLimitInput} />
+                            </div>
+                            <div className={styles.flexCenterGroupSmall}>
+                              <span className={styles.metricLimitLabel}>Max:</span>
+                              <input type="number" value={mMax} onChange={e => handleUpdateRelations(targetName, 'updateMetricConfig', { metric: mName, config: { max: Number(e.target.value) } })} className={styles.metricLimitInput} />
+                            </div>
+                          </div>
                         </div>
                       );
                     })}
                   </div>
 
-                  {/* 대상 ➔ 주체 수정 영역 */}
+                  {/* 대상 ➔ 주체 영역 */}
                   <div className={styles.sectionWrapper} style={{ borderLeft: '3px solid var(--rpg-text)' }}>
                     <div className={styles.sectionHeaderLine}>
                       <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--rpg-text)' }}>{targetName} ➔ {targetChar.name}</span>
@@ -369,35 +389,60 @@ export default function RelationsTab({
 
                     {Object.entries(targetMetricsSource || {}).map(([tmName, tmVal]) => {
                       const isObj = typeof tmVal === 'object' && tmVal !== null;
+                      const tmValue = isObj ? tmVal.value : tmVal;
                       const tmMin = isObj && tmVal.min !== undefined ? tmVal.min : -100;
                       const tmMax = isObj && tmVal.max !== undefined ? tmVal.max : 100;
                       const tmColorNegative = isObj && tmVal.colorNegative ? tmVal.colorNegative : '#e74c3c';
                       const tmColorPositive = isObj && tmVal.colorPositive ? tmVal.colorPositive : '#2ecc71';
 
                       return (
-                        <div key={tmName} className={styles.relationInputRow} style={{ marginTop: '4px' }}>
-                          <input
-                            type="text"
-                            defaultValue={tmName}
-                            onBlur={e => {
-                              const trimmed = e.target.value.trim();
-                              if (!trimmed) { e.target.value = tmName; return; }
-                              const cleanId = trimmed.replace(/[^\p{L}\p{N}_]/gu, '_').replace(/_+/g, '_').replace(/^_+|_+$/g, '');
-                              const newId = cleanId || `NewMetric_${Date.now()}`;
-                              if (newId !== tmName) {
-                                if ((targetMetricsSource || {})[newId] !== undefined) { alert(`Metric "${trimmed}" exists.`); e.target.value = tmName; return; }
-                                handleUpdateTargetRelation(targetName, 'renameMetric', { oldKey: tmName, newKey: newId });
-                              }
-                            }}
-                            className={styles.metricNameInput}
-                          />
-                          <div className={styles.flexItemLine}>
-                            <div className={styles.flexCenterGroupSmall}><span className={styles.metricLimitLabel}>Min:</span><input type="number" value={tmMin} onChange={e => handleUpdateTargetRelation(targetName, 'updateMetricValue', { field: tmName, value: Number(e.target.value) })} className={styles.metricLimitInput} /></div>
-                            <div className={styles.flexCenterGroupSmall}><span className={styles.metricLimitLabel}>Max:</span><input type="number" value={tmMax} onChange={e => handleUpdateTargetRelation(targetName, 'updateMetricValue', { field: tmName, value: Number(e.target.value) })} className={styles.metricLimitInput} /></div>
-                            <div className={styles.flexCenterGroupSmall} title="Negative Color"><span className={styles.metricLimitLabel}>Col(-):</span><input type="color" value={tmColorNegative} onChange={e => handleUpdateTargetRelation(targetName, 'updateMetricConfig', { metric: tmName, config: { colorNegative: e.target.value } })} className={styles.colorPickerInput} /></div>
-                            <div className={styles.flexCenterGroupSmall} title="Positive Color"><span className={styles.metricLimitLabel}>Col(+):</span><input type="color" value={tmColorPositive} onChange={e => handleUpdateTargetRelation(targetName, 'updateMetricConfig', { metric: tmName, config: { colorPositive: e.target.value } })} className={styles.colorPickerInput} /></div>
+                        <div key={tmName} className={styles.metricBlock} style={{ marginTop: '6px' }}>
+                          {/* Row 1: 명칭 (왼쪽 정렬) / 현재값 + 삭제버튼 (오른쪽 끝 정렬) */}
+                          <div className={styles.metricHeaderRow}>
+                            <input
+                              type="text"
+                              defaultValue={tmName}
+                              onBlur={e => {
+                                const trimmed = e.target.value.trim();
+                                if (!trimmed) { e.target.value = tmName; return; }
+                                const cleanId = trimmed.replace(/[^\p{L}\p{N}_]/gu, '_').replace(/_+/g, '_').replace(/^_+|_+$/g, '');
+                                const newId = cleanId || `NewMetric_${Date.now()}`;
+                                if (newId !== tmName) {
+                                  if ((targetMetricsSource || {})[newId] !== undefined) { alert(`Metric "${trimmed}" exists.`); e.target.value = tmName; return; }
+                                  handleUpdateTargetRelation(targetName, 'renameMetric', { oldKey: tmName, newKey: newId });
+                                }
+                              }}
+                              className={styles.metricNameInput}
+                            />
+                            <div className={styles.metricValueGroup}>
+                              <input
+                                type="number"
+                                value={tmValue !== undefined ? tmValue : 0}
+                                onChange={e => handleUpdateTargetRelation(targetName, 'updateMetricValue', { field: tmName, value: Number(e.target.value) })}
+                                className={styles.metricValueInput}
+                              />
+                              <button type="button" className={styles.removeInlineBtn} onClick={() => handleUpdateTargetRelation(targetName, 'removeMetric', { metric: tmName })} style={{ padding: '2px 5px', fontSize: '9px' }}>×</button>
+                            </div>
                           </div>
-                          <button type="button" className={styles.removeInlineBtn} onClick={() => handleUpdateTargetRelation(targetName, 'removeMetric', { metric: tmName })}>X</button>
+                          {/* Row 2: 색상 선택기 및 Min, Max 범위 입력 */}
+                          <div className={styles.metricConfigRow}>
+                            <div className={styles.flexCenterGroupSmall} title="Negative Color">
+                              <span className={styles.metricLimitLabel}>Col(-):</span>
+                              <input type="color" value={tmColorNegative} onChange={e => handleUpdateTargetRelation(targetName, 'updateMetricConfig', { metric: tmName, config: { colorNegative: e.target.value } })} className={styles.colorPickerInput} />
+                            </div>
+                            <div className={styles.flexCenterGroupSmall} title="Positive Color">
+                              <span className={styles.metricLimitLabel}>Col(+):</span>
+                              <input type="color" value={tmColorPositive} onChange={e => handleUpdateTargetRelation(targetName, 'updateMetricConfig', { metric: tmName, config: { colorPositive: e.target.value } })} className={styles.colorPickerInput} />
+                            </div>
+                            <div className={styles.flexCenterGroupSmall}>
+                              <span className={styles.metricLimitLabel}>Min:</span>
+                              <input type="number" value={tmMin} onChange={e => handleUpdateTargetRelation(targetName, 'updateMetricConfig', { metric: tmName, config: { min: Number(e.target.value) } })} className={styles.metricLimitInput} />
+                            </div>
+                            <div className={styles.flexCenterGroupSmall}>
+                              <span className={styles.metricLimitLabel}>Max:</span>
+                              <input type="number" value={tmMax} onChange={e => handleUpdateTargetRelation(targetName, 'updateMetricConfig', { metric: tmName, config: { max: Number(e.target.value) } })} className={styles.metricLimitInput} />
+                            </div>
+                          </div>
                         </div>
                       );
                     })}

@@ -57,8 +57,8 @@ export const getDefaultCharacters = () => {
         equipIsInject: true,
         storageIsLocked: false,
         storageIsInject: true,
-        equipmentLocks: {}, // 슬롯 단위의 미세 제어 잠금
-        storageLocks: {},   // 컨테이너 단위의 미세 제어 잠금
+        equipmentLocks: {},
+        storageLocks: {},
         equipment: { 'Right Hand': null, 'Left Hand': null },
         storage: { 'Backpack': [] }
       },
@@ -116,12 +116,15 @@ export const getInitialTrackerData = () => {
 
 export const DEFAULT_PROMPT_HEADER_MERGED = `[RPG STATUS TRACKER SYSTEM]
 At the VERY BEGINNING of your response, you MUST output a JSON code block wrapped inside an HTML comment with the 'RPG_TRACKER' identifier.
+CRITICAL: This JSON block must act as a DELTA PATCH containing ONLY parameters or fields that have CHANGED this turn.
 Strictly follow this layout:`;
 
 export const DEFAULT_PROMPT_FOOTER_MERGED = `[SYSTEM RULES & GUIDELINES]
-1. ROLE & HYBRID FORMAT: Act as the Game Master. The provided JSON block serves as both the CURRENT STATE and the REQUIRED SCHEMA.
-   - Values containing "<new_value...>" are blank placeholders. You MUST generate and fill in appropriate new data matching the format/type requirements.
-   - Fields containing actual values are the active state. Do NOT output placeholder instructions for these; update their values logically based on narrative events.
+1. ROLE & DELTA PATCHING: Act as the Game Master. The provided JSON represents the CURRENT STATE. You must output a JSON status patch.
+   - You MUST output ONLY the values, metrics, or items that have CHANGED or UPDATED during this turn.
+   - If a status parameter, profile description, or item remains exactly the same as the current reference, completely OMIT it from your JSON response.
+   - If an entire category (like 'profile', 'inventory', 'quests') or an entire character has NO changes, OMIT that object entirely. Do NOT output empty objects (e.g., "inventory": {}).
+   - Value fields containing "<new_value...>" are blank placeholders. Fill them only if relevant to the turn's updates.
 2. REASONING RULES (CRITICAL):
    - STATUS vs PROFILE: STRICT SEPARATION.
      > 'status': ONLY for numerical parameters or game-mechanics (type: consumable, stacking, integer).
@@ -131,9 +134,8 @@ export const DEFAULT_PROMPT_FOOTER_MERGED = `[SYSTEM RULES & GUIDELINES]
    - Minor NPCs: If no separate card exists, update "targetDescription" and "targetMetrics" directly within their relation object.
    - Quests & Events: Use consistent 'name' values to automatically merge updates. Use status "COMPLETED" or "ACTIVE".
    - Inventory: Diligently reflect item gains, losses, and equipment changes. Support standard items ("type": "general"), monetary units ("type": "currency"), and valuable properties ("type": "asset").
-4. LOCKS & OPTIMIZATION:
-   - Absolutely DO NOT change or delete any element listed in '_lockedFields'.
-   - If there are NO updates for a section (like 'inventory', 'quests', or a specific character), completely OMIT that section from the JSON. Do NOT output empty objects like "inventory": {}.
+4. LOCKS & SAFETY:
+   - Absolutely DO NOT change, override, or delete any element listed in '_lockedFields'.
 5. OUTPUT FORMAT (STRICT):
    - The HTML comment block (\`<!--RPG_TRACKER...\`) MUST be the VERY FIRST thing in your response.
    - Absolutely NO conversational filler or prefixes before the JSON block.
@@ -141,19 +143,21 @@ export const DEFAULT_PROMPT_FOOTER_MERGED = `[SYSTEM RULES & GUIDELINES]
 
 export const DEFAULT_PROMPT_HEADER_SEP = `[RPG STATUS TRACKER SYSTEM]
 You MUST output ONLY a JSON code block wrapped inside an HTML comment with the 'RPG_TRACKER' identifier.
+CRITICAL: This JSON block must act as a DELTA PATCH containing ONLY parameters or fields that have CHANGED this turn.
 Strictly follow this layout:`;
 
 export const DEFAULT_PROMPT_FOOTER_SEP = `[SYSTEM RULES & GUIDELINES]
-1. ROLE & HYBRID FORMAT: Act as the Game Master. The provided JSON represents both the CURRENT STATE and the REQUIRED SCHEMA.
-   - Values with "<new_value...>" are placeholders. You MUST generate and fill in valid data replacing the placeholder entirely.
-   - Fields with actual data represent the active state; update them logically if context dictates, maintaining their data format.
+1. ROLE & DELTA PATCHING: Act as the Game Master. The provided JSON represents the CURRENT STATE. You must output a JSON status patch.
+   - You MUST output ONLY the values, metrics, or items that have CHANGED during this turn.
+   - If a status, profile description, or item remains exactly the same, completely OMIT it from your JSON response.
+   - If an entire category or character has no changes, OMIT it completely from the output.
+   - Placeholders containing "<new_value...>" are blank. Fill them only if relevant to the turn's updates.
 2. REASONING RULES (CRITICAL):
    - STATUS vs PROFILE: STRICT SEPARATION.
      > 'status': ONLY numerical parameters.
      > 'profile': ONLY text descriptions.
-3. LOCKS & OPTIMIZATION:
-   - Absolutely DO NOT change or delete any element listed in '_lockedFields'.
-   - Omit entire sections if absolutely NO updates occurred.
+3. LOCKS & SAFETY:
+   - Absolutely DO NOT change, override, or delete any element listed in '_lockedFields'.
 4. OUTPUT LIMIT (STRICT):
    - Output ONLY the JSON HTML comment block.
    - Absolutely NO normal roleplay response, prefixes, conversational filler, or commentary is allowed.`;

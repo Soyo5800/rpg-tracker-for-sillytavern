@@ -51,7 +51,7 @@ export function syncRpgTrackerRegex(enabled) {
         script = {
             id: 'rpg_tracker_json_stripper',
             scriptName: 'RPG Tracker JSON Stripper',
-            findRegex: '```(?:json|markdown)?\\s*\\n?\\{[\\s\\S]*?(?:\"[sS]tatus\"|\"[sS]tatus[sS]chema\"|\"[sS]tats\"|\"[pP]rofile\"|\"[iI]nventory\"|\"[qQ]uests\"|\"[cC]haracter [nN]ame\"|\"[wW]orld\")[\\s\\S]*?\\}\\s*\\n?```\\s*',
+            findRegex: '<!--RPG_TRACKER\\s*```(?:json|markdown)?\\s*\\n?\\{[\\s\\S]*?(?:\"[sS]tatus\"|\"[sS]tatus[sS]chema\"|\"[sS]tats\"|\"[pP]rofile\"|\"[iI]nventory\"|\"[qQ]uests\"|\"[cC]haracter [nN]ame\"|\"[wW]orld\"|\"[rR]elations\"|\"[eE]vents\")[\\s\\S]*?\\}\\s*\\n?```\\s*-->\\s*',
             replaceString: '',
             trimStrings: [],
             placement: [1, 2],
@@ -91,7 +91,7 @@ export function syncRpgTrackerRegex(enabled) {
         commentScript = {
             id: 'rpg_tracker_comment_stripper',
             scriptName: 'RPG Tracker Comment Stripper',
-            findRegex: '<!--RPG_TRACKER\\s*```(?:json|markdown)?\\s*\\n?\\{[\\s\\S]*?(?:\"[sS]tatus\"|\"[sS]tatus[sS]chema\"|\"[sS]tats\"|\"[pP]rofile\"|\"[iI]nventory\"|\"[qQ]uests\"|\"[cC]haracter [nN]ame\"|\"[wW]orld\")[\\s\\S]*?\\}\\s*\\n?```\\s*-->\\s*',
+            findRegex: '<!--RPG_TRACKER\\s*```(?:json|markdown)?\\s*\\n?\\{[\\s\\S]*?(?:\"[sS]tatus\"|\"[sS]tatus[sS]chema\"|\"[sS]tats\"|\"[pP]rofile\"|\"[iI]nventory\"|\"[qQ]uests\"|\"[cC]haracter [nN]ame\"|\"[wW]orld\"|\"[rR]elations\"|\"[eE]vents\")[\\s\\S]*?\\}\\s*\\n?```\\s*-->\\s*',
             replaceString: '',
             trimStrings: [],
             placement: [1, 2],

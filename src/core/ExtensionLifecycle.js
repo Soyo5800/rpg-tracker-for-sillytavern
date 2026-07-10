@@ -1,7 +1,7 @@
 // src/core/ExtensionLifecycle.js
 import { getContext, extension_settings } from "../../../../../extensions.js";
 import { eventSource, event_types, saveChat, saveChatConditional, setExtensionPrompt, extension_prompt_types, extension_prompt_roles } from "../../../../../../script.js";
-import { rehydrateFromHistory, applyLLMPatch } from "./JSONTracker.js";
+import { rehydrateFromHistory, applyLLMPatch, extractNormalizedPatch } from "./JSONTracker.js";
 import { buildDefinitionPromptWrapper, buildStatusPromptWrapper, buildStaticDefinitionsPrompt } from "./ActivePrompt.js";
 import { DEFAULT_PROMPT_HEADER_MERGED, DEFAULT_PROMPT_FOOTER_MERGED, DEFAULT_READONLY_CONTEXT_HEADER } from "./PromptSchema.js";
 import { parseResponse } from "./ResponseParser.js";
@@ -74,11 +74,14 @@ export function registerLifecycleEvents(extensionName) {
 
                 if (patch && Object.keys(patch).length > 0) {
                     lastMessage.mes = cleanedText;
-                    setDeltaLog(lastMessage, patch);
+                    
+                    // 수신된 패치 데이터 구조 정규화 후 로그에 반영
+                    const normPatch = extractNormalizedPatch(patch);
+                    setDeltaLog(lastMessage, normPatch);
 
                     const trackerData = window.RPGBridge?.currentTrackerData || rehydrateFromHistory(context.chat);
                     if (trackerData && Array.isArray(trackerData.characters)) {
-                        const updatedData = applyLLMPatch(trackerData, patch);
+                        const updatedData = applyLLMPatch(trackerData, normPatch);
                         if (window.RPGBridge && typeof window.RPGBridge.syncChatData === 'function') {
                             window.RPGBridge.syncChatData(updatedData);
                         }

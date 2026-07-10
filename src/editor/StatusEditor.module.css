@@ -463,13 +463,57 @@
   color: var(--rpg-text) !important;
 }
 
-.relationInputRow {
+/* 관계 수치 조정을 위한 메트릭 단위 블록 */
+.metricBlock {
+  background: rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 5px;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.metricHeaderRow {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  width: 100%;
   gap: 8px;
-  background: rgba(0, 0, 0, 0.15);
+}
+
+.metricValueGroup {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.metricValueInput {
+  width: 48px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--rpg-border);
+  color: var(--rpg-text);
+  padding: 4px;
   border-radius: 4px;
-  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: bold;
+  text-align: center;
+  outline: none;
+}
+
+.metricValueInput:focus {
+  border-color: var(--rpg-highlight) !important;
+}
+
+.metricConfigRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  width: 100%;
+  border-top: 1px dashed rgba(255, 255, 255, 0.05);
+  padding-top: 4px;
 }
 
 .invActionBar {

@@ -565,18 +565,11 @@ export function syncCrossRelations(characters) {
     }
 }
 
-export function applyLLMPatch(trackerData, patch, isPlayer = false, updateType = 'patch', mutateInPlace = false) {
-    if (!patch || typeof patch !== 'object') return trackerData;
+export function extractNormalizedPatch(patch) {
+    if (!patch || typeof patch !== 'object') return patch;
 
-    const baseData = mutateInPlace ? trackerData : JSON.parse(JSON.stringify(trackerData));
-    const updatedData = sanitizeTrackerData(baseData);
-
-    // ========================================================================
-    // ⚠️ LLM 환각 구조 분해 (Array/Nested Object 방어) 로직 ⚠️
-    // ========================================================================
     let normalizedPatch = patch;
-    
-    // 만약 LLM이 { "characters": [ { name: "Alice", status: ... } ] } 형태로 배열을 뱉은 경우
+
     if (Array.isArray(patch.characters)) {
         normalizedPatch = {};
         patch.characters.forEach(c => {
@@ -585,19 +578,26 @@ export function applyLLMPatch(trackerData, patch, isPlayer = false, updateType =
                 normalizedPatch[name] = rest;
             }
         });
-        // World State 분리 보존
         if (patch.world || patch.worldState || patch.World) {
             normalizedPatch.World = patch.world || patch.worldState || patch.World;
         }
-    } 
-    // 만약 LLM이 { "characters": { "Alice": { status: ... } } } 형태로 감싼 경우
-    else if (patch.characters && typeof patch.characters === 'object') {
+    } else if (patch.characters && typeof patch.characters === 'object') {
         normalizedPatch = { ...patch.characters };
-        // World State 분리 보존
         if (patch.world || patch.worldState || patch.World) {
             normalizedPatch.World = patch.world || patch.worldState || patch.World;
         }
     }
+
+    return normalizedPatch;
+}
+
+export function applyLLMPatch(trackerData, patch, isPlayer = false, updateType = 'patch', mutateInPlace = false) {
+    if (!patch || typeof patch !== 'object') return trackerData;
+
+    const baseData = mutateInPlace ? trackerData : JSON.parse(JSON.stringify(trackerData));
+    const updatedData = sanitizeTrackerData(baseData);
+
+    const normalizedPatch = extractNormalizedPatch(patch);
 
     if (Array.isArray(updatedData.characters)) {
         Object.entries(normalizedPatch).forEach(([charName, rawUpdates]) => {

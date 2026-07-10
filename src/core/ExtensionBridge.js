@@ -2,7 +2,7 @@
 import { getContext, extension_settings } from "../../../../../extensions.js";
 import { saveSettingsDebounced, saveChat, saveChatConditional, updateMessageBlock, getRequestHeaders, generateQuietPrompt } from "../../../../../../script.js";
 import { SlashCommandParser } from "../../../../../slash-commands/SlashCommandParser.js";
-import { backupToMessage, rehydrateFromHistory, rehydrateFromHistoryAsync, applyLLMPatch } from "./JSONTracker.js";
+import { backupToMessage, rehydrateFromHistory, rehydrateFromHistoryAsync, applyLLMPatch, extractNormalizedPatch } from "./JSONTracker.js";
 import { parseResponse } from "./ResponseParser.js";
 import { buildDefinitionPromptWrapper, buildStatusPromptWrapper } from "./ActivePrompt.js";
 import { DEFAULT_PROMPT_HEADER_SEP, DEFAULT_PROMPT_FOOTER_SEP } from "./PromptSchema.js";
@@ -121,11 +121,13 @@ export function establishBridgeConnection(extensionName) {
                     const { patch } = parseResponse(rawOutput);
 
                     if (patch && Object.keys(patch).length > 0) {
-                        const updatedData = applyLLMPatch(trackerData, patch, isPlayer);
+                        // 입력 데이터 정규화 후 패치 적용
+                        const normPatch = extractNormalizedPatch(patch);
+                        const updatedData = applyLLMPatch(trackerData, normPatch, isPlayer);
                         if (typeof window.RPGBridge.syncChatData === 'function') window.RPGBridge.syncChatData(updatedData);
 
                         try {
-                            const sysText = `[RPG Tracker] System has added a new character. <!--RPG_DELTA:${JSON.stringify(patch)}-->`;
+                            const sysText = `[RPG Tracker] System has added a new character. <!--RPG_DELTA:${JSON.stringify(normPatch)}-->`;
                             await SlashCommandParser.commands['sys'].callback({}, sysText);
 
                             const newContext = getContext();
@@ -140,7 +142,7 @@ export function establishBridgeConnection(extensionName) {
 
                                 if (lastSysMsgIdx !== -1) {
                                     const lastSysMsg = newContext.chat[lastSysMsgIdx];
-                                    setDeltaLog(lastSysMsg, patch);
+                                    setDeltaLog(lastSysMsg, normPatch);
                                     safeUpdateMessageBlock(lastSysMsgIdx, lastSysMsg);
                                 }
                             }
@@ -178,11 +180,13 @@ export function establishBridgeConnection(extensionName) {
                     const { patch } = parseResponse(rawOutput);
 
                     if (patch && Object.keys(patch).length > 0) {
-                        const updatedData = applyLLMPatch(trackerData, patch);
+                        // 입력 데이터 정규화 후 패치 적용
+                        const normPatch = extractNormalizedPatch(patch);
+                        const updatedData = applyLLMPatch(trackerData, normPatch);
                         if (typeof window.RPGBridge.syncChatData === 'function') window.RPGBridge.syncChatData(updatedData);
 
                         try {
-                            const sysText = `[RPG Tracker] Status has been manually updated. <!--RPG_DELTA:${JSON.stringify(patch)}-->`;
+                            const sysText = `[RPG Tracker] Status has been manually updated. <!--RPG_DELTA:${JSON.stringify(normPatch)}-->`;
                             await SlashCommandParser.commands['sys'].callback({}, sysText);
 
                             const newContext = getContext();
@@ -197,7 +201,7 @@ export function establishBridgeConnection(extensionName) {
 
                                 if (lastSysMsgIdx !== -1) {
                                     const lastSysMsg = newContext.chat[lastSysMsgIdx];
-                                    setDeltaLog(lastSysMsg, patch);
+                                    setDeltaLog(lastSysMsg, normPatch);
                                     safeUpdateMessageBlock(lastSysMsgIdx, lastSysMsg);
                                 }
                             }

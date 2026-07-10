@@ -10,7 +10,8 @@ export {
 
 export { 
     applyLLMPatch, 
-    syncCrossRelations 
+    syncCrossRelations,
+    extractNormalizedPatch
 } from './JSONTracker_Patcher.js';
 
 export { 

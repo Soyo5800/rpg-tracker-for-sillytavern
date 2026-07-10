@@ -415,7 +415,7 @@ export function buildDynamicValuesPrompt(trackerData) {
 
   if (Object.keys(activeData).length === 0) return '';
 
-  return `\n[RPG Live Status]\n\`\`\`json\n${JSON.stringify(activeData, null, 2)}\n\`\`\`\n`;
+  return `\n[CURRENT RPG STATUS REFERENCE]\n\`\`\`json\n${JSON.stringify(activeData, null, 2)}\n\`\`\`\n`;
 }
 
 export function buildDefinitionPromptWrapper(trackerData, headerPrompt = '', footerPrompt = '', forcePlayer = null) {
