@@ -40,7 +40,7 @@ The core value of this extension is **eliminating the need to manually modify co
 
 ## 🛠️ How to Use
 
-1. **Download and Enable the Extension:** Launch SillyTavern, go to the Extensions menu, click 'Install Extension', enter `https://github.com/Soyo5800/rpg-traker-for-sillytavern` and install. Toggle the **RPG Tracker** checkbox in SillyTavern's extension settings.
+1. **Download and Enable the Extension:** Launch SillyTavern, go to the Extensions menu, click 'Install Extension', enter `https://github.com/Soyo5800/rpg-tracker-for-sillytavern` and install. Toggle the **RPG Tracker** checkbox in SillyTavern's extension settings.
 2. **Connect to Your Chat:** 
    * Click the floating tracker button to open the sidebar panel. (Default position is top-left. You can right-click the button, select **Enable Drag**, and adjust its position.)
    * Enter your chatroom; the tracker will automatically connect. You can check the connection status via the green/red indicator dot next to the RPG Tracker header.
