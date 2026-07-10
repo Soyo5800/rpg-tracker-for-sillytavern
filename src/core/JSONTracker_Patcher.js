@@ -2,13 +2,23 @@ import { getDefaultCharacters } from './PromptSchema.js';
 import { sanitizeTrackerData, cleanIdString, generateUniqueId, parseMetadata } from './JSONTracker_Migrator.js';
 
 function isPlaceholderValue(val) {
-    if (typeof val === 'string' && val.includes('<new_value')) return true;
+    if (typeof val === 'string' && val.toLowerCase().includes('<new_value')) return true;
     return false;
 }
 
-function mergeWorldState(currentWorldState, updates, worldStateLocks) {
+function normalizeKeys(obj) {
+    if (!obj || typeof obj !== 'object') return {};
+    const normalized = {};
+    Object.entries(obj).forEach(([k, v]) => {
+        normalized[k.toLowerCase()] = v;
+    });
+    return normalized;
+}
+
+function mergeWorldState(currentWorldState, rawUpdates, worldStateLocks) {
     const worldState = currentWorldState || { date: '', time: '', location: '', weather: '', events: [] };
     const locks = worldStateLocks || {};
+    const updates = normalizeKeys(rawUpdates);
 
     if (updates.date !== undefined && !locks.date && !isPlaceholderValue(updates.date)) worldState.date = String(updates.date);
     if (updates.time !== undefined && !locks.time && !isPlaceholderValue(updates.time)) worldState.time = String(updates.time);
@@ -23,8 +33,9 @@ function mergeWorldState(currentWorldState, updates, worldStateLocks) {
             if (typeof e === 'string') {
                 desc = e.trim();
             } else if (e && typeof e === 'object') {
-                name = e.name || '';
-                desc = e.desc || '';
+                const normE = normalizeKeys(e);
+                name = normE.name || '';
+                desc = normE.desc || normE.description || '';
             }
             if (!name && !desc) return null;
             if (isPlaceholderValue(name) || isPlaceholderValue(desc)) return null;
@@ -49,15 +60,17 @@ function mergeWorldState(currentWorldState, updates, worldStateLocks) {
     return worldState;
 }
 
-function getOrCreateCharacter(charactersArray, charName, isPlayer, updates) {
+function getOrCreateCharacter(charactersArray, charName, isPlayer, rawUpdates) {
     const cleanCharId = cleanIdString(charName, 'char');
     let charIndex = charactersArray.findIndex(c => c.id === cleanCharId || c.name?.trim().toLowerCase() === charName.trim().toLowerCase());
+
+    const updates = normalizeKeys(rawUpdates);
 
     if (charIndex === -1) {
         const newChar = JSON.parse(JSON.stringify(getDefaultCharacters()[0]));
         newChar.id = cleanCharId;
         newChar.name = charName;
-        newChar.activePlayer = updates.activePlayer !== undefined ? Boolean(updates.activePlayer) : isPlayer;
+        newChar.activePlayer = updates.activeplayer !== undefined ? Boolean(updates.activeplayer) : isPlayer;
 
         newChar.statusSchema = [];
         newChar.status = {};
@@ -76,8 +89,8 @@ function getOrCreateCharacter(charactersArray, charName, isPlayer, updates) {
     }
 
     const char = charactersArray[charIndex];
-    if (updates.activePlayer !== undefined) {
-        char.activePlayer = Boolean(updates.activePlayer);
+    if (updates.activeplayer !== undefined) {
+        char.activePlayer = Boolean(updates.activeplayer);
     }
     return char;
 }
@@ -219,16 +232,28 @@ function mergeCharacterStatus(char, statusUpdates, updateType) {
 
 function mergeCharacterProfile(char, profileUpdates, updateType) {
     char.profileLocks = char.profileLocks || {};
+    char.profile = char.profile || {};
+
+    const actualKeys = {};
+    Object.keys(char.profile).forEach(k => actualKeys[k.toLowerCase()] = k);
 
     const safeStringify = (val) => {
         if (typeof val === 'object' && val !== null) {
-            try {
-                return JSON.stringify(val);
-            } catch (e) {
-                return String(val);
-            }
+            try { return JSON.stringify(val); } catch (e) { return String(val); }
         }
         return String(val);
+    };
+
+    const processProfilePatch = (targetProfile) => {
+        Object.entries(profileUpdates).forEach(([pKey, pVal]) => {
+            if (isPlaceholderValue(pVal)) return;
+            const lowerKey = pKey.toLowerCase();
+            const actualKey = actualKeys[lowerKey] || pKey;
+
+            if (!char.profileLocks[actualKey] && pVal !== undefined && pVal !== null) {
+                targetProfile[actualKey] = safeStringify(pVal);
+            }
+        });
     };
 
     if (updateType === 'replace') {
@@ -236,75 +261,75 @@ function mergeCharacterProfile(char, profileUpdates, updateType) {
         Object.entries(char.profile || {}).forEach(([pKey, pVal]) => {
             if (char.profileLocks[pKey] === true) nextProfile[pKey] = pVal;
         });
-        Object.entries(profileUpdates).forEach(([pKey, pVal]) => {
-            if (isPlaceholderValue(pVal)) return;
-            if (!char.profileLocks[pKey] && pVal !== undefined && pVal !== null) {
-                nextProfile[pKey] = safeStringify(pVal);
-            }
-        });
+        processProfilePatch(nextProfile);
         char.profile = nextProfile;
     } else {
-        char.profile = char.profile || {};
-        Object.entries(profileUpdates).forEach(([pKey, pVal]) => {
-            if (isPlaceholderValue(pVal)) return;
-            if (!char.profileLocks[pKey] && pVal !== undefined && pVal !== null) {
-                char.profile[pKey] = safeStringify(pVal);
-            }
-        });
+        processProfilePatch(char.profile);
     }
 }
 
-function mergeCharacterInventory(char, inventoryUpdates) {
+function mergeCharacterInventory(char, rawInventoryUpdates) {
+    const inventoryUpdates = normalizeKeys(rawInventoryUpdates);
+
     char.inventory = char.inventory || {};
     char.inventory.equipmentLocks = char.inventory.equipmentLocks || {};
     char.inventory.storageLocks = char.inventory.storageLocks || {};
 
     if (inventoryUpdates.equipment && typeof inventoryUpdates.equipment === 'object') {
         char.inventory.equipment = char.inventory.equipment || {};
+        const actualSlots = {};
+        Object.keys(char.inventory.equipment).forEach(k => actualSlots[k.toLowerCase()] = k);
+
         Object.entries(inventoryUpdates.equipment).forEach(([slot, itemVal]) => {
             if (isPlaceholderValue(itemVal)) return;
-
-            const isSlotLocked = char.inventory.equipIsLocked || char.inventory.equipmentLocks[slot] === true;
+            
+            const actualSlot = actualSlots[slot.toLowerCase()] || slot;
+            const isSlotLocked = char.inventory.equipIsLocked || char.inventory.equipmentLocks[actualSlot] === true;
             if (isSlotLocked) return;
 
             if (itemVal === 'Empty' || !itemVal) {
-                char.inventory.equipment[slot] = null;
+                char.inventory.equipment[actualSlot] = null;
             } else {
                 const isObj = typeof itemVal === 'object' && itemVal !== null;
-                const itemType = isObj ? (itemVal.type || 'general') : 'general';
+                const normItem = isObj ? normalizeKeys(itemVal) : {};
+                const itemType = isObj ? (normItem.type || 'general') : 'general';
                 const baseItem = {
-                    id: (isObj && itemVal.id) || `item_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-                    name: isObj ? (itemVal.name || 'Unknown') : String(itemVal),
+                    id: (isObj && normItem.id) || `item_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+                    name: isObj ? (normItem.name || 'Unknown') : String(itemVal),
                     type: itemType,
-                    desc: isObj ? (itemVal.desc || itemVal.description || '') : ''
+                    desc: isObj ? (normItem.desc || normItem.description || '') : ''
                 };
 
                 if (itemType === 'currency') {
-                    baseItem.quantity = isObj && itemVal.quantity !== undefined ? itemVal.quantity : 0;
+                    baseItem.quantity = isObj && normItem.quantity !== undefined ? normItem.quantity : 0;
                     delete baseItem.desc;
                 } else if (itemType === 'asset') {
-                    baseItem.assetValue = isObj && itemVal.assetValue ? itemVal.assetValue : { amount: 0, currencyName: 'Gold' };
+                    baseItem.assetValue = isObj && normItem.assetvalue ? normItem.assetvalue : { amount: 0, currencyName: 'Gold' };
                 } else {
-                    baseItem.quantity = isObj && itemVal.quantity !== undefined ? itemVal.quantity : 1;
+                    baseItem.quantity = isObj && normItem.quantity !== undefined ? normItem.quantity : 1;
                 }
 
-                if (isObj && itemVal.isContainer) {
+                if (isObj && normItem.iscontainer) {
                     baseItem.isContainer = true;
-                    baseItem.storageKey = itemVal.storageKey;
+                    baseItem.storageKey = normItem.storagekey;
                 }
-                char.inventory.equipment[slot] = baseItem;
+                char.inventory.equipment[actualSlot] = baseItem;
             }
         });
     }
 
     if (inventoryUpdates.storage && typeof inventoryUpdates.storage === 'object') {
         char.inventory.storage = char.inventory.storage || {};
+        const actualContainers = {};
+        Object.keys(char.inventory.storage).forEach(k => actualContainers[k.toLowerCase()] = k);
+
         Object.entries(inventoryUpdates.storage).forEach(([container, items]) => {
-            const isContainerLocked = char.inventory.storageIsLocked || char.inventory.storageLocks[container] === true;
+            const actualContainer = actualContainers[container.toLowerCase()] || container;
+            const isContainerLocked = char.inventory.storageIsLocked || char.inventory.storageLocks[actualContainer] === true;
             if (isContainerLocked) return;
 
             if (Array.isArray(items)) {
-                char.inventory.storage[container] = items.map(item => {
+                char.inventory.storage[actualContainer] = items.map(item => {
                     if (isPlaceholderValue(item)) return null;
 
                     if (typeof item === 'string') {
@@ -313,21 +338,22 @@ function mergeCharacterInventory(char, inventoryUpdates) {
                             ? { id: `item_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`, name: qtyMatch[1].trim(), quantity: parseInt(qtyMatch[2], 10) || 1, desc: '', type: 'general' }
                             : { id: `item_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`, name: item, quantity: 1, desc: '', type: 'general' };
                     } else if (item && typeof item === 'object') {
-                        const itemType = item.type || 'general';
+                        const normItem = normalizeKeys(item);
+                        const itemType = normItem.type || 'general';
                         const baseItem = {
-                            id: item.id || `item_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-                            name: item.name || 'Unknown',
+                            id: normItem.id || `item_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+                            name: normItem.name || 'Unknown',
                             type: itemType
                         };
 
                         if (itemType === 'currency') {
-                            baseItem.quantity = item.quantity !== undefined ? item.quantity : 1;
+                            baseItem.quantity = normItem.quantity !== undefined ? normItem.quantity : 1;
                         } else if (itemType === 'asset') {
-                            baseItem.assetValue = item.assetValue || { amount: 0, currencyName: 'Gold' };
-                            baseItem.desc = item.desc || item.description || '';
+                            baseItem.assetValue = normItem.assetvalue || { amount: 0, currencyName: 'Gold' };
+                            baseItem.desc = normItem.desc || normItem.description || '';
                         } else {
-                            baseItem.quantity = item.quantity !== undefined ? item.quantity : 1;
-                            baseItem.desc = item.desc || item.description || '';
+                            baseItem.quantity = normItem.quantity !== undefined ? normItem.quantity : 1;
+                            baseItem.desc = normItem.desc || normItem.description || '';
                         }
                         return baseItem;
                     }
@@ -338,22 +364,29 @@ function mergeCharacterInventory(char, inventoryUpdates) {
     }
 }
 
-function mergeCharacterQuests(char, questUpdates) {
+function mergeCharacterQuests(char, rawQuestUpdates) {
+    const questUpdates = normalizeKeys(rawQuestUpdates);
+    if (questUpdates.sidequests) questUpdates.sideQuests = questUpdates.sidequests;
+    if (questUpdates.sides) questUpdates.sideQuests = questUpdates.sides;
+
     char.quests = char.quests || {};
 
     if (questUpdates.main && typeof questUpdates.main === 'object') {
+        const mainUpdate = normalizeKeys(questUpdates.main);
         char.quests.main = char.quests.main || {};
         if (!char.quests.main.isLocked) {
-            if (questUpdates.main.name !== undefined && !isPlaceholderValue(questUpdates.main.name)) {
-                char.quests.main.name = String(questUpdates.main.name);
+            if (mainUpdate.name !== undefined && !isPlaceholderValue(mainUpdate.name)) {
+                char.quests.main.name = String(mainUpdate.name);
             }
-            if (questUpdates.main.description !== undefined && !isPlaceholderValue(questUpdates.main.description)) {
-                char.quests.main.desc = String(questUpdates.main.description);
+            if (mainUpdate.description !== undefined && !isPlaceholderValue(mainUpdate.description)) {
+                char.quests.main.desc = String(mainUpdate.description);
+            } else if (mainUpdate.desc !== undefined && !isPlaceholderValue(mainUpdate.desc)) {
+                char.quests.main.desc = String(mainUpdate.desc);
             }
-            if (questUpdates.main.status !== undefined && !isPlaceholderValue(questUpdates.main.status)) {
-                char.quests.main.isCompleted = (questUpdates.main.status === 'COMPLETED');
-            } else if (questUpdates.main.isCompleted !== undefined) {
-                char.quests.main.isCompleted = Boolean(questUpdates.main.isCompleted);
+            if (mainUpdate.status !== undefined && !isPlaceholderValue(mainUpdate.status)) {
+                char.quests.main.isCompleted = (mainUpdate.status === 'COMPLETED');
+            } else if (mainUpdate.iscompleted !== undefined) {
+                char.quests.main.isCompleted = Boolean(mainUpdate.iscompleted);
             }
         }
     }
@@ -365,12 +398,14 @@ function mergeCharacterQuests(char, questUpdates) {
         questUpdates.sideQuests.forEach(sq => {
             if (isPlaceholderValue(sq)) return;
             let qName = 'Unknown', qDesc = '', isCompleted = false;
+            
             if (typeof sq === 'string') {
                 qName = sq;
             } else if (sq && typeof sq === 'object') {
-                qName = sq.name || 'Unknown';
-                qDesc = sq.description || sq.desc || '';
-                isCompleted = sq.status === 'COMPLETED' || sq.isCompleted === true;
+                const normSq = normalizeKeys(sq);
+                qName = normSq.name || 'Unknown';
+                qDesc = normSq.description || normSq.desc || '';
+                isCompleted = normSq.status === 'COMPLETED' || normSq.iscompleted === true;
             }
 
             if (isPlaceholderValue(qName) || isPlaceholderValue(qDesc)) return;
@@ -413,73 +448,87 @@ function mergeCharacterRelations(char, relationUpdates, updateType) {
         char.relations = char.relations || {};
     }
 
-    Object.entries(relationUpdates).forEach(([targetName, rData]) => {
-        if (!rData || typeof rData !== 'object' || isPlaceholderValue(targetName)) return;
+    const actualTargets = {};
+    Object.keys(char.relations).forEach(k => actualTargets[k.toLowerCase()] = k);
 
-        const existingRelation = char.relations[targetName] || { text: '', isLocked: false, isInject: true, values: {} };
+    Object.entries(relationUpdates).forEach(([targetName, rawRData]) => {
+        if (!rawRData || typeof rawRData !== 'object' || isPlaceholderValue(targetName)) return;
+
+        const actualTarget = actualTargets[targetName.toLowerCase()] || targetName;
+        const rData = normalizeKeys(rawRData);
+        
+        const existingRelation = char.relations[actualTarget] || { text: '', isLocked: false, isInject: true, values: {} };
         if (existingRelation.isLocked) return;
 
-        if (rData.description !== undefined && !isPlaceholderValue(rData.description)) {
-            existingRelation.text = String(rData.description);
+        const descStr = rData.description || rData.desc;
+        if (descStr !== undefined && !isPlaceholderValue(descStr)) {
+            existingRelation.text = String(descStr);
         }
 
-        if (rData.metrics && typeof rData.metrics === 'object') {
+        const metricsObj = rData.metrics || rData.values;
+        if (metricsObj && typeof metricsObj === 'object') {
             existingRelation.values = existingRelation.values || {};
-            Object.entries(rData.metrics).forEach(([mName, rawMVal]) => {
+            Object.entries(metricsObj).forEach(([mName, rawMVal]) => {
                 if (isPlaceholderValue(rawMVal)) return;
                 const metaInfo = parseMetadata(rawMVal);
                 const parsedInt = parseInt(metaInfo.value, 10);
                 const finalVal = !isNaN(parsedInt) ? parsedInt : String(metaInfo.value);
                 const valType = metaInfo.type || (!isNaN(parsedInt) ? 'integer' : 'text');
 
-                if (existingRelation.values[mName]) {
-                    const existingMetric = existingRelation.values[mName];
+                const actualMName = Object.keys(existingRelation.values).find(k => k.toLowerCase() === mName.toLowerCase()) || mName;
+
+                if (existingRelation.values[actualMName]) {
+                    const existingMetric = existingRelation.values[actualMName];
                     const isObj = typeof existingMetric === 'object' && existingMetric !== null;
                     if (isObj && !isNaN(parsedInt)) {
                         const minLimit = existingMetric.min !== undefined && existingMetric.min !== null ? existingMetric.min : -100;
                         const maxLimit = existingMetric.max !== undefined && existingMetric.max !== null ? existingMetric.max : 100;
-                        existingRelation.values[mName].value = Math.min(maxLimit, Math.max(minLimit, parsedInt));
+                        existingRelation.values[actualMName].value = Math.min(maxLimit, Math.max(minLimit, parsedInt));
                     } else {
-                        existingRelation.values[mName].value = finalVal;
+                        existingRelation.values[actualMName].value = finalVal;
                     }
-                    existingRelation.values[mName].type = existingRelation.values[mName].type || valType;
+                    existingRelation.values[actualMName].type = existingRelation.values[actualMName].type || valType;
                 } else {
-                    existingRelation.values[mName] = { value: finalVal, type: valType, min: -100, max: 100, colorNegative: '#e74c3c', colorPositive: '#2ecc71' };
+                    existingRelation.values[actualMName] = { value: finalVal, type: valType, min: -100, max: 100, colorNegative: '#e74c3c', colorPositive: '#2ecc71' };
                 }
             });
         }
 
-        if (rData.targetDescription !== undefined && !isPlaceholderValue(rData.targetDescription)) {
-            existingRelation.targetText = String(rData.targetDescription);
+        const tDescStr = rData.targetdescription || rData.targettext;
+        if (tDescStr !== undefined && !isPlaceholderValue(tDescStr)) {
+            existingRelation.targetText = String(tDescStr);
         }
 
-        if (rData.targetMetrics && typeof rData.targetMetrics === 'object') {
+        const tMetricsObj = rData.targetmetrics || rData.targetvalues;
+        if (tMetricsObj && typeof tMetricsObj === 'object') {
             existingRelation.targetValues = existingRelation.targetValues || {};
-            Object.entries(rData.targetMetrics).forEach(([tmName, rawMVal]) => {
+            Object.entries(tMetricsObj).forEach(([tmName, rawMVal]) => {
                 if (isPlaceholderValue(rawMVal)) return;
                 const metaInfo = parseMetadata(rawMVal);
                 const parsedInt = parseInt(metaInfo.value, 10);
                 const finalVal = !isNaN(parsedInt) ? parsedInt : String(metaInfo.value);
                 const valType = metaInfo.type || (!isNaN(parsedInt) ? 'integer' : 'text');
 
-                if (existingRelation.targetValues[tmName]) {
-                    const existingMetric = existingRelation.targetValues[tmName];
+                const actualTMName = Object.keys(existingRelation.targetValues).find(k => k.toLowerCase() === tmName.toLowerCase()) || tmName;
+
+                if (existingRelation.targetValues[actualTMName]) {
+                    const existingMetric = existingRelation.targetValues[actualTMName];
                     const isObj = typeof existingMetric === 'object' && existingMetric !== null;
                     if (isObj && !isNaN(parsedInt)) {
                         const minLimit = existingMetric.min !== undefined && existingMetric.min !== null ? existingMetric.min : -100;
                         const maxLimit = existingMetric.max !== undefined && existingMetric.max !== null ? existingMetric.max : 100;
-                        existingRelation.targetValues[tmName].value = Math.min(maxLimit, Math.max(minLimit, parsedInt));
+                        existingRelation.targetValues[actualTMName].value = Math.min(maxLimit, Math.max(minLimit, parsedInt));
                     } else {
-                        existingRelation.targetValues[tmName].value = finalVal;
+                        existingRelation.targetValues[actualTMName].value = finalVal;
                     }
-                    existingRelation.targetValues[tmName].type = existingRelation.targetValues[tmName].type || valType;
+                    existingRelation.targetValues[actualTMName].type = existingRelation.targetValues[actualTMName].type || valType;
                 } else {
-                    existingRelation.targetValues[tmName] = { value: finalVal, type: valType, min: -100, max: 100, colorNegative: '#e74c3c', colorPositive: '#2ecc71' };
+                    existingRelation.targetValues[actualTMName] = { value: finalVal, type: valType, min: -100, max: 100, colorNegative: '#e74c3c', colorPositive: '#2ecc71' };
                 }
             });
         }
 
-        char.relations[targetName] = existingRelation;
+        char.relations[actualTarget] = existingRelation;
     });
 }
 
@@ -522,11 +571,41 @@ export function applyLLMPatch(trackerData, patch, isPlayer = false, updateType =
     const baseData = mutateInPlace ? trackerData : JSON.parse(JSON.stringify(trackerData));
     const updatedData = sanitizeTrackerData(baseData);
 
-    if (Array.isArray(updatedData.characters)) {
-        Object.entries(patch).forEach(([charName, updates]) => {
-            if (!updates || typeof updates !== 'object') return;
+    // ========================================================================
+    // ⚠️ LLM 환각 구조 분해 (Array/Nested Object 방어) 로직 ⚠️
+    // ========================================================================
+    let normalizedPatch = patch;
+    
+    // 만약 LLM이 { "characters": [ { name: "Alice", status: ... } ] } 형태로 배열을 뱉은 경우
+    if (Array.isArray(patch.characters)) {
+        normalizedPatch = {};
+        patch.characters.forEach(c => {
+            if (c && typeof c === 'object' && c.name) {
+                const { name, ...rest } = c;
+                normalizedPatch[name] = rest;
+            }
+        });
+        // World State 분리 보존
+        if (patch.world || patch.worldState || patch.World) {
+            normalizedPatch.World = patch.world || patch.worldState || patch.World;
+        }
+    } 
+    // 만약 LLM이 { "characters": { "Alice": { status: ... } } } 형태로 감싼 경우
+    else if (patch.characters && typeof patch.characters === 'object') {
+        normalizedPatch = { ...patch.characters };
+        // World State 분리 보존
+        if (patch.world || patch.worldState || patch.World) {
+            normalizedPatch.World = patch.world || patch.worldState || patch.World;
+        }
+    }
 
-            if (charName.toLowerCase() === 'world') {
+    if (Array.isArray(updatedData.characters)) {
+        Object.entries(normalizedPatch).forEach(([charName, rawUpdates]) => {
+            if (!rawUpdates || typeof rawUpdates !== 'object') return;
+
+            const updates = normalizeKeys(rawUpdates);
+
+            if (charName.toLowerCase() === 'world' || charName.toLowerCase() === 'worldstate') {
                 updatedData.worldState = mergeWorldState(updatedData.worldState, updates, updatedData.worldStateLocks);
                 return;
             }
@@ -536,11 +615,11 @@ export function applyLLMPatch(trackerData, patch, isPlayer = false, updateType =
                 return;
             }
 
-            const char = getOrCreateCharacter(updatedData.characters, charName, isPlayer, updates);
+            const char = getOrCreateCharacter(updatedData.characters, charName, isPlayer, rawUpdates);
 
             let statusUpdates = updates.status || updates.stats || null;
             if (!statusUpdates && !updates.profile && !updates.relations && !updates.inventory && !updates.quests) {
-                statusUpdates = updates;
+                statusUpdates = rawUpdates; 
             }
 
             if (statusUpdates) mergeCharacterStatus(char, statusUpdates, updateType);

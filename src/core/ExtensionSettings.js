@@ -45,13 +45,13 @@ export function syncRpgTrackerRegex(enabled) {
         return true;
     });
 
-    // 1. JSON Stripper
+    // 1. JSON Stripper (대소문자 환각 완벽 방어형 정규식)
     let script = extension_settings.regex.find(s => s.id === 'rpg_tracker_json_stripper');
     if (!script) {
         script = {
             id: 'rpg_tracker_json_stripper',
             scriptName: 'RPG Tracker JSON Stripper',
-            findRegex: '```(?:json|markdown)?\\s*\\n?\\{[\\s\\S]*?(?:\"status\"|\"statusSchema\"|\"stats\"|\"profile\"|\"inventory\"|\"quests\"|\"Character Name\")[\\s\\S]*?\\}\\s*\\n?```\\s*',
+            findRegex: '```(?:json|markdown)?\\s*\\n?\\{[\\s\\S]*?(?:\"[sS]tatus\"|\"[sS]tatus[sS]chema\"|\"[sS]tats\"|\"[pP]rofile\"|\"[iI]nventory\"|\"[qQ]uests\"|\"[cC]haracter [nN]ame\"|\"[wW]orld\")[\\s\\S]*?\\}\\s*\\n?```\\s*',
             replaceString: '',
             trimStrings: [],
             placement: [1, 2],
@@ -85,13 +85,13 @@ export function syncRpgTrackerRegex(enabled) {
         deltaScript.disabled = !enabled;
     }
 
-    // 3. Comment Stripper
+    // 3. Comment Stripper (대소문자 환각 완벽 방어형 정규식)
     let commentScript = extension_settings.regex.find(s => s.id === 'rpg_tracker_comment_stripper');
     if (!commentScript) {
         commentScript = {
             id: 'rpg_tracker_comment_stripper',
             scriptName: 'RPG Tracker Comment Stripper',
-            findRegex: '<!--RPG_TRACKER\\s*```(?:json|markdown)?\\s*\\n?\\{[\\s\\S]*?(?:\"status\"|\"statusSchema\"|\"stats\"|\"profile\"|\"inventory\"|\"quests\"|\"Character Name\")[\\s\\S]*?\\}\\s*\\n?```\\s*-->\\s*',
+            findRegex: '<!--RPG_TRACKER\\s*```(?:json|markdown)?\\s*\\n?\\{[\\s\\S]*?(?:\"[sS]tatus\"|\"[sS]tatus[sS]chema\"|\"[sS]tats\"|\"[pP]rofile\"|\"[iI]nventory\"|\"[qQ]uests\"|\"[cC]haracter [nN]ame\"|\"[wW]orld\")[\\s\\S]*?\\}\\s*\\n?```\\s*-->\\s*',
             replaceString: '',
             trimStrings: [],
             placement: [1, 2],

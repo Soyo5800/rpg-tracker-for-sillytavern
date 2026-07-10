@@ -1,8 +1,8 @@
 Place your custom RPG Tracker preset JSON files in this directory.
 
 Paths:
-Your SillyTavern Paths\data\default-user\extensions\rpg-traker-for-sillytavern\presets
+Your SillyTavern Paths\data\default-user\extensions\rpg-tracker-for-sillytavern\presets
 or
-Your SillyTavern Paths\public\scripts\extensions\third-party\rpg-traker-for-sillytavern\presets
+Your SillyTavern Paths\public\scripts\extensions\third-party\rpg-tracker-for-sillytavern\presets
 
 After placing your preset files in the directories above, you can import or load them directly from the Character List UI.
