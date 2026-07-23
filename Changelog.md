@@ -61,8 +61,6 @@ All notable changes and updates to the RPG Tracker extension are documented in t
 
 ## v1.2.0 Update
 
-* Repository: [rpg-tracker-for-sillytavern](https://github.com/Soyo5800/rpg-tracker-for-sillytavern)
-
 ### [ Choice of 3 Update Modes ]
 The tracking and prompting logic is divided into three distinct modes in Settings to give users full control over token consumption:
 * **Merged**: Standard auto-updating behavior on every turn.
