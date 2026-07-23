@@ -2,7 +2,7 @@
 
 **Notice & Disclaimer:**
 This extension was created with heavy assistance from AI. It is in an experimental stage, so feedback, bug reports, and suggestions are welcome!
-You can check the changelog [here](https://github.com/Soyo5800/rpg-tracker-for-sillytavern/raw/e6b01fde6643a568cb533230759584c9d25b1e58/Changelog.md)
+You can check the changelog [here](https://github.com/Soyo5800/rpg-tracker-for-sillytavern/blob/e6b01fde6643a568cb533230759584c9d25b1e58/Changelog.md)
 
 ---
 
