@@ -1,50 +1,9 @@
 // src/tracker/WorldSection.jsx
 
-import React, { useRef, useState, useEffect } from 'react';
+import React from 'react';
 import { useRPG } from '../core/RPGControl';
 import styles from './WorldSection.module.css';
-
-function AutoGrowingTextArea({ value, onChange, placeholder, className, disabled }) {
-  const textareaRef = useRef(null);
-  const [isFocused, setIsFocused] = useState(false);
-
-  const adjustHeight = () => {
-    const el = textareaRef.current;
-    if (el) {
-      if (!isFocused) {
-        el.style.height = 'auto';
-        el.style.height = `${el.scrollHeight}px`;
-      }
-    }
-  };
-
-  useEffect(() => {
-    adjustHeight();
-  }, [value, isFocused]);
-
-  return (
-    <textarea
-      ref={textareaRef}
-      className={className || styles.eventDescTextarea}
-      style={{ resize: isFocused && !disabled ? 'vertical' : 'none' }}
-      value={value || ''}
-      onChange={(e) => onChange(e.target.value)}
-      onFocus={() => {
-        if (disabled) return;
-        setIsFocused(true);
-        const el = textareaRef.current;
-        if (el) {
-          el.style.height = 'auto';
-          el.style.height = `${el.scrollHeight}px`;
-        }
-      }}
-      onBlur={() => setIsFocused(false)}
-      placeholder={placeholder}
-      rows={1}
-      disabled={disabled}
-    />
-  );
-}
+import { AutoGrowingTextArea } from '../utils';
 
 export default function WorldSection() {
   const { trackerData, updateTrackerData, patchWorldField } = useRPG();
@@ -100,7 +59,6 @@ export default function WorldSection() {
 
   const handleEventChange = (index, key, value) => {
     const newEvents = [...events];
-    // 정규화된 이벤트를 기준으로 간결하게 프로퍼티를 변경합니다.
     newEvents[index] = { ...newEvents[index], [key]: value };
     handleUpdate({ events: newEvents });
   };
@@ -244,6 +202,7 @@ export default function WorldSection() {
                     />
 
                     <AutoGrowingTextArea
+                      className={styles.eventDescTextarea}
                       value={evtObj.desc || ''}
                       onChange={(text) => handleEventChange(idx, 'desc', text)}
                       placeholder="Describe event..."

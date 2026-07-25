@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { defensiveMerge, reconstructTurnState } from './JSONTracker';
-import { getDefaultCharacters, DEFAULT_GUIDE_PROMPTS, getInitialTrackerData } from './PromptSchema';
+import { getDefaultCharacters, getInitialTrackerData } from './PromptSchema';
 import { setNestedValue, deleteNestedValue } from './StateHelpers';
 
 const RPGContext = createContext(null);
@@ -23,6 +23,8 @@ const DEFAULT_SETTINGS = {
   showQuests: true,
   presets: [],
   characterSyncs: {},
+  useCustomModel: false,
+  customModel: '',
   customColors: {
     bg: '#1a1a2e',
     accent: '#4a7ba7',
@@ -37,7 +39,10 @@ const getDefaultTrackerData = () => {
 };
 
 export function RPGControlProvider({ children }) {
-  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+  const [settings, setSettings] = useState(() => {
+    const existing = window.RPGBridge?.latestSettings;
+    return existing ? { ...DEFAULT_SETTINGS, ...existing } : DEFAULT_SETTINGS;
+  });
   const [trackerData, setTrackerData] = useState(getDefaultTrackerData);
   const [isChatConnected, setIsChatConnected] = useState(false);
 
@@ -129,7 +134,6 @@ export function RPGControlProvider({ children }) {
     setTrackerData((prev) => {
       const updated = { ...prev, ...newTrackerData };
 
-      // 1. 캐릭터 삭제 시 크롭 이미지 찌꺼기 자동 청소
       if (updated.characters && settingsRef.current?.croppedAvatars) {
         const activeIds = new Set(updated.characters.map(c => c.id));
         const currentCropped = settingsRef.current.croppedAvatars;
@@ -148,7 +152,6 @@ export function RPGControlProvider({ children }) {
         }
       }
 
-      // 2. extension_settings에 남아있는 유령(Stale) characterSyncs 찌꺼기 자동 청소 (Pruning)
       const context = window.SillyTavern?.getContext?.() || {};
       const chatId = context.chatId;
       if (chatId && settingsRef.current?.characterSyncs?.[chatId] && Array.isArray(updated.characters)) {

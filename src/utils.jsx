@@ -1,7 +1,10 @@
 // src/utils.jsx
 import React, { useRef, useEffect, useState } from 'react';
 
-// Resolves SillyTavern avatar filenames to browser-accessible URLs, returning null for default/unsynced states
+/**
+ * Resolves SillyTavern avatar filenames to browser-accessible URLs.
+ * Bundle-safe implementation for React UI components.
+ */
 export function resolveSillyTavernAvatarUrl(avatarFile, type = 'Card') {
   if (!avatarFile || typeof avatarFile !== 'string') return null;
   if (avatarFile.startsWith('http://') || avatarFile.startsWith('https://') || avatarFile.startsWith('data:')) {
@@ -17,7 +20,6 @@ export function resolveSillyTavernAvatarUrl(avatarFile, type = 'Card') {
 
   const lower = filename.toLowerCase();
 
-  // Return null for default or placeholder filenames to prevent 404 network requests in console
   if (
     lower === 'default.png' || lower === 'ghost.png' || lower === 'user.png' ||
     lower === 'system.png' || lower === 'default-user' || lower === 'default' ||
@@ -53,6 +55,10 @@ export function resolveSillyTavernAvatarUrl(avatarFile, type = 'Card') {
   return null;
 }
 
+/**
+ * Auto-resizing multi-line text input component.
+ * Enforces hidden overflow and border-box sizing to eliminate scrollbars.
+ */
 export function AutoGrowingTextArea({ value, onChange, placeholder, className, style, disabled }) {
   const textareaRef = useRef(null);
   const [isFocused, setIsFocused] = useState(false);
@@ -77,7 +83,12 @@ export function AutoGrowingTextArea({ value, onChange, placeholder, className, s
     <textarea
       ref={textareaRef}
       className={className}
-      style={{ resize: isFocused && !disabled ? 'vertical' : 'none', ...style }}
+      style={{
+        overflowY: 'hidden',
+        boxSizing: 'border-box',
+        resize: isFocused && !disabled ? 'vertical' : 'none',
+        ...style
+      }}
       value={value || ''}
       onChange={(e) => {
         onChange(e.target.value);

@@ -10,16 +10,13 @@ export default function SnapshotModal() {
 
   const isHistorical = !!snapshotModalData?.historicalData;
 
-  // 직관적인 명칭의 탭 제어
   const [activeTab, setActiveTab] = useState('select');
 
-  // 체크박스 선택 상태 초기값
   const [selections, setSelections] = useState({
     world: { selected: false, date: true, time: true, weather: true, location: true, events: false },
     chars: {}
   });
 
-  // 로컬 상태 복제본
   const [workingData, setWorkingData] = useState(null);
   const [customNote, setCustomNote] = useState('');
 
@@ -87,7 +84,6 @@ export default function SnapshotModal() {
     }
   }, [snapshotModalData?.isOpen, targetData, snapshotModalData?.existingPayload]);
 
-  // 세부 편집 수치 전이기
   const updateWorkingCharValue = (charId, section, fieldKey, newVal) => {
     setWorkingData(prev => {
       if (!prev || !prev.characters) return prev;
@@ -103,7 +99,6 @@ export default function SnapshotModal() {
     });
   };
 
-  // 실시간 사이드바 수치 복제 오버라이트 
   const handleCopyCurrentSidebarState = () => {
     if (window.confirm("Overwrite the editor with the current live sidebar status? This will sync values and reset options.")) {
       const liveClone = JSON.parse(JSON.stringify(trackerData));
@@ -298,7 +293,6 @@ export default function SnapshotModal() {
           <button className={styles.closeBtn} onClick={handleClose}>×</button>
         </header>
 
-        {/* 정돈된 내비게이션 바 */}
         <div className={styles.tabNav}>
           <button
             type="button"
@@ -327,8 +321,8 @@ export default function SnapshotModal() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
             <div style={{ fontSize: '11px', opacity: 0.8, fontWeight: 'bold' }}>
               {isHistorical
-                ? "✓ Loaded historical state from this turn."
-                : "⚠️ No historical data found. Using current live data."}
+                ? "Loaded historical state from this turn."
+                : "No historical data found. Using current live data."}
             </div>
             <button
               type="button"
@@ -340,7 +334,6 @@ export default function SnapshotModal() {
             </button>
           </div>
 
-          {/* 탭 1: 체크박스 및 커스텀 노트 */}
           {activeTab === 'select' && (
             <div className={styles.tabContentFadeIn}>
               <div className={styles.section}>
@@ -356,7 +349,6 @@ export default function SnapshotModal() {
                   </button>
                 </div>
 
-                {/* 월드 타겟 섹션 (2열 구성 보증) */}
                 <div className={`${styles.charRow} ${styles.worldRow}`}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
                     <label className={styles.checkboxItem} style={{ marginTop: '2px' }}>
@@ -417,7 +409,6 @@ export default function SnapshotModal() {
                   </div>
                 </div>
 
-                {/* 캐릭터 루프 섹션 */}
                 {targetData && targetData.characters?.map(char => {
                   const charSel = selections.chars[char.id] || {};
                   return (
@@ -472,13 +463,11 @@ export default function SnapshotModal() {
             </div>
           )}
 
-          {/* 탭 2: 수치 보정 및 세부 폼 편집 */}
           {activeTab === 'editor' && (
             <div className={styles.tabContentFadeIn}>
               <div className={styles.section}>
                 <div className={styles.sectionTitle} style={{ marginBottom: '8px' }}>Active Values Tuning</div>
 
-                {/* 월드 정보 에디터 - 옵셔널 체이닝으로 렌더 크래시 방지 */}
                 {selections.world?.selected && workingData?.worldState && (
                   <div className={styles.editorGroupBlock}>
                     <div className={styles.editorGroupTitle}>World Parameters</div>
@@ -539,7 +528,6 @@ export default function SnapshotModal() {
                       </div>
                     )}
 
-                    {/* 월드 이벤트 폼 편집 구역 */}
                     {selections.world.events && workingData.worldState?.events && workingData.worldState.events.length > 0 && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '6px', borderTop: '1px dashed rgba(255,255,255,0.05)', paddingTop: '6px' }}>
                         <div className={styles.visualEditorSubLabel}>Active World Events</div>
@@ -588,7 +576,6 @@ export default function SnapshotModal() {
                   </div>
                 )}
 
-                {/* 캐릭터 정보 에디터 - 예외 방어 보증 */}
                 {workingData && workingData.characters?.map(char => {
                   const charSel = selections.chars[char.id] || {};
                   if (!charSel.selected) return null;
@@ -597,7 +584,6 @@ export default function SnapshotModal() {
                     <div key={char.id} className={styles.editorGroupBlock}>
                       <div className={styles.editorGroupTitle}>{char.name} Parameters</div>
 
-                      {/* Status 편집 */}
                       {charSel.status && char.statusSchema?.map(schema => {
                         const val = char.status?.[schema.id] ?? '';
                         return (
@@ -616,7 +602,6 @@ export default function SnapshotModal() {
                         );
                       })}
 
-                      {/* Profile 편집 */}
                       {charSel.profile && Object.keys(char.profile || {}).map(profKey => {
                         const val = char.profile[profKey] ?? '';
                         return (
@@ -632,7 +617,6 @@ export default function SnapshotModal() {
                         );
                       })}
 
-                      {/* 플레이어 캐릭터 전용: 인벤토리 세부 편집 */}
                       {charSel.inventory && char.inventory?.equipment && (
                         <div style={{ marginTop: '6px', borderTop: '1px dashed rgba(255,255,255,0.05)', paddingTop: '6px' }}>
                           <div className={styles.visualEditorSubLabel}>Equipment Items</div>
@@ -704,7 +688,6 @@ export default function SnapshotModal() {
                         </div>
                       )}
 
-                      {/* 플레이어 캐릭터 전용: 퀘스트 편집 */}
                       {charSel.quests && char.quests && (
                         <div style={{ marginTop: '6px', borderTop: '1px dashed rgba(255,255,255,0.05)', paddingTop: '6px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                           <div className={styles.visualEditorSubLabel}>Quest State</div>
@@ -770,7 +753,6 @@ export default function SnapshotModal() {
                   );
                 })}
 
-                {/* 예외 예방 구문 안전화 */}
                 {workingData && !selections.world?.selected && !Object.values(selections.chars).some(c => c.selected) && (
                   <div style={{ padding: '24px 0', opacity: 0.4, fontSize: '12px', textAlign: 'center' }}>
                     No entities are selected.<br />Please check entities to edit in 'Select Targets' tab.
@@ -780,7 +762,6 @@ export default function SnapshotModal() {
             </div>
           )}
 
-          {/* 탭 3: 프리뷰 및 JSON 코드 편집 */}
           {activeTab === 'preview' && (
             <div className={styles.tabContentFadeIn}>
               <div className={styles.section}>
@@ -802,7 +783,7 @@ export default function SnapshotModal() {
                       }
                     }}
                   >
-                    {isEditable ? '🔒 Lock Data' : '🔓 Edit JSON'}
+                    {isEditable ? 'Lock Data' : 'Edit JSON'}
                   </button>
                 </div>
 

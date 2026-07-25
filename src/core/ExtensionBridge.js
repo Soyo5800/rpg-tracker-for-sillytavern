@@ -1,12 +1,15 @@
 // src/core/ExtensionBridge.js
 import { getContext, extension_settings, writeExtensionField } from "../../../../../extensions.js";
-import { saveSettingsDebounced, saveChat, saveChatConditional, updateMessageBlock, getRequestHeaders, generateQuietPrompt, getThumbnailUrl, user_avatar, setExtensionPrompt, extension_prompt_types, extension_prompt_roles } from "../../../../../../script.js";
+import { saveSettingsDebounced, saveChat, saveChatConditional, updateMessageBlock, getRequestHeaders, getThumbnailUrl, user_avatar, setExtensionPrompt, extension_prompt_types, extension_prompt_roles } from "../../../../../../script.js";
 import { SlashCommandParser } from "../../../../../slash-commands/SlashCommandParser.js";
 import { backupToMessage, rehydrateFromHistory, rehydrateFromHistoryAsync, applyLLMPatch, extractNormalizedPatch } from "./JSONTracker.js";
 import { parseResponse } from "./ResponseParser.js";
-import { buildDefinitionPromptWrapper, getDynamicSchemaExample, buildStaticDefinitionsPrompt, buildDynamicValuesPrompt, buildAddonSection } from "./ActivePrompt.js";
-import { DEFAULT_PROMPT_HEADER_SEP, DEFAULT_PROMPT_FOOTER_SEP, DEFAULT_READONLY_CONTEXT_HEADER } from "./PromptSchema.js";
+import { buildDefinitionPromptWrapper, getDynamicSchemaExample, buildStaticDefinitionsPrompt, buildDynamicValuesPrompt } from "./ActivePrompt.js";
+import { DEFAULT_PROMPT_HEADER_SEP, DEFAULT_PROMPT_FOOTER_SEP } from "./PromptSchema.js";
 import { setDeltaLog } from "../tracker/DeltaLogRenderer.js";
+
+import { resolveSillyTavernAvatarUrl } from "./AvatarResolver.js";
+import { getAvailableModels, executeQuietPromptWithModelOverride } from "./ModelManager.js";
 
 window.SillyTavern = {
     getContext: () => {
@@ -21,59 +24,6 @@ window.SillyTavern = {
         }
     }
 };
-
-// Resolves SillyTavern avatar filenames to URLs, returning null for default/unsynced files
-function resolveSillyTavernAvatarUrl(avatarFile, type = 'Card') {
-    if (!avatarFile || typeof avatarFile !== 'string') return null;
-    if (avatarFile.startsWith('http://') || avatarFile.startsWith('https://') || avatarFile.startsWith('data:')) {
-        return avatarFile;
-    }
-
-    let filename = String(avatarFile);
-    if (filename.includes('/')) {
-        filename = filename.split('/').pop();
-    }
-
-    try { filename = decodeURIComponent(filename); } catch (e) { }
-
-    const lower = filename.toLowerCase();
-    if (
-        lower === 'default.png' || lower === 'ghost.png' || lower === 'user.png' ||
-        lower === 'system.png' || lower === 'default-user' || lower === 'default' ||
-        lower === 'user-default.png' || lower === 'user-default' || lower === 'none' ||
-        lower === ''
-    ) {
-        return null;
-    }
-
-    if (type === 'Card') {
-        if (typeof window.getAvatarPath === 'function') {
-            const resolved = window.getAvatarPath(avatarFile);
-            if (resolved && (resolved.startsWith('http') || resolved.startsWith('/') || resolved.startsWith('.'))) {
-                return resolved;
-            }
-        }
-        return `/characters/${encodeURIComponent(filename)}`;
-    }
-
-    if (type === 'Persona') {
-        try {
-            if (typeof getThumbnailUrl === 'function') {
-                const url = getThumbnailUrl('persona', filename) || getThumbnailUrl('avatar', filename);
-                if (url) return url;
-            }
-        } catch (e) {
-            console.warn("[RPG Tracker] Native getThumbnailUrl call failed:", e);
-        }
-
-        if (!/\.[a-zA-Z0-9]{2,5}$/.test(filename)) {
-            filename += '.png';
-        }
-        return `/api/images/avatars/${encodeURIComponent(filename)}`;
-    }
-
-    return null;
-}
 
 export function safeUpdateMessageBlock(index, messageObject) {
     if (typeof updateMessageBlock !== 'function') return;
@@ -91,76 +41,6 @@ export function safeUpdateMessageBlock(index, messageObject) {
 }
 
 export function establishBridgeConnection(extensionName) {
-    async function executeQuietPromptWithModelOverride(prompt, customModel, sendChat = true, clearExtensionPrompt = true) {
-        globalThis.rpgTracker_isQuietUpdating = true;
-        if (window.RPGBridge) {
-            window.RPGBridge.isQuietUpdating = true;
-        }
-
-        const settings = window.RPGBridge?.latestSettings || extension_settings[extensionName] || {};
-        const shouldUseCustom = settings.useCustomModel && typeof customModel === 'string' && customModel.trim() !== '';
-
-        if (clearExtensionPrompt) {
-            if (extension_settings.extension_prompts) {
-                delete extension_settings.extension_prompts[`${extensionName}_def`];
-                delete extension_settings.extension_prompts[`${extensionName}_status`];
-            }
-            if (typeof setExtensionPrompt === 'function' && typeof extension_prompt_types !== 'undefined') {
-                try {
-                    setExtensionPrompt(`${extensionName}_def`, '', extension_prompt_types.IN_PROMPT, 0, false);
-                } catch (e) {
-                    console.warn("[RPG Tracker] Clearing active extension prompt failed:", e);
-                }
-            }
-        }
-
-        const targetModel = customModel ? customModel.trim() : null;
-
-        try {
-            if (shouldUseCustom && targetModel) {
-                return await generateQuietPrompt(prompt, sendChat, false, targetModel);
-            } else {
-                return await generateQuietPrompt(prompt, sendChat, false);
-            }
-        } finally {
-            globalThis.rpgTracker_isQuietUpdating = false;
-            if (window.RPGBridge) {
-                window.RPGBridge.isQuietUpdating = false;
-            }
-
-            restoreExtensionPromptForCurrentMode(extensionName);
-        }
-    }
-
-    function restoreExtensionPromptForCurrentMode(extName) {
-        if (typeof setExtensionPrompt !== 'function' || typeof extension_prompt_types === 'undefined') return;
-
-        const currentSettings = extension_settings[extName] || {};
-        const mode = currentSettings.updateMode || 'merged';
-        const trackerData = window.RPGBridge?.currentTrackerData;
-
-        if (!currentSettings.enabled || mode === 'isolated' || !trackerData) {
-            setExtensionPrompt(`${extName}_def`, '', extension_prompt_types.IN_PROMPT, 0, false);
-            return;
-        }
-
-        if (mode === 'separated') {
-            const staticDefs = buildStaticDefinitionsPrompt(trackerData) || '';
-            const statusPrompt = buildDynamicValuesPrompt(trackerData);
-            const readOnlyHeader = trackerData.systemPrompt_readonly !== undefined ? trackerData.systemPrompt_readonly : DEFAULT_READONLY_CONTEXT_HEADER;
-            const addonSection = buildAddonSection(trackerData);
-            const readOnlyPrompt = `${readOnlyHeader}\n\n${statusPrompt}\n${staticDefs}\n${addonSection}`;
-
-            setExtensionPrompt(`${extName}_def`, readOnlyPrompt, extension_prompt_types.IN_CHAT, 0, false, extension_prompt_roles.SYSTEM || 0);
-        } else if (mode === 'merged') {
-            const header = trackerData.systemPromptHeader_merged !== undefined ? trackerData.systemPromptHeader_merged : DEFAULT_PROMPT_HEADER_SEP;
-            const footer = trackerData.systemPromptFooter_merged !== undefined ? trackerData.systemPromptFooter_merged : DEFAULT_PROMPT_FOOTER_SEP;
-            const finalPrompt = buildDefinitionPromptWrapper(trackerData, header, footer);
-
-            setExtensionPrompt(`${extName}_def`, finalPrompt, extension_prompt_types.IN_PROMPT, 0, false, extension_prompt_roles.SYSTEM || 0);
-        }
-    }
-
     const connectionInterval = setInterval(() => {
         if (window.RPGBridge && typeof window.RPGBridge.syncSettings === 'function') {
             clearInterval(connectionInterval);
@@ -216,104 +96,7 @@ export function establishBridgeConnection(extensionName) {
                 return null;
             };
 
-            window.RPGBridge.getAvailableModels = () => {
-                try {
-                    const context = getContext();
-                    const mainApi = ($('#main_api').val() || window.main_api || context?.main_api || '').toLowerCase();
-
-                    let activeSource = '';
-                    let $container = null;
-
-                    if (mainApi === 'openai') {
-                        activeSource = ($('#chat_completion_source').val() || '').toLowerCase();
-                        $container = activeSource
-                            ? $(`#openai_api [data-source="${activeSource}"], #openai_api #${activeSource}_form`).first()
-                            : $('#openai_api');
-                    } else if (mainApi === 'textgenerationwebui') {
-                        activeSource = ($('#textgen_type').val() || '').toLowerCase();
-                        $container = activeSource
-                            ? $(`#textgenerationwebui_api [data-tg-type="${activeSource}"]`).first()
-                            : $('#textgenerationwebui_api');
-                    } else if (mainApi === 'novel') {
-                        $container = $('#novel_api');
-                    } else if (mainApi === 'koboldhorde') {
-                        $container = $('#kobold_horde');
-                    } else if (mainApi === 'kobold') {
-                        $container = $('#kobold_api');
-                    }
-
-                    if (!$container || $container.length === 0) {
-                        $container = $('#top-settings-holder');
-                    }
-
-                    const modelMap = new Map();
-                    let currentModel = '';
-
-                    const $selects = $container.find('select').filter(function () {
-                        const id = (this.id || '').toLowerCase();
-                        if (!id.includes('model')) return false;
-                        const blacklist = ['auth', 'proxy', 'preset', 'sort', 'region', 'provider', 'quantization', 'format', 'type', 'strategy', 'middleout', 'resolution', 'aspect_ratio'];
-                        return !blacklist.some(keyword => id.includes(keyword));
-                    });
-
-                    $selects.each(function () {
-                        const val = $(this).val();
-                        if (val && typeof val === 'string' && !currentModel) {
-                            currentModel = val.trim();
-                        }
-
-                        $(this).find('option').each(function () {
-                            const optVal = ($(this).val() || $(this).text() || '').trim();
-                            const optLabel = ($(this).text() || optVal).trim();
-                            const lowerVal = optVal.toLowerCase();
-
-                            if (optVal &&
-                                !lowerVal.includes('connect to') &&
-                                !lowerVal.includes('click \'connect\'') &&
-                                !lowerVal.includes('not loaded') &&
-                                !lowerVal.includes('express mode') &&
-                                !lowerVal.includes('full version')) {
-                                if (!modelMap.has(optVal)) {
-                                    modelMap.set(optVal, optLabel || optVal);
-                                }
-                            }
-                        });
-                    });
-
-                    if (modelMap.size === 0) {
-                        const $inputs = $container.find('input[list], input[id*="model"]').filter(function () {
-                            const id = (this.id || '').toLowerCase();
-                            return !id.includes('proxy') && !id.includes('key');
-                        });
-
-                        $inputs.each(function () {
-                            const listId = $(this).attr('list');
-                            if (listId) {
-                                $(`#${listId} option`).each(function () {
-                                    const optVal = ($(this).val() || $(this).text() || '').trim();
-                                    if (optVal) modelMap.set(optVal, optVal);
-                                });
-                            }
-                            const inputVal = $(this).val();
-                            if (inputVal && typeof inputVal === 'string' && !currentModel) {
-                                currentModel = inputVal.trim();
-                            }
-                        });
-                    }
-
-                    return {
-                        api: activeSource || mainApi || 'default',
-                        currentModel: currentModel,
-                        models: Array.from(modelMap.entries()).map(([value, label]) => ({
-                            value,
-                            label: label && label !== value ? label : value
-                        }))
-                    };
-                } catch (e) {
-                    console.warn("[RPG Tracker] Failed to extract API models:", e);
-                    return { api: 'default', currentModel: '', models: [] };
-                }
-            };
+            window.RPGBridge.getAvailableModels = getAvailableModels;
 
             window.RPGBridge.saveSettings = (updatedSettings) => {
                 extension_settings[extensionName] = extension_settings[extensionName] || {};
@@ -431,7 +214,7 @@ export function establishBridgeConnection(extensionName) {
 
                     const instructionText = `[USER INSTRUCTION]\n${promptText}\n\nOutput the generated character's status JSON block only.`;
 
-                    const rawOutput = await executeQuietPromptWithModelOverride(instructionText, targetModel, true, false);
+                    const rawOutput = await executeQuietPromptWithModelOverride(extensionName, instructionText, targetModel, false, false);
                     const { patch } = parseResponse(rawOutput);
 
                     if (patch && Object.keys(patch).length > 0) {
@@ -507,7 +290,7 @@ export function establishBridgeConnection(extensionName) {
 
                     const instructionText = "Analyze the recent chat log above and current status, then output the updated status JSON block only.";
 
-                    const rawOutput = await executeQuietPromptWithModelOverride(instructionText, targetModel, true, false);
+                    const rawOutput = await executeQuietPromptWithModelOverride(extensionName, instructionText, targetModel, false, false);
                     const { patch } = parseResponse(rawOutput);
 
                     if (patch && Object.keys(patch).length > 0) {

@@ -46,12 +46,11 @@
   color: var(--rpg-highlight);
 }
 
-/* Row-style fields (Label [Input]) */
 .stateGrid {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  margin-top: 10px; /* 타이틀과의 살짝의 여백 */
+  margin-top: 10px;
 }
 
 .rowField {
@@ -111,7 +110,8 @@
   height: auto;
   line-height: 1.4;
   resize: none;
-  overflow-y: hidden;
+  overflow-y: hidden !important;
+  box-sizing: border-box;
   display: block;
 }
 
@@ -125,7 +125,6 @@
   background: rgba(0, 0, 0, 0.1);
 }
 
-/* Events block */
 .eventsList {
   display: flex;
   flex-direction: column;
@@ -181,6 +180,7 @@
   color: var(--rpg-text);
   outline: none;
   font-family: inherit;
+  box-sizing: border-box;
 }
 
 .eventTitleInput:focus {
@@ -198,10 +198,10 @@
   min-height: 32px;
   height: auto;
   line-height: 1.4;
-  resize: vertical;
   outline: none;
   font-family: inherit;
-  overflow-y: hidden;
+  overflow-y: hidden !important;
+  box-sizing: border-box;
   display: block;
 }
 

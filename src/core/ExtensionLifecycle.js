@@ -15,7 +15,6 @@ export function registerLifecycleEvents(extensionName) {
             window.RPGBridge.flushSave();
         }
 
-        // 백그라운드 콰이엇 프롬프트(수동 업데이트/캐릭터 생성) 진행 중일 때는 프롬프트 재주입 방지
         if (window.RPGBridge?.isQuietUpdating) return;
 
         if (!extension_settings[extensionName]?.enabled) return;
@@ -42,7 +41,6 @@ export function registerLifecycleEvents(extensionName) {
                     const statusPrompt = buildDynamicValuesPrompt(trackerData);
                     const readOnlyHeader = trackerData.systemPrompt_readonly !== undefined ? trackerData.systemPrompt_readonly : DEFAULT_READONLY_CONTEXT_HEADER;
 
-                    // 유저 대화 응답 시에만 애드온 지침 포함
                     const addonSection = buildAddonSection(trackerData);
                     const readOnlyPrompt = `${readOnlyHeader}\n\n${statusPrompt}\n${staticDefs}\n${addonSection}`;
 
@@ -71,7 +69,7 @@ export function registerLifecycleEvents(extensionName) {
         if (context && context.chat && context.chat.length > 0) {
             const lastMessage = context.chat[context.chat.length - 1];
 
-            if (lastMessage && lastMessage.is_user === false) {
+            if (lastMessage && lastMessage.is_user === false && typeof lastMessage.mes === 'string') {
                 const text = lastMessage.mes;
                 const { cleanedText, patch } = parseResponse(text);
 

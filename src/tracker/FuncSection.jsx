@@ -173,7 +173,7 @@ export default function FuncSection() {
                 value={settings.customModel || ''}
                 onChange={(e) => updateSettings({ customModel: e.target.value })}
               >
-                <option value="">※ Current Model</option>
+                <option value="">Current Model</option>
                 {modelInfo.models.map((m) => (
                   <option key={m.value} value={m.value}>
                     {m.label}
