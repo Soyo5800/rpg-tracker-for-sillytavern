@@ -1,5 +1,3 @@
-/* src/tracker/PlayerComponent.module.css */
-
 .tabContentStack {
   display: flex;
   flex-direction: column;
@@ -32,23 +30,6 @@
   font-size: 12.5px;
   font-weight: bold;
   color: var(--rpg-text);
-}
-
-.quickAddBtn {
-  background: transparent;
-  border: 1px solid var(--rpg-border);
-  color: var(--rpg-text);
-  border-radius: 4px;
-  padding: 3px 10px;
-  font-size: 10.5px;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.quickAddBtn:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: var(--rpg-highlight);
-  color: var(--rpg-highlight);
 }
 
 .flexCenterGap {
@@ -303,20 +284,6 @@
   font-weight: bold;
 }
 
-.questSideRemoveBtn {
-  background: transparent;
-  border: none;
-  color: rgba(255, 255, 255, 0.4);
-  font-size: 14px;
-  cursor: pointer;
-  padding: 0 4px;
-  line-height: 1;
-}
-
-.questSideRemoveBtn:hover {
-  color: #e74c3c;
-}
-
 .emptyPlaceholder {
   font-size: 11.5px;
   opacity: 0.3;
@@ -324,66 +291,6 @@
   padding: 16px;
 }
 
-/* Switch Toggle UI */
-.switchRow {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 11px;
-  opacity: 0.7;
-  cursor: pointer;
-  margin: 0;
-}
-
-.switchLabel {
-  position: relative;
-  display: inline-block;
-  width: 28px;
-  height: 14px;
-}
-
-.switchInput {
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.switchSlider {
-  position: absolute;
-  cursor: pointer;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(255, 255, 255, 0.08);
-  transition: 0.2s;
-  border-radius: 14px;
-  border: 1px solid var(--rpg-border);
-}
-
-.switchSlider:before {
-  position: absolute;
-  content: "";
-  height: 8px;
-  width: 8px;
-  left: 2px;
-  bottom: 2px;
-  background-color: var(--rpg-text);
-  transition: 0.2s;
-  border-radius: 50%;
-}
-
-.switchInput:checked + .switchSlider {
-  background-color: var(--rpg-highlight-bg);
-  border-color: var(--rpg-highlight);
-}
-
-.switchInput:checked + .switchSlider:before {
-  transform: translateX(14px);
-  background-color: var(--rpg-highlight);
-}
-
-/* Common Textarea Styles */
 .textBlockInput {
   width: 100%;
   background: rgba(0, 0, 0, 0.2);

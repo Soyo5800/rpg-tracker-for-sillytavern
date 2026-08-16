@@ -1,118 +1,4 @@
-/* src/messagetracker/SnapshotModal.module.css */
-
-.overlay {
-  position: fixed; 
-  top: 0; 
-  left: 0; 
-  width: 100vw; 
-  height: 100vh;
-  background: rgba(0, 0, 0, 0.75); 
-  z-index: 4000 !important;
-  display: flex; 
-  align-items: center; 
-  justify-content: center;
-}
-
-.modal {
-  background: var(--rpg-bg); 
-  border: 1px solid var(--rpg-border);
-  border-radius: 10px; 
-  width: 540px; 
-  height: 680px; 
-  max-width: 100%; 
-  max-height: 90vh;
-  display: flex; 
-  flex-direction: column; 
-  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.65);
-  color: var(--rpg-text);
-  overflow: hidden;
-}
-
-.header {
-  display: flex; 
-  justify-content: space-between; 
-  align-items: center;
-  padding: 0 20px; 
-  border-bottom: 1px solid var(--rpg-border);
-  flex-shrink: 0;
-  height: 54px;
-  box-sizing: border-box;
-}
-
-.header h4 { 
-  margin: 0; 
-  font-size: 15px; 
-  color: var(--rpg-highlight); 
-}
-
-.closeBtn { 
-  background: transparent; 
-  border: none; 
-  font-size: 24px; 
-  color: var(--rpg-text); 
-  cursor: pointer; 
-  opacity: 0.6; 
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  line-height: 1;
-  outline: none;
-  transition: opacity 0.15s ease;
-}
-
-.closeBtn:hover { 
-  opacity: 1; 
-}
-
-/* 탭 메뉴 바 */
-.tabNav {
-  display: flex;
-  background: rgba(0, 0, 0, 0.15);
-  border-bottom: 1px solid var(--rpg-border);
-  flex-shrink: 0;
-  width: 100%;
-}
-
-.tabBtn {
-  flex: 1;
-  background: transparent;
-  border: none;
-  border-bottom: 2px solid transparent;
-  color: var(--rpg-text);
-  opacity: 0.6;
-  padding: 12px 0;
-  font-size: 11.5px;
-  font-weight: bold;
-  cursor: pointer;
-  transition: opacity 0.15s, border-color 0.15s, color 0.15s;
-  outline: none;
-}
-
-.tabBtn:hover {
-  opacity: 0.9;
-  background: rgba(255, 255, 255, 0.02);
-}
-
-.tabActive {
-  opacity: 1 !important;
-  border-color: var(--rpg-highlight) !important;
-  color: var(--rpg-highlight) !important;
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.body { 
-  padding: 16px; 
-  overflow-y: auto;
-  display: flex; 
-  flex-direction: column; 
-  gap: 14px; 
-  flex: 1;
-}
-
-/* 트랜지션 애니메이션 */
+/* Tab Content Animation */
 .tabContentFadeIn {
   animation: tabFadeIn 0.18s ease-out forwards;
 }
@@ -123,7 +9,7 @@
 }
 
 .section {
-  background: rgba(0,0,0,0.15); 
+  background: rgba(0, 0, 0, 0.15); 
   border: 1px solid var(--rpg-border);
   border-radius: 6px; 
   padding: 12px;
@@ -140,31 +26,6 @@
   font-size: 13px; 
   font-weight: bold; 
   color: var(--rpg-highlight); 
-}
-
-.deselectAllBtn {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--rpg-border);
-  color: var(--rpg-text);
-  font-size: 10.5px;
-  font-weight: bold;
-  height: 22px;
-  padding: 0 8px;
-  border-radius: 4px;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
-  box-sizing: border-box;
-  outline: none;
-  transition: all 0.15s ease-out;
-}
-
-.deselectAllBtn:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: #e74c3c;
-  color: #ff6b6b;
 }
 
 .charRow {
@@ -235,7 +96,7 @@
 
 .textarea {
   width: 100%; 
-  background: rgba(0,0,0,0.2); 
+  background: rgba(0, 0, 0, 0.2); 
   border: 1px solid var(--rpg-border);
   border-radius: 4px; 
   padding: 8px; 
@@ -249,46 +110,6 @@
 
 .textarea:focus:not(:disabled) { 
   border-color: var(--rpg-highlight); 
-}
-
-.viewBtn {
-  background: rgba(255, 255, 255, 0.05); 
-  border: 1px solid var(--rpg-border);
-  color: var(--rpg-text); 
-  font-size: 11px; 
-  height: 24px;
-  padding: 0 10px; 
-  border-radius: 4px; 
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
-  box-sizing: border-box;
-  outline: none;
-  transition: all 0.15s ease;
-}
-
-.viewBtn:hover {
-  background: rgba(255, 255, 255, 0.12);
-}
-
-.viewBtnActive {
-  background: var(--rpg-highlight-bg); 
-  border: 1px solid var(--rpg-highlight);
-  color: var(--rpg-highlight); 
-  font-size: 11px; 
-  height: 24px;
-  padding: 0 10px; 
-  border-radius: 4px; 
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
-  box-sizing: border-box;
-  outline: none;
-  box-shadow: 0 0 8px rgba(0,0,0,0.2);
 }
 
 .jsonEditor {
@@ -311,83 +132,7 @@
   background: #111216 !important;
   color: #e6ebf5 !important;
   border-color: var(--rpg-highlight) !important;
-  box-shadow: inset 0 0 6px rgba(0,0,0,0.5);
-}
-
-.footer {
-  display: flex; 
-  justify-content: flex-end; 
-  align-items: center;
-  gap: 10px; 
-  padding: 0 20px;
-  border-top: 1px solid var(--rpg-border); 
-  background: rgba(0,0,0,0.2);
-  flex-shrink: 0;
-  height: 54px;
-  box-sizing: border-box;
-}
-
-.cancelBtn, .saveBtn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 32px;
-  padding: 0 16px;
-  border-radius: 5px;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: bold;
-  line-height: 1;
-  box-sizing: border-box;
-  outline: none;
-  transition: all 0.15s ease-out;
-}
-
-.cancelBtn { 
-  background: rgba(255,255,255,0.05); 
-  border: 1px solid var(--rpg-border); 
-  color: var(--rpg-text); 
-}
-
-.cancelBtn:hover {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: var(--rpg-highlight);
-}
-
-.saveBtn { 
-  background: var(--rpg-highlight-bg); 
-  border: 1px solid var(--rpg-highlight); 
-  color: var(--rpg-highlight); 
-}
-
-.saveBtn:hover {
-  opacity: 0.9;
-}
-
-/* 폼 시각 에디터 컴포넌트 추가 스타일 */
-
-.syncLiveBtn {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--rpg-border);
-  color: var(--rpg-text);
-  font-size: 10.5px;
-  font-weight: bold;
-  height: 22px;
-  padding: 0 10px;
-  border-radius: 4px;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
-  outline: none;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
-}
-
-.syncLiveBtn:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: var(--rpg-highlight);
-  color: var(--rpg-highlight);
+  box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.5);
 }
 
 .editorGroupBlock {

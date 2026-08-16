@@ -1,6 +1,18 @@
 import { getDefaultCharacters } from './PromptSchema.js';
 import { sanitizeTrackerData, cleanIdString, generateUniqueId, parseMetadata } from './JSONTracker_Migrator.js';
 
+const IGNORED_CHAR_KEYS = new Set([
+    'character name',
+    'character_name',
+    'character',
+    'target name',
+    'target_name',
+    'target example',
+    'target_example',
+    'your character',
+    'player character'
+]);
+
 function isPlaceholderValue(val) {
     if (typeof val === 'string' && val.toLowerCase().includes('<new_value')) return true;
     return false;
@@ -603,19 +615,26 @@ export function applyLLMPatch(trackerData, patch, isPlayer = false, updateType =
         Object.entries(normalizedPatch).forEach(([charName, rawUpdates]) => {
             if (!rawUpdates || typeof rawUpdates !== 'object') return;
 
-            const updates = normalizeKeys(rawUpdates);
+            const cleanName = charName.trim();
+            const lowerName = cleanName.toLowerCase();
 
-            if (charName.toLowerCase() === 'world' || charName.toLowerCase() === 'worldstate') {
+            if (lowerName === 'world' || lowerName === 'worldstate') {
+                const updates = normalizeKeys(rawUpdates);
                 updatedData.worldState = mergeWorldState(updatedData.worldState, updates, updatedData.worldStateLocks);
                 return;
             }
 
-            const existingChar = updatedData.characters.find(c => c.name?.trim().toLowerCase() === charName.trim().toLowerCase());
+            if (IGNORED_CHAR_KEYS.has(lowerName) || isPlaceholderValue(cleanName)) {
+                return;
+            }
+
+            const existingChar = updatedData.characters.find(c => c.name?.trim().toLowerCase() === lowerName);
             if (existingChar && existingChar.activeInjection === false) {
                 return;
             }
 
-            const char = getOrCreateCharacter(updatedData.characters, charName, isPlayer, rawUpdates);
+            const char = getOrCreateCharacter(updatedData.characters, cleanName, isPlayer, rawUpdates);
+            const updates = normalizeKeys(rawUpdates);
 
             let statusUpdates = updates.status || updates.stats || null;
             if (!statusUpdates && !updates.profile && !updates.relations && !updates.inventory && !updates.quests) {

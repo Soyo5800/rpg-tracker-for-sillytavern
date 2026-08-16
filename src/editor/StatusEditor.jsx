@@ -1,4 +1,3 @@
-// src/editor/StatusEditor.jsx
 import React, { useState, useEffect } from 'react';
 import { useRPG } from '../core/RPGControl';
 import styles from './StatusEditor.module.css';
@@ -117,7 +116,7 @@ export default function StatusEditor({ charId, initialTab = 'status', onClose, c
   if (!charId || !targetChar) {
     if (!charId) {
       return (
-        <button type="button" className={styles.addCharMainBtn} onClick={handleAddCharacter}>
+        <button type="button" className="rpg-btn-dashed" onClick={handleAddCharacter}>
           + Add Character
         </button>
       );
@@ -157,7 +156,6 @@ export default function StatusEditor({ charId, initialTab = 'status', onClose, c
     }
   };
 
-  // 기능 1: 카드 내부 메타데이터 프리셋을 가져와 바깥 활성 세션 상태 필드에 로드
   const handleLoadPresetToActive = () => {
     const context = window.SillyTavern?.getContext?.();
     const syncedAvatar = targetChar.syncedCardAvatar;
@@ -192,7 +190,6 @@ export default function StatusEditor({ charId, initialTab = 'status', onClose, c
     }
   };
 
-  // 기능 2: 현재 바깥 활성 세션의 필드 값을 프리셋 편집기 가상 타겟(샌드박스) 내부로 수집
   const handleLoadActiveToPreset = () => {
     if (window.confirm("Are you sure you want to copy the active session's current status and features into this preset editor? This will overwrite your working preset edits.")) {
       setPresetEditingTarget(prev => ({
@@ -237,7 +234,6 @@ export default function StatusEditor({ charId, initialTab = 'status', onClose, c
 
   const handleResetCharacter = () => {
     if (isEditingPreset) {
-      // 카드 메타데이터에 실제 저장된 원래의 파일 값으로 되돌리는 복원 로직
       const context = window.SillyTavern?.getContext?.();
       const syncedAvatar = targetChar.syncedCardAvatar;
       const allChars = Array.isArray(context?.characters) ? context.characters : (Array.isArray(window.characters) ? window.characters : []);
@@ -261,7 +257,6 @@ export default function StatusEditor({ charId, initialTab = 'status', onClose, c
         }));
       }
     } else {
-      // 바깥 활성 세션 상태 초기화 (기존 동작 방식 유지)
       const context = window.SillyTavern?.getContext?.();
       const allChars = Array.isArray(context?.characters) ? context.characters : (Array.isArray(window.characters) ? window.characters : []);
       const matchedCard = allChars.find(c => c.avatar === targetChar.syncedCardAvatar);
@@ -454,22 +449,14 @@ export default function StatusEditor({ charId, initialTab = 'status', onClose, c
   const isSyncedCard = targetChar.syncedCardAvatar && targetChar.syncedCardType === 'Card';
 
   return (
-    <div className={styles.editorOverlay}>
-      <div className={styles.editorModal} onClick={(e) => e.stopPropagation()}>
-        <header className={styles.editorHeader}>
+    <div className="rpg-modal-overlay">
+      <div className="rpg-modal-container" onClick={(e) => e.stopPropagation()}>
+        <header className="rpg-modal-header">
           {isEditingPreset ? (
             <div className={styles.headerNav} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <button
                 type="button"
-                className={styles.flatHeaderAddBtn}
-                style={{
-                  height: '28px',
-                  padding: '4px 10px',
-                  fontSize: '11px',
-                  fontWeight: 'bold',
-                  borderColor: 'rgba(255,255,255,0.25)',
-                  cursor: 'pointer'
-                }}
+                className="rpg-btn rpg-btn-sm"
                 onClick={() => setPresetEditingTarget(null)}
               >
                 Back
@@ -500,14 +487,14 @@ export default function StatusEditor({ charId, initialTab = 'status', onClose, c
                 <>
                   <button
                     type="button"
-                    className={styles.flatHeaderAddBtn}
+                    className="rpg-btn rpg-btn-sm"
                     onClick={handleOpenPresetEditor}
                   >
                     Edit Preset
                   </button>
                   <button
                     type="button"
-                    className={styles.flatHeaderAddBtn}
+                    className="rpg-btn rpg-btn-sm"
                     onClick={handleLoadPresetToActive}
                   >
                     Load Preset
@@ -516,64 +503,94 @@ export default function StatusEditor({ charId, initialTab = 'status', onClose, c
               )}
             </div>
           )}
-          <button className={styles.closeBtn} onClick={isEditingPreset ? () => setPresetEditingTarget(null) : onClose}>×</button>
+          <button className="rpg-modal-close-btn" onClick={isEditingPreset ? () => setPresetEditingTarget(null) : onClose}>×</button>
         </header>
 
-        <div className={styles.editorTabs}>
-          <button type="button" className={`${styles.tabBtn} ${activeTab === 'status' ? styles.tabBtnActive : ''}`} onClick={() => setActiveTab('status')}>Status</button>
-          <button type="button" className={`${styles.tabBtn} ${activeTab === 'relations' ? styles.tabBtnActive : ''}`} onClick={() => setActiveTab('relations')}>Relations</button>
-          <button type="button" className={`${styles.tabBtn} ${activeTab === 'inventory' ? styles.tabBtnActive : ''}`} onClick={() => setActiveTab('inventory')}>Inventory</button>
+        <div className="rpg-tab-nav">
+          <button
+            type="button"
+            className={`rpg-tab-btn ${activeTab === 'status' ? 'active' : ''}`}
+            onClick={() => setActiveTab('status')}
+          >
+            Status
+          </button>
+          <button
+            type="button"
+            className={`rpg-tab-btn ${activeTab === 'relations' ? 'active' : ''}`}
+            onClick={() => setActiveTab('relations')}
+          >
+            Relations
+          </button>
+          <button
+            type="button"
+            className={`rpg-tab-btn ${activeTab === 'inventory' ? 'active' : ''}`}
+            onClick={() => setActiveTab('inventory')}
+          >
+            Inventory
+          </button>
         </div>
 
-        <div className={styles.editorBody}>
+        <div className="rpg-modal-body">
           {activeTab === 'status' && (
             <StatusSpecsTab
-              charId={currentEditingChar.id} targetChar={currentEditingChar} localCharacters={currentEditingList}
-              setLocalCharacters={handleUpdateList} expandedIds={expandedIds} setExpandedIds={setExpandedIds}
-              updateSchemaField={updateSchemaField} handleUpdateNestedField={handleUpdateNestedField}
+              charId={currentEditingChar.id}
+              targetChar={currentEditingChar}
+              localCharacters={currentEditingList}
+              setLocalCharacters={handleUpdateList}
+              expandedIds={expandedIds}
+              setExpandedIds={setExpandedIds}
+              updateSchemaField={updateSchemaField}
+              handleUpdateNestedField={handleUpdateNestedField}
             />
           )}
           {activeTab === 'relations' && (
             <RelationsTab
-              charId={currentEditingChar.id} targetChar={currentEditingChar} localCharacters={currentEditingList}
-              setLocalCharacters={handleUpdateList} expandedIds={expandedIds} setExpandedIds={setExpandedIds}
+              charId={currentEditingChar.id}
+              targetChar={currentEditingChar}
+              localCharacters={currentEditingList}
+              setLocalCharacters={handleUpdateList}
+              expandedIds={expandedIds}
+              setExpandedIds={setExpandedIds}
             />
           )}
           {activeTab === 'inventory' && (
             <InventoryTab
-              charId={currentEditingChar.id} targetChar={currentEditingChar} localCharacters={currentEditingList}
-              setLocalCharacters={handleUpdateList} expandedIds={expandedIds} setExpandedIds={setExpandedIds}
+              charId={currentEditingChar.id}
+              targetChar={currentEditingChar}
+              localCharacters={currentEditingList}
+              setLocalCharacters={handleUpdateList}
+              expandedIds={expandedIds}
+              setExpandedIds={setExpandedIds}
               handleUpdateNestedField={handleUpdateNestedField}
             />
           )}
         </div>
 
-        <footer className={styles.editorFooter}>
+        <footer className="rpg-modal-footer">
           {isEditingPreset ? (
             <>
-              {/* Reset 시 메타데이터 원본 복원, Delete 시 메타 비우기, Load 시 실시간 세션 값을 수집 */}
-              <div className={styles.footerLeft} style={{ display: 'flex', gap: '6px' }}>
-                <button className={`${styles.footerBtn} ${styles.reset}`} onClick={handleResetCharacter}>Reset</button>
-                <button className={`${styles.footerBtn} ${styles.reset}`} onClick={handleDeletePresetFromCard}>Delete</button>
-                <button className={styles.footerBtn} onClick={handleLoadActiveToPreset}>Load</button>
+              <div className="rpg-modal-footer-left">
+                <button className="rpg-modal-btn reset" onClick={handleResetCharacter}>Reset</button>
+                <button className="rpg-modal-btn reset" onClick={handleDeletePresetFromCard}>Delete</button>
+                <button className="rpg-modal-btn" onClick={handleLoadActiveToPreset}>Load</button>
               </div>
-              <div className={styles.footerRight}>
-                <button className={`${styles.footerBtn} ${styles.save}`} onClick={handleSavePresetToCard}>Save Preset to Card</button>
+              <div className="rpg-modal-footer-right">
+                <button className="rpg-modal-btn save" onClick={handleSavePresetToCard}>Save Preset to Card</button>
               </div>
             </>
           ) : (
             <>
-              <div className={styles.footerLeft}>
-                <button className={`${styles.footerBtn} ${styles.reset}`} onClick={handleResetCharacter}>Reset</button>
-                <button className={`${styles.footerBtn} ${styles.reset}`} style={{ marginLeft: '6px' }} onClick={handleDeleteCharacter}>Delete</button>
+              <div className="rpg-modal-footer-left">
+                <button className="rpg-modal-btn reset" onClick={handleResetCharacter}>Reset</button>
+                <button className="rpg-modal-btn reset" onClick={handleDeleteCharacter}>Delete</button>
               </div>
-              <div className={styles.footerRight}>
-                <button className={styles.footerBtn} onClick={handleExportCharacter}>Export</button>
-                <label className={styles.footerBtn} style={{ cursor: 'pointer', margin: '0 6px' }}>
+              <div className="rpg-modal-footer-right">
+                <button className="rpg-modal-btn" onClick={handleExportCharacter}>Export</button>
+                <label className="rpg-modal-btn" style={{ cursor: 'pointer' }}>
                   Import
                   <input type="file" accept=".json" style={{ display: 'none' }} onChange={handleImportCharacter} />
                 </label>
-                <button className={`${styles.footerBtn} ${styles.save}`} onClick={handleSaveChanges}>Save</button>
+                <button className="rpg-modal-btn save" onClick={handleSaveChanges}>Save</button>
               </div>
             </>
           )}

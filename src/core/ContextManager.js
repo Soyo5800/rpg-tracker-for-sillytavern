@@ -1,4 +1,3 @@
-// src/core/ContextManager.js
 import { extension_settings } from "../../../../../extensions.js";
 
 /**
@@ -10,15 +9,30 @@ export function registerContextInterceptor(extensionName) {
     const interceptor = function RPGTracker_interceptGeneration(chat, _contextSize, _abort, type) {
         const isQuiet = type === 'quiet' || globalThis.rpgTracker_isQuietUpdating || window.RPGBridge?.isQuietUpdating;
         if (!isQuiet) return;
-        if (!Array.isArray(chat)) return;
+        if (!Array.isArray(chat) || chat.length === 0) return;
 
         const settings = window.RPGBridge?.latestSettings || extension_settings[extensionName] || extension_settings['rpg-tracker-for-sillytavern'] || {};
         const rawLimit = settings.contextMessageLimit;
         const limit = (rawLimit !== undefined && rawLimit !== null && !isNaN(Number(rawLimit))) ? Math.max(0, Number(rawLimit)) : 4;
 
-        while (chat.length > limit) {
-            chat.shift();
-        }
+        // Separate the quiet prompt instruction from the chat history
+        const instructionMessage = chat[chat.length - 1];
+        const historyMessages = chat.slice(0, chat.length - 1);
+
+        // Filter out SillyTavern system messages (/sys) and tracker notification logs
+        const validChatMessages = historyMessages.filter(msg => {
+            if (!msg) return false;
+            if (msg.is_system === true || msg.extra?.is_system === true || msg.extra?.type === 'system') return false;
+            if (typeof msg.mes === 'string' && msg.mes.startsWith('[RPG Tracker]')) return false;
+            return true;
+        });
+
+        // Slice exact amount of recent chat messages based on configured limit
+        const slicedHistory = limit > 0 ? validChatMessages.slice(-limit) : [];
+
+        // Reconstruct chat array preserving exact history count and trailing instruction
+        const finalChat = [...slicedHistory, instructionMessage];
+        chat.splice(0, chat.length, ...finalChat);
     };
 
     globalThis.RPGTracker_interceptGeneration = interceptor;

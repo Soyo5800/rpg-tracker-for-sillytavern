@@ -1,10 +1,80 @@
-// src/editor/tabs/StatusSpecsTab.jsx
 import React, { useState } from 'react';
 import styles from './StatusEditor.module.css';
+import { AccordionArrow, SortButtons, ToggleSwitch } from '../utils';
+
+// Status 필드 세부 속성 설정 폼 (PromptEditor와 공용으로 사용)
+export function StatusSpecConfig({
+  type = 'consumable',
+  min = 0,
+  max = 100,
+  color = '#e74c3c',
+  disabled = false,
+  onChange
+}) {
+  return (
+    <div className={styles.itemFields}>
+      <div className={styles.inlineRow}>
+        <label>Type</label>
+        <select
+          value={type}
+          disabled={disabled}
+          onChange={(e) => onChange && onChange('type', e.target.value)}
+          className="rpg-select-custom"
+        >
+          <option value="consumable">Consumable (Max ➔ 0)</option>
+          <option value="stacking">Stacking (0 ➔ Max)</option>
+          <option value="integer">Integer</option>
+          <option value="text">Text</option>
+        </select>
+      </div>
+
+      {type !== 'text' && (
+        <>
+          <div className={styles.inlineRow}>
+            <label>Min Limit</label>
+            <input
+              type="number"
+              disabled={disabled}
+              value={min !== undefined && min !== null ? min : 0}
+              onChange={(e) => onChange && onChange('min', Number(e.target.value))}
+            />
+          </div>
+          <div className={styles.inlineRow}>
+            <label>Max Limit</label>
+            <input
+              type="number"
+              disabled={disabled}
+              value={max !== undefined && max !== null ? max : 100}
+              onChange={(e) => onChange && onChange('max', Number(e.target.value))}
+            />
+          </div>
+        </>
+      )}
+
+      {['consumable', 'stacking'].includes(type) && (
+        <div className={styles.inlineRow}>
+          <label>Visual Color</label>
+          <input
+            type="color"
+            disabled={disabled}
+            value={color || (type === 'stacking' ? '#3498db' : '#e74c3c')}
+            onChange={(e) => onChange && onChange('color', e.target.value)}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function StatusSpecsTab({
-  charId, targetChar, localCharacters, setLocalCharacters,
-  expandedIds, setExpandedIds, updateSchemaField, handleUpdateNestedField
+  charId,
+  targetChar,
+  localCharacters,
+  setLocalCharacters,
+  expandedIds,
+  setExpandedIds,
+  updateSchemaField,
+  handleUpdateNestedField
 }) {
   const [gaugePreset, setGaugePreset] = useState('0~100');
   const [gaugeMin, setGaugeMin] = useState(0);
@@ -46,6 +116,7 @@ export default function StatusSpecsTab({
       isLocked: false,
       isInject: true
     };
+
     setLocalCharacters(localCharacters.map(c =>
       c.id === charId
         ? {
@@ -146,6 +217,7 @@ export default function StatusSpecsTab({
 
   return (
     <div className={styles.statEditorDetail}>
+      {/* Consumables & Stackings */}
       <div className={styles.sectionWrapper}>
         <div className={styles.sectionHeaderLine}>
           <h5>Consumables & Stackings</h5>
@@ -156,20 +228,39 @@ export default function StatusSpecsTab({
                 setGaugePreset(e.target.value);
                 if (e.target.value !== 'custom') { setGaugeMin(0); setGaugeMax(100); }
               }}
-              className={styles.presetSelect}
+              className="rpg-select-custom"
             >
               <option value="0~100">0~100</option>
               <option value="custom">custom</option>
             </select>
             <div className={styles.metricLimitWrapper}>
               <span className={styles.metricLimitLabel}>min</span>
-              <input type="number" value={gaugeMin} disabled={gaugePreset !== 'custom'} onChange={e => setGaugeMin(Number(e.target.value))} className={styles.limitInput} />
+              <input
+                type="number"
+                value={gaugeMin}
+                disabled={gaugePreset !== 'custom'}
+                onChange={e => setGaugeMin(Number(e.target.value))}
+                className={styles.limitInput}
+              />
               <span className={styles.metricLimitLabel}>max</span>
-              <input type="number" value={gaugeMax} disabled={gaugePreset !== 'custom'} onChange={e => setGaugeMax(Number(e.target.value))} className={styles.limitInput} />
+              <input
+                type="number"
+                value={gaugeMax}
+                disabled={gaugePreset !== 'custom'}
+                onChange={e => setGaugeMax(Number(e.target.value))}
+                className={styles.limitInput}
+              />
             </div>
-            <button className={styles.addQuickFieldBtn} onClick={() => handleAddStat('consumable', gaugeMin, gaugeMax)}>+Add</button>
+            <button
+              type="button"
+              className="rpg-btn-sm"
+              onClick={() => handleAddStat('consumable', gaugeMin, gaugeMax)}
+            >
+              +Add
+            </button>
           </div>
         </div>
+
         {groupedStatus.gauge.length === 0 ? (
           <p className={styles.emptySectionText}>No gauge fields defined.</p>
         ) : (
@@ -177,51 +268,57 @@ export default function StatusSpecsTab({
             <div key={item.id} className={`${styles.schemaItem} ${expandedIds[item.id] ? styles.itemExpanded : ''}`}>
               <div className={styles.itemHeader}>
                 <div className={styles.headerLeftZone}>
-                  <button type="button" className={`${styles.accordionToggleBtn} ${expandedIds[item.id] ? styles.activeToggle : ''}`} onClick={() => toggleAccordion(item.id)}>▶</button>
-                  <input type="text" value={item.name} onChange={e => updateSchemaField(item.id, 'name', e.target.value)} onBlur={e => handleSchemaNameBlur(item.id, e.target.value)} className={styles.nameInput} />
+                  <AccordionArrow
+                    isExpanded={!!expandedIds[item.id]}
+                    onClick={() => toggleAccordion(item.id)}
+                  />
+                  <input
+                    type="text"
+                    value={item.name}
+                    onChange={e => updateSchemaField(item.id, 'name', e.target.value)}
+                    onBlur={e => handleSchemaNameBlur(item.id, e.target.value)}
+                    className={styles.nameInput}
+                  />
                   <span className={styles.fixedBadge}>{item.type.toUpperCase()}</span>
                 </div>
                 <div className={styles.headerRightZone}>
-                  <label className={styles.switchRow} title="Toggle Prompt Injection">
-                    <span>Inject</span>
-                    <div className={styles.switchLabel}>
-                      <input type="checkbox" className={styles.switchInput} checked={item.isInject !== false} onChange={e => updateSchemaField(item.id, 'isInject', e.target.checked)} />
-                      <span className={styles.switchSlider}></span>
-                    </div>
-                  </label>
-                  <button type="button" className={styles.sortBtn} disabled={fIdx === 0} onClick={() => handleMoveStat(item.id, 'up')}>▲</button>
-                  <button type="button" className={styles.sortBtn} disabled={fIdx === groupedStatus.gauge.length - 1} onClick={() => handleMoveStat(item.id, 'down')}>▼</button>
-                  <button type="button" className={styles.removeInlineBtn} onClick={() => removeField(item.id)}>X</button>
+                  <ToggleSwitch
+                    label="Inject"
+                    checked={item.isInject !== false}
+                    onChange={checked => updateSchemaField(item.id, 'isInject', checked)}
+                    title="Toggle Prompt Injection"
+                  />
+                  <SortButtons
+                    isFirst={fIdx === 0}
+                    isLast={fIdx === groupedStatus.gauge.length - 1}
+                    onMoveUp={() => handleMoveStat(item.id, 'up')}
+                    onMoveDown={() => handleMoveStat(item.id, 'down')}
+                  />
+                  <button
+                    type="button"
+                    className="rpg-btn-del"
+                    onClick={() => removeField(item.id)}
+                  >
+                    ×
+                  </button>
                 </div>
               </div>
+
               {expandedIds[item.id] && (
-                <div className={styles.itemFields}>
-                  <div className={styles.inlineRow}>
-                    <label>Type</label>
-                    <select value={item.type} onChange={e => updateSchemaField(item.id, 'type', e.target.value)}>
-                      <option value="consumable">Consumable (Max ➔ 0)</option>
-                      <option value="stacking">Stacking (0 ➔ Max)</option>
-                    </select>
-                  </div>
-                  <div className={styles.inlineRow}>
-                    <label>Min Limit</label>
-                    <input type="number" value={item.min !== undefined && item.min !== null ? item.min : 0} onChange={e => updateSchemaField(item.id, 'min', Number(e.target.value))} />
-                  </div>
-                  <div className={styles.inlineRow}>
-                    <label>Max Limit</label>
-                    <input type="number" value={item.max || 100} onChange={e => updateSchemaField(item.id, 'max', Number(e.target.value))} />
-                  </div>
-                  <div className={styles.inlineRow}>
-                    <label>Visual Color</label>
-                    <input type="color" value={item.color || '#3498db'} onChange={e => updateSchemaField(item.id, 'color', e.target.value)} />
-                  </div>
-                </div>
+                <StatusSpecConfig
+                  type={item.type}
+                  min={item.min}
+                  max={item.max}
+                  color={item.color}
+                  onChange={(key, val) => updateSchemaField(item.id, key, val)}
+                />
               )}
             </div>
           ))
         )}
       </div>
 
+      {/* Integer */}
       <div className={styles.sectionWrapper}>
         <div className={styles.sectionHeaderLine}>
           <h5>Integer</h5>
@@ -233,7 +330,7 @@ export default function StatusSpecsTab({
                 if (e.target.value === '0~25') { setIntegerMin(0); setIntegerMax(25); }
                 else if (e.target.value === '0~100') { setIntegerMin(0); setIntegerMax(100); }
               }}
-              className={styles.presetSelect}
+              className="rpg-select-custom"
             >
               <option value="0~25">0~25</option>
               <option value="0~100">0~100</option>
@@ -241,13 +338,32 @@ export default function StatusSpecsTab({
             </select>
             <div className={styles.metricLimitWrapper}>
               <span className={styles.metricLimitLabel}>min</span>
-              <input type="number" value={integerMin} disabled={integerPreset !== 'custom'} onChange={e => setIntegerMin(Number(e.target.value))} className={styles.limitInput} />
+              <input
+                type="number"
+                value={integerMin}
+                disabled={integerPreset !== 'custom'}
+                onChange={e => setIntegerMin(Number(e.target.value))}
+                className={styles.limitInput}
+              />
               <span className={styles.metricLimitLabel}>max</span>
-              <input type="number" value={integerMax} disabled={integerPreset !== 'custom'} onChange={e => setIntegerMax(Number(e.target.value))} className={styles.limitInput} />
+              <input
+                type="number"
+                value={integerMax}
+                disabled={integerPreset !== 'custom'}
+                onChange={e => setIntegerMax(Number(e.target.value))}
+                className={styles.limitInput}
+              />
             </div>
-            <button className={styles.addQuickFieldBtn} onClick={() => handleAddStat('integer', integerMin, integerMax)}>+Add</button>
+            <button
+              type="button"
+              className="rpg-btn-sm"
+              onClick={() => handleAddStat('integer', integerMin, integerMax)}
+            >
+              +Add
+            </button>
           </div>
         </div>
+
         {groupedStatus.integer.length === 0 ? (
           <p className={styles.emptySectionText}>No integer fields defined.</p>
         ) : (
@@ -255,45 +371,70 @@ export default function StatusSpecsTab({
             <div key={item.id} className={`${styles.schemaItem} ${expandedIds[item.id] ? styles.itemExpanded : ''}`}>
               <div className={styles.itemHeader}>
                 <div className={styles.headerLeftZone}>
-                  <button type="button" className={`${styles.accordionToggleBtn} ${expandedIds[item.id] ? styles.activeToggle : ''}`} onClick={() => toggleAccordion(item.id)}>▶</button>
-                  <input type="text" value={item.name} placeholder="Field Name" onChange={e => updateSchemaField(item.id, 'name', e.target.value)} onBlur={e => handleSchemaNameBlur(item.id, e.target.value)} className={styles.nameInput} />
+                  <AccordionArrow
+                    isExpanded={!!expandedIds[item.id]}
+                    onClick={() => toggleAccordion(item.id)}
+                  />
+                  <input
+                    type="text"
+                    value={item.name}
+                    placeholder="Field Name"
+                    onChange={e => updateSchemaField(item.id, 'name', e.target.value)}
+                    onBlur={e => handleSchemaNameBlur(item.id, e.target.value)}
+                    className={styles.nameInput}
+                  />
                   <span className={styles.fixedBadge}>INT</span>
                 </div>
                 <div className={styles.headerRightZone}>
-                  <label className={styles.switchRow} title="Toggle Prompt Injection">
-                    <span>Inject</span>
-                    <div className={styles.switchLabel}>
-                      <input type="checkbox" className={styles.switchInput} checked={item.isInject !== false} onChange={e => updateSchemaField(item.id, 'isInject', e.target.checked)} />
-                      <span className={styles.switchSlider}></span>
-                    </div>
-                  </label>
-                  <button type="button" className={styles.sortBtn} disabled={fIdx === 0} onClick={() => handleMoveStat(item.id, 'up')}>▲</button>
-                  <button type="button" className={styles.sortBtn} disabled={fIdx === groupedStatus.integer.length - 1} onClick={() => handleMoveStat(item.id, 'down')}>▼</button>
-                  <button type="button" className={styles.removeInlineBtn} onClick={() => removeField(item.id)}>X</button>
+                  <ToggleSwitch
+                    label="Inject"
+                    checked={item.isInject !== false}
+                    onChange={checked => updateSchemaField(item.id, 'isInject', checked)}
+                    title="Toggle Prompt Injection"
+                  />
+                  <SortButtons
+                    isFirst={fIdx === 0}
+                    isLast={fIdx === groupedStatus.integer.length - 1}
+                    onMoveUp={() => handleMoveStat(item.id, 'up')}
+                    onMoveDown={() => handleMoveStat(item.id, 'down')}
+                  />
+                  <button
+                    type="button"
+                    className="rpg-btn-del"
+                    onClick={() => removeField(item.id)}
+                  >
+                    ×
+                  </button>
                 </div>
               </div>
+
               {expandedIds[item.id] && (
-                <div className={styles.itemFields}>
-                  <div className={styles.inlineRow}>
-                    <label>Min Limit</label>
-                    <input type="number" value={item.min !== undefined && item.min !== null ? item.min : 0} onChange={e => updateSchemaField(item.id, 'min', Number(e.target.value))} />
-                  </div>
-                  <div className={styles.inlineRow}>
-                    <label>Max Limit</label>
-                    <input type="number" value={item.max !== undefined && item.max !== null ? item.max : 100} onChange={e => updateSchemaField(item.id, 'max', Number(e.target.value))} />
-                  </div>
-                </div>
+                <StatusSpecConfig
+                  type={item.type}
+                  min={item.min}
+                  max={item.max}
+                  color={item.color}
+                  onChange={(key, val) => updateSchemaField(item.id, key, val)}
+                />
               )}
             </div>
           ))
         )}
       </div>
 
+      {/* Text */}
       <div className={styles.sectionWrapper}>
         <div className={styles.sectionHeaderLine}>
           <h5>Text</h5>
-          <button className={styles.addQuickFieldBtn} onClick={() => handleAddStat('text')}>+ Add Text</button>
+          <button
+            type="button"
+            className="rpg-btn-sm"
+            onClick={() => handleAddStat('text')}
+          >
+            + Add Text
+          </button>
         </div>
+
         {groupedStatus.text.length === 0 ? (
           <p className={styles.emptySectionText}>No custom text fields defined.</p>
         ) : (
@@ -301,20 +442,36 @@ export default function StatusSpecsTab({
             <div key={item.id} className={styles.schemaItem}>
               <div className={styles.itemHeader}>
                 <div className={styles.headerLeftZone}>
-                  <input type="text" value={item.name} placeholder="Field Name" onChange={e => updateSchemaField(item.id, 'name', e.target.value)} onBlur={e => handleSchemaNameBlur(item.id, e.target.value)} className={styles.nameInput} />
+                  <input
+                    type="text"
+                    value={item.name}
+                    placeholder="Field Name"
+                    onChange={e => updateSchemaField(item.id, 'name', e.target.value)}
+                    onBlur={e => handleSchemaNameBlur(item.id, e.target.value)}
+                    className={styles.nameInput}
+                  />
                   <span className={styles.fixedBadge}>TEXT</span>
                 </div>
                 <div className={styles.headerRightZone}>
-                  <label className={styles.switchRow} title="Toggle Prompt Injection">
-                    <span>Inject</span>
-                    <div className={styles.switchLabel}>
-                      <input type="checkbox" className={styles.switchInput} checked={item.isInject !== false} onChange={e => updateSchemaField(item.id, 'isInject', e.target.checked)} />
-                      <span className={styles.switchSlider}></span>
-                    </div>
-                  </label>
-                  <button type="button" className={styles.sortBtn} disabled={fIdx === 0} onClick={() => handleMoveStat(item.id, 'up')}>▲</button>
-                  <button type="button" className={styles.sortBtn} disabled={fIdx === groupedStatus.text.length - 1} onClick={() => handleMoveStat(item.id, 'down')}>▼</button>
-                  <button type="button" className={styles.removeInlineBtn} onClick={() => removeField(item.id)}>X</button>
+                  <ToggleSwitch
+                    label="Inject"
+                    checked={item.isInject !== false}
+                    onChange={checked => updateSchemaField(item.id, 'isInject', checked)}
+                    title="Toggle Prompt Injection"
+                  />
+                  <SortButtons
+                    isFirst={fIdx === 0}
+                    isLast={fIdx === groupedStatus.text.length - 1}
+                    onMoveUp={() => handleMoveStat(item.id, 'up')}
+                    onMoveDown={() => handleMoveStat(item.id, 'down')}
+                  />
+                  <button
+                    type="button"
+                    className="rpg-btn-del"
+                    onClick={() => removeField(item.id)}
+                  >
+                    ×
+                  </button>
                 </div>
               </div>
             </div>
@@ -322,11 +479,13 @@ export default function StatusSpecsTab({
         )}
       </div>
 
+      {/* Profile */}
       <div className={styles.sectionWrapper}>
         <div className={styles.sectionHeaderLine}>
           <h5>Profile</h5>
           <button
-            className={styles.addQuickFieldBtn}
+            type="button"
+            className="rpg-btn-sm"
             onClick={() => {
               const prof = targetChar.profile || {};
               let baseKey = 'NewField';
@@ -342,6 +501,7 @@ export default function StatusSpecsTab({
             + Add Field
           </button>
         </div>
+
         <div className={styles.appearanceSection}>
           {profileKeys.length === 0 ? (
             <p className={styles.emptySectionText}>No profile fields defined.</p>
@@ -359,7 +519,8 @@ export default function StatusSpecsTab({
                         if (!newKey) { e.target.value = key; return; }
                         if (newKey !== key && targetChar.profile?.[newKey] !== undefined) {
                           alert(`The profile field name "${newKey}" already exists.`);
-                          e.target.value = key; return;
+                          e.target.value = key;
+                          return;
                         }
                         if (newKey !== key) {
                           const prof = { ...(targetChar.profile || {}) };
@@ -367,7 +528,9 @@ export default function StatusSpecsTab({
                           const pInjects = { ...(targetChar.profileInjects || {}) };
 
                           const keys = Object.keys(prof);
-                          const newProf = {}; const newLocks = {}; const newInjects = {};
+                          const newProf = {};
+                          const newLocks = {};
+                          const newInjects = {};
 
                           keys.forEach(k => {
                             if (k === key) {
@@ -388,36 +551,36 @@ export default function StatusSpecsTab({
                     <span className={styles.fixedBadge}>TEXT</span>
                   </div>
                   <div className={styles.headerRightZone}>
-                    <label className={styles.switchRow} title="Toggle Prompt Injection">
-                      <span>Inject</span>
-                      <div className={styles.switchLabel}>
-                        <input
-                          type="checkbox"
-                          className={styles.switchInput}
-                          checked={targetChar.profileInjects?.[key] !== false}
-                          onChange={e => {
-                            const injects = { ...(targetChar.profileInjects || {}) };
-                            injects[key] = e.target.checked;
-                            handleUpdateNestedField('profileInjects', null, injects);
-                          }}
-                        />
-                        <span className={styles.switchSlider}></span>
-                      </div>
-                    </label>
-                    <button type="button" className={styles.sortBtn} disabled={fIdx === 0} onClick={() => handleMoveProfile(key, 'up')}>▲</button>
-                    <button type="button" className={styles.sortBtn} disabled={fIdx === profileKeys.length - 1} onClick={() => handleMoveProfile(key, 'down')}>▼</button>
+                    <ToggleSwitch
+                      label="Inject"
+                      checked={targetChar.profileInjects?.[key] !== false}
+                      onChange={checked => {
+                        const injects = { ...(targetChar.profileInjects || {}) };
+                        injects[key] = checked;
+                        handleUpdateNestedField('profileInjects', null, injects);
+                      }}
+                      title="Toggle Prompt Injection"
+                    />
+                    <SortButtons
+                      isFirst={fIdx === 0}
+                      isLast={fIdx === profileKeys.length - 1}
+                      onMoveUp={() => handleMoveProfile(key, 'up')}
+                      onMoveDown={() => handleMoveProfile(key, 'down')}
+                    />
                     <button
                       type="button"
-                      className={styles.removeInlineBtn}
+                      className="rpg-btn-del"
                       onClick={() => {
                         const prof = { ...(targetChar.profile || {}) };
                         const pLocks = { ...(targetChar.profileLocks || {}) };
                         const pInjects = { ...(targetChar.profileInjects || {}) };
-                        delete prof[key]; delete pLocks[key]; delete pInjects[key];
+                        delete prof[key];
+                        delete pLocks[key];
+                        delete pInjects[key];
                         setLocalCharacters(localCharacters.map(c => c.id === charId ? { ...c, profile: prof, profileLocks: pLocks, profileInjects: pInjects } : c));
                       }}
                     >
-                      X
+                      ×
                     </button>
                   </div>
                 </div>

@@ -1,10 +1,9 @@
-// src/core/ExtensionBridge.js
 import { getContext, extension_settings, writeExtensionField } from "../../../../../extensions.js";
 import { saveSettingsDebounced, saveChat, saveChatConditional, updateMessageBlock, getRequestHeaders, getThumbnailUrl, user_avatar, setExtensionPrompt, extension_prompt_types, extension_prompt_roles } from "../../../../../../script.js";
 import { SlashCommandParser } from "../../../../../slash-commands/SlashCommandParser.js";
 import { backupToMessage, rehydrateFromHistory, rehydrateFromHistoryAsync, applyLLMPatch, extractNormalizedPatch } from "./JSONTracker.js";
 import { parseResponse } from "./ResponseParser.js";
-import { buildDefinitionPromptWrapper, getDynamicSchemaExample, buildStaticDefinitionsPrompt, buildDynamicValuesPrompt } from "./ActivePrompt.js";
+import { buildUpdatePromptWrapper } from "./ActivePrompt.js";
 import { DEFAULT_PROMPT_HEADER_SEP, DEFAULT_PROMPT_FOOTER_SEP } from "./PromptSchema.js";
 import { setDeltaLog } from "../tracker/DeltaLogRenderer.js";
 
@@ -205,7 +204,7 @@ export function establishBridgeConnection(extensionName) {
                 const header = trackerData.systemPromptHeader_separated !== undefined ? trackerData.systemPromptHeader_separated : DEFAULT_PROMPT_HEADER_SEP;
                 const footer = trackerData.systemPromptFooter_separated !== undefined ? trackerData.systemPromptFooter_separated : DEFAULT_PROMPT_FOOTER_SEP;
 
-                const defPrompt = buildDefinitionPromptWrapper(trackerData, header, footer, isPlayer);
+                const defPrompt = buildUpdatePromptWrapper(trackerData, header, footer, isPlayer);
 
                 try {
                     if (typeof setExtensionPrompt === 'function' && typeof extension_prompt_types !== 'undefined') {
@@ -269,19 +268,7 @@ export function establishBridgeConnection(extensionName) {
                 const header = trackerData.systemPromptHeader_separated !== undefined ? trackerData.systemPromptHeader_separated : DEFAULT_PROMPT_HEADER_SEP;
                 const footer = trackerData.systemPromptFooter_separated !== undefined ? trackerData.systemPromptFooter_separated : DEFAULT_PROMPT_FOOTER_SEP;
 
-                const schemaExample = getDynamicSchemaExample(trackerData) || '';
-                const staticDefs = buildStaticDefinitionsPrompt(trackerData) || '';
-                const statusReference = buildDynamicValuesPrompt(trackerData) || '';
-
-                const systemPromptParts = [
-                    header,
-                    schemaExample,
-                    staticDefs,
-                    statusReference,
-                    footer
-                ].filter(part => part && part.trim() !== '');
-
-                const systemPromptText = systemPromptParts.join('\n\n');
+                const systemPromptText = buildUpdatePromptWrapper(trackerData, header, footer);
 
                 try {
                     if (typeof setExtensionPrompt === 'function' && typeof extension_prompt_types !== 'undefined') {

@@ -1,5 +1,3 @@
-// src/messagetracker/SnapshotModal.jsx
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { useRPG } from '../core/RPGControl';
 import styles from './SnapshotModal.module.css';
@@ -286,38 +284,38 @@ export default function SnapshotModal() {
   };
 
   return (
-    <div className={styles.overlay}>
-      <div className={styles.modal} onClick={e => e.stopPropagation()}>
-        <header className={styles.header}>
+    <div className="rpg-modal-overlay">
+      <div className="rpg-modal-container" onClick={e => e.stopPropagation()}>
+        <header className="rpg-modal-header">
           <h4>Message Tracker</h4>
-          <button className={styles.closeBtn} onClick={handleClose}>×</button>
+          <button className="rpg-modal-close-btn" onClick={handleClose}>×</button>
         </header>
 
-        <div className={styles.tabNav}>
+        <nav className="rpg-tab-nav">
           <button
             type="button"
-            className={`${styles.tabBtn} ${activeTab === 'select' ? styles.tabActive : ''}`}
+            className={`rpg-tab-btn ${activeTab === 'select' ? 'active' : ''}`}
             onClick={() => setActiveTab('select')}
           >
             Select Targets
           </button>
           <button
             type="button"
-            className={`${styles.tabBtn} ${activeTab === 'editor' ? styles.tabActive : ''}`}
+            className={`rpg-tab-btn ${activeTab === 'editor' ? 'active' : ''}`}
             onClick={() => setActiveTab('editor')}
           >
             Edit Parameters
           </button>
           <button
             type="button"
-            className={`${styles.tabBtn} ${activeTab === 'preview' ? styles.tabActive : ''}`}
+            className={`rpg-tab-btn ${activeTab === 'preview' ? 'active' : ''}`}
             onClick={() => setActiveTab('preview')}
           >
             Preview JSON
           </button>
-        </div>
+        </nav>
 
-        <div className={styles.body}>
+        <div className="rpg-modal-body">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
             <div style={{ fontSize: '11px', opacity: 0.8, fontWeight: 'bold' }}>
               {isHistorical
@@ -326,7 +324,7 @@ export default function SnapshotModal() {
             </div>
             <button
               type="button"
-              className={styles.syncLiveBtn}
+              className="rpg-btn-sm"
               onClick={handleCopyCurrentSidebarState}
               title="Pull values and check options from the active live sidebar tracker panel"
             >
@@ -341,7 +339,7 @@ export default function SnapshotModal() {
                   <div className={styles.sectionTitle}>Entities & Options</div>
                   <button
                     type="button"
-                    className={styles.deselectAllBtn}
+                    className="rpg-btn-sm"
                     onClick={handleDeselectAll}
                     title="Deselect all elements & notes"
                   >
@@ -769,7 +767,7 @@ export default function SnapshotModal() {
                   <div className={styles.sectionTitle} style={{ margin: 0 }}>Payload Code</div>
                   <button
                     type="button"
-                    className={isEditable ? styles.viewBtnActive : styles.viewBtn}
+                    className={`rpg-btn-sm ${isEditable ? 'rpg-btn-primary' : ''}`}
                     onClick={() => {
                       if (isEditable) {
                         try {
@@ -802,9 +800,12 @@ export default function SnapshotModal() {
           )}
         </div>
 
-        <footer className={styles.footer}>
-          <button className={styles.cancelBtn} onClick={handleClose}>Cancel</button>
-          <button className={styles.saveBtn} onClick={handleAttach}>Attach Tracker</button>
+        <footer className="rpg-modal-footer">
+          <div className="rpg-modal-footer-left"></div>
+          <div className="rpg-modal-footer-right">
+            <button className="rpg-modal-btn" onClick={handleClose}>Cancel</button>
+            <button className="rpg-modal-btn save" onClick={handleAttach}>Attach Tracker</button>
+          </div>
         </footer>
       </div>
     </div>

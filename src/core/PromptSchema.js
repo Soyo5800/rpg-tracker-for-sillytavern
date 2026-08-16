@@ -1,5 +1,3 @@
-// src/core/PromptSchema.js
-
 export const DEFAULT_STATUS_SCHEMAS = [
   { id: 'HP', name: 'HP', type: 'consumable', min: 0, max: 100, color: '#e74c3c', isLocked: false, isInject: true },
   { id: 'Fatigue', name: 'Fatigue', type: 'stacking', min: 0, max: 100, color: '#f39c12', isLocked: false, isInject: true },
@@ -32,8 +30,8 @@ export const DEFAULT_GUIDE_PROMPTS = [
   { id: 'status', name: 'Update Status', prompt: 'Update active status parameters based on action outcomes, damage taken, or roleplay events in the chat.', enabled: true },
   { id: 'profile', name: 'Update Profile', prompt: 'Dynamically generate, update, or remove unlocked profile fields and parameters based on character cards, user persona, or chat context.', enabled: true },
   { id: 'relations', name: 'Update Relations', prompt: 'Reflect the latest changes in emotions, relationship metrics, and impressions. If the target is a minor/one-time NPC (no separate character card exists), you can also update "targetDescription" (how they feel about this character) and "targetMetrics" (their metrics toward this character) directly within this relation.', enabled: true },
-  { id: 'inventory', name: 'Update Inventory', prompt: 'If any items or equipment are acquired or lost, update the inventory and storage accordingly.', enabled: true },
-  { id: 'quests', name: 'Update Quests', prompt: 'If there is progress or a change in ongoing quests, update the quest list. Use status "ACTIVE" or "COMPLETED" to reflect progress.', enabled: true },
+  { id: 'inventory', name: 'Update Inventory', prompt: 'If any items or equipment are acquired or lost, update the inventory and storage accordingly. Applicable ONLY to the active player character.', enabled: true },
+  { id: 'quests', name: 'Update Quests', prompt: 'If there is progress or a change in ongoing quests, update the quest list. Use status "ACTIVE" or "COMPLETED" to reflect progress. Applicable ONLY to the active player character.', enabled: true },
   { id: 'world_date', name: 'Update Date', prompt: 'Update world date.', enabled: true },
   { id: 'world_time', name: 'Update Time', prompt: 'Update world time.', enabled: true },
   { id: 'world_weather', name: 'Update Weather', prompt: 'Update world weather.', enabled: true },
@@ -52,6 +50,7 @@ export const getDefaultCharacters = () => {
       status: JSON.parse(JSON.stringify(DEFAULT_STATUS)),
       profile: { Race: '', Height: '', Appearance: '' },
       profileLocks: { Race: false, Height: false, Appearance: false },
+      profileInjects: {},
       inventory: {
         equipIsLocked: false,
         equipIsInject: true,
@@ -79,15 +78,16 @@ export const getDefaultCharacters = () => {
 };
 
 export const DEFAULT_ADD_CHAR_PROMPT = `Based on the chat log, create a profile for the character.
-CRITICAL CONSTRAINT: You MUST separate numerical status parameters and text-based descriptive profile features.
-1. 'status': Put ALL numeric/integer status parameters and variables used for rolls, mechanics, or tests (e.g., Strength, Agility, Level, etc.) inside the 'status' object. Formatted as "value (type: integer, min: 0, max: 100)".
-2. 'profile': Keep 'profile' EXCLUSIVELY for text-based, non-numerical descriptions (e.g., Race, Gender, Height, Appearance, Personality, Background). Do NOT put any numeric/integer status parameters here.
-Create suitable status, profile features, and relations (including 'targetDescription' to define what the target thinks about this character) that fit their role. Return the result as a JSON block wrapped in an HTML comment with the identifier RPG_TRACKER. Omit inventory and quests unless necessary.`;
+CRITICAL CONSTRAINTS:
+1. 'status': Put ALL numerical/integer status parameters and variables used for rolls, mechanics, or tests (e.g., Strength, Agility, Level, etc.) inside the 'status' object. Formatted as "value (type: integer, min: 0, max: 100)".
+2. 'profile': Keep 'profile' EXCLUSIVELY for text-based, non-numerical descriptions (e.g., Race, Gender, Height, Appearance, Personality, Background). NEVER put any numerical status parameters here.
+3. 'inventory' & 'quests': Non-player characters must NEVER possess inventory or quests objects. Omit them entirely.
+Create suitable status, profile features, and relations (including 'targetDescription' to define what the target thinks about this character) that fit their role. Return the result as a JSON block wrapped in an HTML comment with the identifier RPG_TRACKER.`;
 
 export const DEFAULT_ADD_PLAYER_CHAR_PROMPT = `Based on the chat log, create a profile for the player character.
-CRITICAL CONSTRAINT: You MUST separate numerical status parameters and text-based descriptive profile features.
-1. 'status': Put ALL numeric/integer status parameters and variables used for rolls, mechanics, or tests (e.g., Strength, Agility, Level, etc.) inside the 'status' object. Formatted as "value (type: integer, min: 0, max: 100)".
-2. 'profile': Keep 'profile' EXCLUSIVELY for text-based, non-numerical descriptions (e.g., Race, Gender, Height, Appearance, Personality, Background). Do NOT put any numeric/integer status parameters here.
+CRITICAL CONSTRAINTS:
+1. 'status': Put ALL numerical/integer status parameters and variables used for rolls, mechanics, or tests (e.g., Strength, Agility, Level, etc.) inside the 'status' object. Formatted as "value (type: integer, min: 0, max: 100)".
+2. 'profile': Keep 'profile' EXCLUSIVELY for text-based, non-numerical descriptions (e.g., Race, Gender, Height, Appearance, Personality, Background). NEVER put any numerical status parameters here.
 3. 'inventory': Generate starting items. Differentiate item types:
    - "general": Standard items with 'quantity' and 'desc'.
    - "currency": Wealth items (e.g. Gold) with only 'quantity' (amount) and no desc.
@@ -98,28 +98,6 @@ Create suitable status, profile features, relations, starting inventory, and ini
 export const DEFAULT_CYOA_PROMPT = "CYOA Mode: Act as an interactive adventure where you present choices to the player at the end of each response.";
 export const DEFAULT_WEATHER_PROMPT = "Dynamic Weather: Include weather changes and environmental descriptions.";
 export const DEFAULT_WORLD_EVENTS_PROMPT = "World Events: Generate random world events that affect the current situation.";
-
-export const getInitialTrackerData = () => {
-  return {
-    characters: getDefaultCharacters(),
-    worldState: JSON.parse(JSON.stringify(DEFAULT_WORLD_STATE)),
-    worldStateLocks: { date: false, time: false, location: false, weather: false },
-    worldSchema: JSON.parse(JSON.stringify(DEFAULT_WORLD_SCHEMA)),
-    guidePrompts: JSON.parse(JSON.stringify(DEFAULT_GUIDE_PROMPTS)),
-    globalDefinitions: {},
-    systemPromptHeader_merged: DEFAULT_PROMPT_HEADER_MERGED,
-    systemPromptFooter_merged: DEFAULT_PROMPT_FOOTER_MERGED,
-    systemPrompt_readonly: DEFAULT_READONLY_CONTEXT_HEADER,
-    systemPromptHeader_separated: DEFAULT_PROMPT_HEADER_SEP,
-    systemPromptFooter_separated: DEFAULT_PROMPT_FOOTER_SEP,
-    addons: { weather: false, worldEvents: false, cyoa: false },
-    addCharPrompt: DEFAULT_ADD_CHAR_PROMPT,
-    addPlayerCharPrompt: DEFAULT_ADD_PLAYER_CHAR_PROMPT,
-    cyoaPrompt: DEFAULT_CYOA_PROMPT,
-    weatherPrompt: DEFAULT_WEATHER_PROMPT,
-    worldEventsPrompt: DEFAULT_WORLD_EVENTS_PROMPT
-  };
-};
 
 export const DEFAULT_PROMPT_HEADER_MERGED = `[RPG STATUS TRACKER SYSTEM]
 At the VERY BEGINNING of your response, you MUST output a JSON code block wrapped inside an HTML comment with the 'RPG_TRACKER' identifier.
@@ -136,9 +114,12 @@ export const DEFAULT_PROMPT_FOOTER_MERGED = `[SYSTEM RULES & GUIDELINES]
    - STATUS vs PROFILE: STRICT SEPARATION.
      > 'status': ONLY for numerical parameters or game-mechanics (type: consumable, stacking, integer).
      > 'profile': EXCLUSIVELY for text-based descriptions. NEVER put numeric parameters here.
+   - BOUNDARY ENFORCEMENT: Strictly obey Min and Max limits for all parameters and metrics. Clamp and freeze values at Min or Max bounds; NEVER output values exceeding specified boundaries.
    - Text Parameters (type: text): Keep descriptions extremely concise (e.g., "Healthy", "Injured (Left Leg)").
-3. DYNAMIC ENTITIES:
-   - Minor NPCs: If no separate card exists, update "targetDescription" and "targetMetrics" directly within their relation object.
+3. DYNAMIC ENTITIES & CONSTRAINTS:
+   - NO ARBITRARY CHARACTERS: Update ONLY existing characters provided in the reference. Do NOT create, introduce, or output new character objects in your JSON unless explicitly requested by the user.
+   - PLAYER VS NPC: Track 'inventory' and 'quests' EXCLUSIVELY for the active Player character (where activePlayer: true). NEVER generate or patch inventory or quests for non-player NPCs.
+   - MINOR NPCS: If an interaction occurs with an NPC who has no separate character card, update "targetDescription" and "targetMetrics" directly inside the relation object instead of creating a new character.
    - Quests & Events: Use consistent 'name' values to automatically merge updates. Use status "COMPLETED" or "ACTIVE".
    - Inventory: Diligently reflect item gains, losses, and equipment changes. Support standard items ("type": "general"), monetary units ("type": "currency"), and valuable properties ("type": "asset").
 4. LOCKS & SAFETY:
@@ -163,6 +144,9 @@ export const DEFAULT_PROMPT_FOOTER_SEP = `[SYSTEM RULES & GUIDELINES]
    - STATUS vs PROFILE: STRICT SEPARATION.
      > 'status': ONLY numerical parameters.
      > 'profile': ONLY text descriptions.
+   - BOUNDARY ENFORCEMENT: Strictly obey Min and Max limits for all parameters and metrics. Clamp and freeze values at limits; NEVER exceed specified bounds.
+   - NO ARBITRARY CHARACTERS: Update ONLY existing characters provided in the reference. Do NOT introduce new character objects in your JSON without explicit instruction.
+   - PLAYER VS NPC: Track 'inventory' and 'quests' ONLY for the active Player character. Non-player NPCs must not have inventory or quests.
 3. LOCKS & SAFETY:
    - Absolutely DO NOT change, override, or delete any element listed in '_lockedFields'.
 4. OUTPUT LIMIT (STRICT):
@@ -173,7 +157,29 @@ export const DEFAULT_READONLY_CONTEXT_HEADER = `[CURRENT RPG STATUS CONTEXT]
 Understand the current situation, parameters, and relationship metrics from the live status data below.
 This data is provided for your narrative and contextual reference only.
 
-CRITICAL CONSTRAINT:
+CRITICAL CONSTRAINTS:
 - Do NOT output any JSON, HTML comments (such as <!--RPG_TRACKER...-->), or code blocks in your response.
 - Do NOT attempt to update these stats in your output.
 - Write your normal story roleplay response only, naturally reflecting the status provided.`;
+
+export const getInitialTrackerData = () => {
+  return {
+    characters: getDefaultCharacters(),
+    worldState: JSON.parse(JSON.stringify(DEFAULT_WORLD_STATE)),
+    worldStateLocks: { date: false, time: false, location: false, weather: false },
+    worldSchema: JSON.parse(JSON.stringify(DEFAULT_WORLD_SCHEMA)),
+    guidePrompts: JSON.parse(JSON.stringify(DEFAULT_GUIDE_PROMPTS)),
+    globalDefinitions: {},
+    systemPromptHeader_merged: DEFAULT_PROMPT_HEADER_MERGED,
+    systemPromptFooter_merged: DEFAULT_PROMPT_FOOTER_MERGED,
+    systemPrompt_readonly: DEFAULT_READONLY_CONTEXT_HEADER,
+    systemPromptHeader_separated: DEFAULT_PROMPT_HEADER_SEP,
+    systemPromptFooter_separated: DEFAULT_PROMPT_FOOTER_SEP,
+    addons: { weather: false, worldEvents: false, cyoa: false },
+    addCharPrompt: DEFAULT_ADD_CHAR_PROMPT,
+    addPlayerCharPrompt: DEFAULT_ADD_PLAYER_CHAR_PROMPT,
+    cyoaPrompt: DEFAULT_CYOA_PROMPT,
+    weatherPrompt: DEFAULT_WEATHER_PROMPT,
+    worldEventsPrompt: DEFAULT_WORLD_EVENTS_PROMPT
+  };
+};

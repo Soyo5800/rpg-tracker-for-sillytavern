@@ -29,23 +29,6 @@
   color: var(--rpg-text);
 }
 
-.addBtn {
-  background: transparent;
-  border: 1px solid var(--rpg-border);
-  color: var(--rpg-text);
-  border-radius: 4px;
-  padding: 4px 12px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.addBtn:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: var(--rpg-highlight);
-  color: var(--rpg-highlight);
-}
-
 .stateGrid {
   display: flex;
   flex-direction: column;
@@ -153,20 +136,6 @@
   font-size: 11.5px;
   opacity: 0.5;
   font-weight: bold;
-}
-
-.removeBtn {
-  background: transparent;
-  border: none;
-  color: rgba(255, 255, 255, 0.4);
-  font-size: 16px;
-  cursor: pointer;
-  padding: 0 4px;
-  line-height: 1;
-}
-
-.removeBtn:hover {
-  color: #e74c3c;
 }
 
 .eventTitleInput {

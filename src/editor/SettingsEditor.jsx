@@ -1,8 +1,7 @@
-// src/editor/SettingsEditor.jsx
-
 import React, { useState, useEffect } from 'react';
 import { useRPG } from '../core/RPGControl';
 import styles from './SettingsEditor.module.css';
+import { ToggleSwitch } from '../utils';
 
 function rgbToHex(rgbStr) {
   const match = rgbStr.match(/\d+/g);
@@ -115,14 +114,14 @@ export default function SettingsEditor({ onClose }) {
   };
 
   return (
-    <div className={styles.overlay}>
-      <div className={styles.modal} onClick={e => e.stopPropagation()}>
-        <header className={styles.header}>
+    <div className="rpg-modal-overlay">
+      <div className="rpg-modal-container" onClick={e => e.stopPropagation()}>
+        <header className="rpg-modal-header">
           <h4>Settings</h4>
-          <button className={styles.closeBtn} onClick={onClose}>×</button>
+          <button className="rpg-modal-close-btn" onClick={onClose}>×</button>
         </header>
 
-        <div className={styles.body}>
+        <div className="rpg-modal-body">
           {/* 1. Update Mode */}
           <div className={styles.section}>
             <label className={styles.label}>Update Mode</label>
@@ -132,7 +131,7 @@ export default function SettingsEditor({ onClose }) {
             <select
               value={localUpdateMode}
               onChange={e => setLocalUpdateMode(e.target.value)}
-              className={styles.settingsSelect}
+              className={`${styles.settingsSelect} rpg-select-custom`}
             >
               <option value="merged">Merged (Inject status & Auto-update every turn)</option>
               <option value="separated">Separated (Inject status for context, Manual update)</option>
@@ -149,7 +148,7 @@ export default function SettingsEditor({ onClose }) {
             <select
               value={localPanelPosition}
               onChange={e => setLocalPanelPosition(e.target.value)}
-              className={styles.settingsSelect}
+              className={`${styles.settingsSelect} rpg-select-custom`}
             >
               <option value="left">Left Side</option>
               <option value="right">Right Side</option>
@@ -165,7 +164,7 @@ export default function SettingsEditor({ onClose }) {
             <select
               value={localTheme}
               onChange={e => handleThemeChange(e.target.value)}
-              className={styles.settingsSelect}
+              className={`${styles.settingsSelect} rpg-select-custom`}
             >
               <option value="default">Default (Follow SillyTavern UI)</option>
               <option value="custom">Custom Color Palette</option>
@@ -258,14 +257,10 @@ export default function SettingsEditor({ onClose }) {
               <label className={styles.label}>
                 Show Status Change Log
               </label>
-              <label className={styles.switch}>
-                <input
-                  type="checkbox"
-                  checked={localShowDeltaLog}
-                  onChange={e => setLocalShowDeltaLog(e.target.checked)}
-                />
-                <span className={styles.slider}></span>
-              </label>
+              <ToggleSwitch
+                checked={localShowDeltaLog}
+                onChange={setLocalShowDeltaLog}
+              />
             </div>
             <p className={styles.settingsDesc}>
               Show collapsing delta change log at the bottom of AI messages.
@@ -298,7 +293,7 @@ export default function SettingsEditor({ onClose }) {
                 <button
                   type="button"
                   onClick={() => setLocalKeepAllBackups(!localKeepAllBackups)}
-                  className={`${styles.unlimitedBtn} ${localKeepAllBackups ? styles.unlimitedBtnActive : ''}`}
+                  className={`rpg-btn ${localKeepAllBackups ? 'rpg-btn-primary' : ''}`}
                 >
                   Unlimited {localKeepAllBackups ? 'ON' : 'OFF'}
                 </button>
@@ -311,9 +306,12 @@ export default function SettingsEditor({ onClose }) {
           </div>
         </div>
 
-        <footer className={styles.footer}>
-          <button className={styles.cancelBtn} onClick={onClose}>Cancel</button>
-          <button className={styles.saveBtn} onClick={handleSave}>Save Changes</button>
+        <footer className="rpg-modal-footer">
+          <div className="rpg-modal-footer-left"></div>
+          <div className="rpg-modal-footer-right">
+            <button type="button" className="rpg-modal-btn" onClick={onClose}>Cancel</button>
+            <button type="button" className="rpg-modal-btn save" onClick={handleSave}>Save Changes</button>
+          </div>
         </footer>
       </div>
     </div>

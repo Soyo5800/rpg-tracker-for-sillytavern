@@ -1,8 +1,7 @@
-// src/core/ExtensionLifecycle.js
 import { getContext, extension_settings } from "../../../../../extensions.js";
 import { eventSource, event_types, saveChat, saveChatConditional, setExtensionPrompt, extension_prompt_types, extension_prompt_roles } from "../../../../../../script.js";
 import { rehydrateFromHistory, rehydrateFromHistoryAsync, applyLLMPatch, extractNormalizedPatch } from "./JSONTracker.js";
-import { buildDefinitionPromptWrapper, buildDynamicValuesPrompt, buildStaticDefinitionsPrompt, buildAddonSection } from "./ActivePrompt.js";
+import { buildDefinitionPromptWrapper, buildCleanStatusPrompt, buildStaticDefinitionsPrompt, buildAddonSection } from "./ActivePrompt.js";
 import { DEFAULT_PROMPT_HEADER_MERGED, DEFAULT_PROMPT_FOOTER_MERGED, DEFAULT_READONLY_CONTEXT_HEADER } from "./PromptSchema.js";
 import { parseResponse } from "./ResponseParser.js";
 import { setDeltaLog } from "../tracker/DeltaLogRenderer.js";
@@ -16,49 +15,54 @@ export function registerLifecycleEvents(extensionName) {
         }
 
         if (window.RPGBridge?.isQuietUpdating) return;
-
         if (!extension_settings[extensionName]?.enabled) return;
 
         if (extension_settings.extension_prompts?.[`${extensionName}_status`]) {
             delete extension_settings.extension_prompts[`${extensionName}_status`];
         }
 
-        if (extension_settings[extensionName].updateMode === 'isolated') {
-            if (typeof window.extension_prompt_types !== 'undefined' && typeof setExtensionPrompt === 'function') {
-                setExtensionPrompt(`${extensionName}_def`, '', extension_prompt_types.IN_PROMPT, 0, false);
-                delete extension_settings.extension_prompts[`${extensionName}_def`];
+        const context = getContext();
+        const trackerData = window.RPGBridge?.currentTrackerData || (context?.chatId ? rehydrateFromHistory(context.chat) : null);
+
+        if (!trackerData || !Array.isArray(trackerData.characters)) return;
+
+        const updateMode = extension_settings[extensionName].updateMode || 'merged';
+
+        if (updateMode === 'isolated') {
+            const addonSection = buildAddonSection(trackerData);
+            if (typeof extension_prompt_types !== 'undefined' && typeof setExtensionPrompt === 'function') {
+                if (addonSection && addonSection.trim() !== '') {
+                    setExtensionPrompt(`${extensionName}_def`, addonSection.trim(), extension_prompt_types.IN_CHAT, 0, false, extension_prompt_roles.SYSTEM || 0);
+                } else {
+                    setExtensionPrompt(`${extensionName}_def`, '', extension_prompt_types.IN_PROMPT, 0, false);
+                    delete extension_settings.extension_prompts[`${extensionName}_def`];
+                }
             }
             return;
         }
 
-        const context = getContext();
-        if (context && context.chatId) {
-            const trackerData = window.RPGBridge?.currentTrackerData || rehydrateFromHistory(context.chat);
+        if (updateMode === 'separated') {
+            const cleanStatusPrompt = buildCleanStatusPrompt(trackerData);
+            const staticDefs = buildStaticDefinitionsPrompt(trackerData) || '';
+            const readOnlyHeader = trackerData.systemPrompt_readonly !== undefined ? trackerData.systemPrompt_readonly : DEFAULT_READONLY_CONTEXT_HEADER;
+            const addonSection = buildAddonSection(trackerData);
 
-            if (trackerData && Array.isArray(trackerData.characters)) {
-                if (extension_settings[extensionName].updateMode === 'separated') {
-                    const staticDefs = buildStaticDefinitionsPrompt(trackerData) || '';
-                    const statusPrompt = buildDynamicValuesPrompt(trackerData);
-                    const readOnlyHeader = trackerData.systemPrompt_readonly !== undefined ? trackerData.systemPrompt_readonly : DEFAULT_READONLY_CONTEXT_HEADER;
+            const readOnlyPrompt = [readOnlyHeader, cleanStatusPrompt, staticDefs, addonSection]
+                .filter(part => part && part.trim() !== '')
+                .join('\n\n');
 
-                    const addonSection = buildAddonSection(trackerData);
-                    const readOnlyPrompt = `${readOnlyHeader}\n\n${statusPrompt}\n${staticDefs}\n${addonSection}`;
-
-                    if (typeof extension_prompt_types !== 'undefined' && typeof setExtensionPrompt === 'function') {
-                        setExtensionPrompt(`${extensionName}_def`, readOnlyPrompt, extension_prompt_types.IN_CHAT, 0, false, extension_prompt_roles.SYSTEM || 0);
-                    }
-                    return;
-                }
-
-                const header = trackerData.systemPromptHeader_merged !== undefined ? trackerData.systemPromptHeader_merged : DEFAULT_PROMPT_HEADER_MERGED;
-                const footer = trackerData.systemPromptFooter_merged !== undefined ? trackerData.systemPromptFooter_merged : DEFAULT_PROMPT_FOOTER_MERGED;
-
-                const finalPrompt = buildDefinitionPromptWrapper(trackerData, header, footer);
-
-                if (typeof extension_prompt_types !== 'undefined' && typeof setExtensionPrompt === 'function') {
-                    setExtensionPrompt(`${extensionName}_def`, finalPrompt, extension_prompt_types.IN_PROMPT, 0, false, extension_prompt_roles.SYSTEM || 0);
-                }
+            if (typeof extension_prompt_types !== 'undefined' && typeof setExtensionPrompt === 'function') {
+                setExtensionPrompt(`${extensionName}_def`, readOnlyPrompt, extension_prompt_types.IN_CHAT, 0, false, extension_prompt_roles.SYSTEM || 0);
             }
+            return;
+        }
+
+        const header = trackerData.systemPromptHeader_merged !== undefined ? trackerData.systemPromptHeader_merged : DEFAULT_PROMPT_HEADER_MERGED;
+        const footer = trackerData.systemPromptFooter_merged !== undefined ? trackerData.systemPromptFooter_merged : DEFAULT_PROMPT_FOOTER_MERGED;
+        const finalPrompt = buildDefinitionPromptWrapper(trackerData, header, footer);
+
+        if (typeof extension_prompt_types !== 'undefined' && typeof setExtensionPrompt === 'function') {
+            setExtensionPrompt(`${extensionName}_def`, finalPrompt, extension_prompt_types.IN_PROMPT, 0, false, extension_prompt_roles.SYSTEM || 0);
         }
     });
 

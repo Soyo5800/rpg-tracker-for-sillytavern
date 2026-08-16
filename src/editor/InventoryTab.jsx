@@ -1,47 +1,50 @@
-// src/editor/InventoryTab.jsx
 import React, { useRef, useState } from 'react';
 import styles from './StatusEditor.module.css';
-import { AutoGrowingTextArea } from '../utils';
+import { AutoGrowingTextArea, SortButtons, AccordionArrow } from '../utils';
 
 function DragHandle({ type, size = 16, ...props }) {
   if (type === 'container') {
     return (
       <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" {...props}>
-        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
       </svg>
     );
   }
   if (type === 'currency') {
     return (
       <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" {...props}>
-        <circle cx="12" cy="12" r="8"/>
-        <line x1="12" y1="8" x2="12" y2="16"/>
-        <line x1="8" y1="12" x2="16" y2="12"/>
+        <circle cx="12" cy="12" r="8" />
+        <line x1="12" y1="8" x2="12" y2="16" />
+        <line x1="8" y1="12" x2="16" y2="12" />
       </svg>
     );
   }
   if (type === 'asset') {
     return (
       <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" {...props}>
-        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-        <polyline points="9 22 9 12 15 12 15 22"/>
+        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+        <polyline points="9 22 9 12 15 12 15 22" />
       </svg>
     );
   }
   return (
     <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <polyline points="21 8 21 21 3 21 3 8"/>
-      <rect x="1" y="3" width="22" height="5"/>
-      <line x1="10" y1="12" x2="14" y2="12"/>
+      <polyline points="21 8 21 21 3 21 3 8" />
+      <rect x="1" y="3" width="22" height="5" />
+      <line x1="10" y1="12" x2="14" y2="12" />
     </svg>
   );
 }
 
 export default function InventoryTab({
-  charId, targetChar, localCharacters, setLocalCharacters,
-  expandedIds, setExpandedIds, handleUpdateNestedField
+  charId,
+  targetChar,
+  localCharacters,
+  setLocalCharacters,
+  expandedIds,
+  setExpandedIds,
+  handleUpdateNestedField
 }) {
-
   const scrollIntervalRef = useRef(null);
   const [equipExpanded, setEquipExpanded] = useState(true);
   const [containersExpanded, setContainersExpanded] = useState(true);
@@ -90,7 +93,7 @@ export default function InventoryTab({
 
     if (dragItem.loc === 'container' && destLoc === 'equipment') {
       const storageKey = dragItem.item.storageKey;
-      nextEquip[destKey] = {
+      const containerItem = {
         id: `container_${storageKey}_${Date.now()}`,
         name: storageKey,
         isContainer: true,
@@ -98,7 +101,30 @@ export default function InventoryTab({
         type: 'general',
         desc: 'Equipped storage container.'
       };
-      
+
+      const targetItem = nextEquip[destKey];
+      if (!targetItem) {
+        nextEquip[destKey] = containerItem;
+      } else {
+        const equipEntries = Object.entries(nextEquip);
+        const targetIndex = equipEntries.findIndex(([k]) => k === destKey);
+
+        const existingKeys = new Set(Object.keys(nextEquip));
+        let newSlotKey = 'Slot';
+        let counter = 1;
+        while (existingKeys.has(newSlotKey)) {
+          newSlotKey = `Slot_${counter++}`;
+        }
+
+        const insertIndex = (destIdx === 'before') ? Math.max(0, targetIndex) : targetIndex + 1;
+        equipEntries.splice(insertIndex, 0, [newSlotKey, containerItem]);
+
+        const reorderedEquip = {};
+        equipEntries.forEach(([k, v]) => { reorderedEquip[k] = v; });
+        Object.keys(nextEquip).forEach(k => delete nextEquip[k]);
+        Object.assign(nextEquip, reorderedEquip);
+      }
+
       setLocalCharacters(localCharacters.map(c => {
         if (c.id !== charId) return c;
         return {
@@ -122,7 +148,7 @@ export default function InventoryTab({
     let qtyToMove = sourceQty;
 
     if (isStackable && sourceQty > 1) {
-      const inputVal = prompt(`Enter quantity to move. (Max: ${sourceQty})`, sourceQty);
+      const inputVal = prompt(`Enter quantity to move (Max: ${sourceQty}):`, sourceQty);
       if (inputVal === null) return;
 
       const parsedQty = parseInt(inputVal, 10);
@@ -162,37 +188,42 @@ export default function InventoryTab({
 
     if (destLoc === 'equipment') {
       const targetItem = nextEquip[destKey];
+
       if (targetItem && targetItem.name?.trim().toLowerCase() === itemToMove.name?.trim().toLowerCase() && isStackable) {
         const targetQty = Number(targetItem.quantity) || 1;
         nextEquip[destKey] = {
           ...targetItem,
           quantity: targetQty + qtyToMove
         };
-      } else {
+      } else if (!targetItem) {
         nextEquip[destKey] = itemToMove;
-        if (targetItem) {
-          const firstStore = Object.keys(nextStorage)[0] || 'Backpack';
-          if (!nextStorage[firstStore]) nextStorage[firstStore] = [];
-          
-          const existingIdxInStore = nextStorage[firstStore].findIndex(i =>
-            i.name?.trim().toLowerCase() === targetItem.name?.trim().toLowerCase()
-          );
+      } else {
+        const equipEntries = Object.entries(nextEquip);
+        const targetIndex = equipEntries.findIndex(([k]) => k === destKey);
 
-          if (existingIdxInStore !== -1 && isStackable) {
-            nextStorage[firstStore][existingIdxInStore] = {
-              ...nextStorage[firstStore][existingIdxInStore],
-              quantity: (Number(nextStorage[firstStore][existingIdxInStore].quantity) || 0) + (Number(targetItem.quantity) || 1)
-            };
-          } else {
-            nextStorage[firstStore].push(targetItem);
-          }
+        const existingKeys = new Set(Object.keys(nextEquip));
+        let newSlotKey = 'Slot';
+        let counter = 1;
+        while (existingKeys.has(newSlotKey)) {
+          newSlotKey = `Slot_${counter++}`;
         }
+
+        const insertIndex = (destIdx === 'before') ? Math.max(0, targetIndex) : targetIndex + 1;
+        equipEntries.splice(insertIndex, 0, [newSlotKey, itemToMove]);
+
+        const reorderedEquip = {};
+        equipEntries.forEach(([k, v]) => {
+          reorderedEquip[k] = v;
+        });
+
+        Object.keys(nextEquip).forEach(k => delete nextEquip[k]);
+        Object.assign(nextEquip, reorderedEquip);
       }
     } else {
       if (!nextStorage[destKey]) nextStorage[destKey] = [];
       let destList = [...(nextStorage[destKey] || [])];
 
-      const existingItemIdx = destList.findIndex(i => 
+      const existingItemIdx = destList.findIndex(i =>
         i.name?.trim().toLowerCase() === itemToMove.name?.trim().toLowerCase()
       );
 
@@ -267,7 +298,7 @@ export default function InventoryTab({
     e.stopPropagation();
 
     const clientY = e.clientY;
-    const scrollParent = e.currentTarget.closest('[class*="editorBody"], [class*="panelBody"]');
+    const scrollParent = e.currentTarget.closest('[class*="editorBody"], [class*="panelBody"], [class*="rpg-modal-body"]');
     if (!scrollParent) return;
 
     const rect = scrollParent.getBoundingClientRect();
@@ -293,21 +324,31 @@ export default function InventoryTab({
 
   return (
     <div className={styles.inventoryTabBody} onDragOver={handleDragOver}>
-      
+      {/* 1. Equipment Slots Header */}
       <div className={styles.flatHeaderRow}>
         <div className={styles.headerLeftZone} onClick={() => setEquipExpanded(!equipExpanded)} style={{ cursor: 'pointer' }}>
-          <span className={`${styles.accordionArrow} ${equipExpanded ? styles.activeArrow : ''}`}>▶</span>
+          <AccordionArrow isExpanded={equipExpanded} />
           <span className={styles.flatHeaderTitle}>Equipment Slots</span>
         </div>
-        <button type="button" className={styles.flatHeaderAddBtn} onClick={() => {
-          const equip = { ...(targetChar.inventory?.equipment || {}) };
-          let name = 'NewSlot'; let counter = 1;
-          while (equip[name] !== undefined) { name = `NewSlot_${counter++}`; }
-          equip[name] = null;
-          handleUpdateNestedField('inventory', 'equipment', equip);
-        }}>+ Add Slot</button>
+        <button
+          type="button"
+          className="rpg-btn-sm"
+          onClick={() => {
+            const equip = { ...(targetChar.inventory?.equipment || {}) };
+            let name = 'Slot';
+            let counter = 1;
+            while (equip[name] !== undefined) {
+              name = `Slot_${counter++}`;
+            }
+            equip[name] = null;
+            handleUpdateNestedField('inventory', 'equipment', equip);
+          }}
+        >
+          + Add Slot
+        </button>
       </div>
 
+      {/* Equipment Slots Grid */}
       {equipExpanded && (
         <div className={styles.invEquipGrid}>
           {(() => {
@@ -321,8 +362,13 @@ export default function InventoryTab({
                   className={styles.invSlotCard}
                   onDragEnter={handleDragOver}
                   onDragOver={handleDragOver}
-                  onDrop={e => handleDrop(e, 'equipment', slotKey)}
+                  onDrop={e => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const isUpperHalf = (e.clientY - rect.top) < (rect.height / 2);
+                    handleDrop(e, 'equipment', slotKey, isUpperHalf ? 'before' : 'after');
+                  }}
                 >
+                  {/* Slot Header */}
                   <div className={styles.slotHeader}>
                     <div className={styles.slotInputOuter}>
                       <input
@@ -333,22 +379,29 @@ export default function InventoryTab({
                           const newKey = e.target.value.trim();
                           if (!newKey) { e.target.value = slotKey; return; }
                           if (newKey !== slotKey && (targetChar.inventory?.equipment || {})[newKey] !== undefined) {
-                            alert(`Slot "${newKey}" already exists.`); e.target.value = slotKey; return;
+                            alert(`Slot "${newKey}" already exists.`);
+                            e.target.value = slotKey;
+                            return;
                           }
                           if (newKey !== slotKey) {
                             const equip = { ...(targetChar.inventory?.equipment || {}) };
-                            equip[newKey] = equip[slotKey]; delete equip[slotKey];
+                            equip[newKey] = equip[slotKey];
+                            delete equip[slotKey];
                             handleUpdateNestedField("inventory", "equipment", equip);
                           }
                         }}
                       />
                     </div>
                     <div className={styles.flexCenterGroupSmall} style={{ gap: '4px' }}>
-                      <button type="button" className={`${styles.sortBtn} ${styles.miniSortBtn}`} disabled={slotIdx === 0} onClick={() => handleReorderEquipmentSlot(slotKey, "up")}>▲</button>
-                      <button type="button" className={`${styles.sortBtn} ${styles.miniSortBtn}`} disabled={slotIdx === totalSlots - 1} onClick={() => handleReorderEquipmentSlot(slotKey, "down")}>▼</button>
+                      <SortButtons
+                        onMoveUp={() => handleReorderEquipmentSlot(slotKey, "up")}
+                        onMoveDown={() => handleReorderEquipmentSlot(slotKey, "down")}
+                        isFirst={slotIdx === 0}
+                        isLast={slotIdx === totalSlots - 1}
+                      />
                       <button
                         type="button"
-                        className={styles.removeInlineBtn}
+                        className="rpg-btn-del"
                         style={{ padding: '2px 5px', fontSize: '9px' }}
                         onClick={() => {
                           if (window.confirm(`Are you sure you want to delete the equipment slot "${slotKey}"?`)) {
@@ -358,15 +411,17 @@ export default function InventoryTab({
                           }
                         }}
                       >
-                        X
+                        ×
                       </button>
                     </div>
                   </div>
 
+                  {/* Slot Item Row */}
                   {item ? (
-                    <div className={styles.invItemRow} style={{ border: 'none', background: 'rgba(255,255,255,0.03)', padding: '6px 8px' }}>
-                      <div className={styles.flexColumnFull} style={{ gap: '4px' }}>
-                        {/* Line 1: 아이콘 + 아이템명(좌측) / 드롭다운 + 삭제버튼(우측) */}
+                    <div className={styles.invItemRow} style={{ border: 'none', background: 'rgba(255,255,255,0.03)', padding: '8px' }}>
+                      <div className={styles.flexColumnFull} style={{ gap: '6px' }}>
+                        
+                        {/* Line 1: [Icon + Item Name] ------------------ [Item Type + Delete Button] */}
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '8px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
                             <div
@@ -390,10 +445,10 @@ export default function InventoryTab({
                             />
                           </div>
 
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                             <div className={styles.itemTypeSelectWrapper}>
                               <select
-                                className={styles.itemTypeSelect}
+                                className="rpg-select-custom"
                                 value={itemType}
                                 disabled={item.isContainer}
                                 onChange={e => {
@@ -429,11 +484,11 @@ export default function InventoryTab({
                             </div>
                             <button
                               type="button"
-                              className={styles.removeInlineBtn}
+                              className="rpg-btn-del"
                               style={{ padding: '2px 6px', fontSize: '11px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                               onClick={() => {
                                 if (window.confirm("Are you sure you want to delete this equipped item?")) {
-                                  const equip = { ...(targetChar.inventory?.equipment || {}) }; 
+                                  const equip = { ...(targetChar.inventory?.equipment || {}) };
                                   equip[slotKey] = null;
                                   handleUpdateNestedField('inventory', 'equipment', equip);
                                 }
@@ -444,9 +499,23 @@ export default function InventoryTab({
                           </div>
                         </div>
 
-                        {/* Line 2: 개수/값조정(좌측) / 설명 서술칸(나머지 우측 끝까지 자동조절) */}
-                        <div style={{ display: 'flex', alignItems: 'center', width: '100%', gap: '12px', marginTop: '2px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                        {/* Line 2: [Item ID] ------------------ [Quantity / Amount] */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '8px' }}>
+                          <input
+                            type="text"
+                            className={styles.slotRenameInputRefactored}
+                            style={{ flex: 1, minWidth: 0, fontSize: '10.5px', padding: '3px 6px', height: '22px', boxSizing: 'border-box' }}
+                            value={item.id || ''}
+                            placeholder="Item ID..."
+                            title="Unique Item ID"
+                            onChange={e => {
+                              const equip = { ...(targetChar.inventory?.equipment || {}) };
+                              equip[slotKey] = { ...(equip[slotKey] || {}), id: e.target.value.trim() };
+                              handleUpdateNestedField('inventory', 'equipment', equip);
+                            }}
+                          />
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                             {itemType === 'general' && !item.isContainer && (
                               <div className={styles.itemQtyBox}>
                                 <input
@@ -508,22 +577,24 @@ export default function InventoryTab({
                               </div>
                             )}
                           </div>
-
-                          {itemType !== 'currency' && (
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <AutoGrowingTextArea
-                                className={styles.itemDescInputRefactored}
-                                value={item.desc || ''}
-                                placeholder="Description..."
-                                onChange={val => {
-                                  const equip = { ...(targetChar.inventory?.equipment || {}) };
-                                  equip[slotKey] = { ...(equip[slotKey] || {}), desc: val };
-                                  handleUpdateNestedField('inventory', 'equipment', equip);
-                                }}
-                              />
-                            </div>
-                          )}
                         </div>
+
+                        {/* Line 3: [Description] */}
+                        {itemType !== 'currency' && (
+                          <div style={{ width: '100%', marginTop: '1px' }}>
+                            <AutoGrowingTextArea
+                              className={styles.itemDescInputRefactored}
+                              value={item.desc || ''}
+                              placeholder="Description..."
+                              onChange={val => {
+                                const equip = { ...(targetChar.inventory?.equipment || {}) };
+                                equip[slotKey] = { ...(equip[slotKey] || {}), desc: val };
+                                handleUpdateNestedField('inventory', 'equipment', equip);
+                              }}
+                            />
+                          </div>
+                        )}
+
                       </div>
                     </div>
                   ) : <span className={styles.emptyText}>Empty</span>}
@@ -536,20 +607,31 @@ export default function InventoryTab({
 
       <div className={styles.accordionSeparator} />
 
+      {/* 2. Containers & Items Header */}
       <div className={styles.flatHeaderRow}>
         <div className={styles.headerLeftZone} onClick={() => setContainersExpanded(!containersExpanded)} style={{ cursor: 'pointer' }}>
-          <span className={`${styles.accordionArrow} ${containersExpanded ? styles.activeArrow : ''}`}>▶</span>
+          <AccordionArrow isExpanded={containersExpanded} />
           <span className={styles.flatHeaderTitle}>Containers & Items</span>
         </div>
-        <button type="button" className={styles.flatHeaderAddBtn} onClick={() => {
-          const storage = { ...(targetChar.inventory?.storage || {}) };
-          let name = 'NewContainer'; let counter = 1;
-          while (storage[name] !== undefined) { name = `NewContainer_${counter++}`; }
-          storage[name] = [];
-          handleUpdateNestedField('inventory', 'storage', storage);
-        }}>+ Add Container</button>
+        <button
+          type="button"
+          className="rpg-btn-sm"
+          onClick={() => {
+            const storage = { ...(targetChar.inventory?.storage || {}) };
+            let name = 'Container';
+            let counter = 1;
+            while (storage[name] !== undefined) {
+              name = `Container_${counter++}`;
+            }
+            storage[name] = [];
+            handleUpdateNestedField('inventory', 'storage', storage);
+          }}
+        >
+          + Add Container
+        </button>
       </div>
 
+      {/* Containers Grid */}
       {containersExpanded && (
         <div className={styles.invStorageGrid}>
           {(() => {
@@ -557,6 +639,8 @@ export default function InventoryTab({
             const totalStorages = storagesList.length;
             return storagesList.map(([storageKey, items], sIdx) => {
               const itemList = Array.isArray(items) ? items : [];
+              const isContainerOpen = expandedIds[`storage_${storageKey}`] !== false;
+
               return (
                 <div
                   key={storageKey}
@@ -565,9 +649,9 @@ export default function InventoryTab({
                   onDragOver={handleDragOver}
                   onDrop={e => handleDrop(e, 'storage', storageKey)}
                 >
+                  {/* Container Header */}
                   <div className={styles.slotHeader} style={{ cursor: 'default', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                     <div className={styles.slotInputOuter} style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1 }}>
-                      
                       <div
                         draggable={true}
                         onDragStart={e => handleDragStart(e, 'container', null, null, { name: storageKey, isContainer: true, storageKey: storageKey })}
@@ -578,15 +662,16 @@ export default function InventoryTab({
                         <DragHandle type="container" />
                       </div>
 
-                      <button
-                        type="button"
-                        className={`${styles.accordionToggleBtn} ${expandedIds[`storage_${storageKey}`] !== false ? styles.activeToggle : ''}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setExpandedIds(prev => ({ ...prev, [`storage_${storageKey}`]: prev[`storage_${storageKey}`] === false ? true : false }));
+                      <AccordionArrow
+                        isExpanded={isContainerOpen}
+                        onClick={() => {
+                          setExpandedIds(prev => ({
+                            ...prev,
+                            [`storage_${storageKey}`]: prev[`storage_${storageKey}`] === false ? true : false
+                          }));
                         }}
-                      >▶</button>
-                      
+                      />
+
                       <input
                         type="text"
                         className={styles.slotRenameInputRefactored}
@@ -595,12 +680,15 @@ export default function InventoryTab({
                           const newKey = e.target.value.trim();
                           if (!newKey) { e.target.value = storageKey; return; }
                           if (newKey !== storageKey && (targetChar.inventory?.storage || {})[newKey] !== undefined) {
-                            alert(`Container "${newKey}" already exists.`); e.target.value = storageKey; return;
+                            alert(`Container "${newKey}" already exists.`);
+                            e.target.value = storageKey;
+                            return;
                           }
                           if (newKey !== storageKey) {
                             const storage = { ...(targetChar.inventory?.storage || {}) };
-                            storage[newKey] = storage[storageKey]; delete storage[storageKey];
-                            
+                            storage[newKey] = storage[storageKey];
+                            delete storage[storageKey];
+
                             const locks = { ...(targetChar.inventory?.storageLocks || {}) };
                             locks[newKey] = locks[storageKey] || false;
                             delete locks[storageKey];
@@ -624,50 +712,65 @@ export default function InventoryTab({
                         }}
                       />
                     </div>
-                    
+
                     <div className={styles.spacedHeaderButtonGroup} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <div className={styles.flexCenterGroupSmall} style={{ display: 'flex', gap: '2px' }}>
-                        <button type="button" className={`${styles.sortBtn} ${styles.miniSortBtn}`} disabled={sIdx === 0} onClick={() => handleReorderStorage(storageKey, 'up')}>▲</button>
-                        <button type="button" className={`${styles.sortBtn} ${styles.miniSortBtn}`} disabled={sIdx === totalStorages - 1} onClick={() => handleReorderStorage(storageKey, 'down')}>▼</button>
-                      </div>
+                      <SortButtons
+                        onMoveUp={() => handleReorderStorage(storageKey, 'up')}
+                        onMoveDown={() => handleReorderStorage(storageKey, 'down')}
+                        isFirst={sIdx === 0}
+                        isLast={sIdx === totalStorages - 1}
+                      />
 
-                      <button type="button" className={styles.miniAddBtn} onClick={() => {
-                        const storage = { ...(targetChar.inventory?.storage || {}) };
-                        if (!storage[storageKey]) storage[storageKey] = [];
-                        storage[storageKey] = [
-                          { id: `item_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`, name: '', desc: '', quantity: 1, type: 'general' },
-                          ...storage[storageKey]
-                        ];
-                        handleUpdateNestedField('inventory', 'storage', storage);
-                      }}>+ Item</button>
+                      <button
+                        type="button"
+                        className="rpg-btn-sm"
+                        onClick={() => {
+                          const storage = { ...(targetChar.inventory?.storage || {}) };
+                          if (!storage[storageKey]) storage[storageKey] = [];
+                          storage[storageKey] = [
+                            { id: `item_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`, name: '', desc: '', quantity: 1, type: 'general' },
+                            ...storage[storageKey]
+                          ];
+                          handleUpdateNestedField('inventory', 'storage', storage);
+                        }}
+                      >
+                        + Item
+                      </button>
 
-                      <button type="button" className={styles.removeInlineBtn} onClick={() => {
-                        const storage = { ...(targetChar.inventory?.storage || {}) };
-                        if (storage[storageKey]?.length > 0 && !window.confirm(`The container "${storageKey}" contains items. Do you want to delete it?`)) return;
-                        
-                        delete storage[storageKey];
-                        const locks = { ...(targetChar.inventory?.storageLocks || {}) };
-                        delete locks[storageKey];
+                      <button
+                        type="button"
+                        className="rpg-btn-del"
+                        onClick={() => {
+                          const storage = { ...(targetChar.inventory?.storage || {}) };
+                          if (storage[storageKey]?.length > 0 && !window.confirm(`The container "${storageKey}" contains items. Do you want to delete it?`)) return;
 
-                        const equip = { ...(targetChar.inventory?.equipment || {}) };
-                        Object.entries(equip).forEach(([slot, eqItem]) => {
-                          if (eqItem && eqItem.isContainer && eqItem.storageKey === storageKey) {
-                            equip[slot] = null;
-                          }
-                        });
+                          delete storage[storageKey];
+                          const locks = { ...(targetChar.inventory?.storageLocks || {}) };
+                          delete locks[storageKey];
 
-                        setLocalCharacters(localCharacters.map(c => {
-                          if (c.id !== charId) return c;
-                          return {
-                            ...c,
-                            inventory: { ...(c.inventory || {}), storage, storageLocks: locks, equipment: equip }
-                          };
-                        }));
-                      }}>X</button>
+                          const equip = { ...(targetChar.inventory?.equipment || {}) };
+                          Object.entries(equip).forEach(([slot, eqItem]) => {
+                            if (eqItem && eqItem.isContainer && eqItem.storageKey === storageKey) {
+                              equip[slot] = null;
+                            }
+                          });
+
+                          setLocalCharacters(localCharacters.map(c => {
+                            if (c.id !== charId) return c;
+                            return {
+                              ...c,
+                              inventory: { ...(c.inventory || {}), storage, storageLocks: locks, equipment: equip }
+                            };
+                          }));
+                        }}
+                      >
+                        ×
+                      </button>
                     </div>
                   </div>
 
-                  {expandedIds[`storage_${storageKey}`] !== false && (
+                  {/* Container Items List */}
+                  {isContainerOpen && (
                     <div className={styles.invStorageItemsList}>
                       {itemList.length === 0 ? <span className={styles.emptyText}>Empty container</span> : (
                         itemList.map((item, idx) => {
@@ -679,10 +782,11 @@ export default function InventoryTab({
                               onDragEnter={handleDragOver}
                               onDragOver={handleDragOver}
                               onDrop={e => { e.stopPropagation(); handleDrop(e, 'storage', storageKey, idx); }}
-                              style={{ padding: '6px 8px' }}
+                              style={{ padding: '8px' }}
                             >
-                              <div className={styles.flexColumnFull} style={{ gap: '4px' }}>
-                                {/* Line 1: 아이콘 + 아이템명(좌측) / 드롭다운 + 삭제버튼(우측) */}
+                              <div className={styles.flexColumnFull} style={{ gap: '6px' }}>
+                                
+                                {/* Line 1: [Icon + Item Name] ------------------ [Item Type + Delete Button] */}
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '8px' }}>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
                                     <div
@@ -706,10 +810,10 @@ export default function InventoryTab({
                                     />
                                   </div>
 
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                                     <div className={styles.itemTypeSelectWrapper}>
                                       <select
-                                        className={styles.itemTypeSelect}
+                                        className="rpg-select-custom"
                                         value={itemType}
                                         onChange={e => {
                                           const storage = { ...(targetChar.inventory?.storage || {}) };
@@ -738,7 +842,7 @@ export default function InventoryTab({
                                     </div>
                                     <button
                                       type="button"
-                                      className={styles.removeInlineBtn}
+                                      className="rpg-btn-del"
                                       style={{ padding: '2px 6px', fontSize: '11px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                       onClick={() => {
                                         if (window.confirm("Are you sure you want to delete this item from the container?")) {
@@ -753,9 +857,23 @@ export default function InventoryTab({
                                   </div>
                                 </div>
 
-                                {/* Line 2: 개수/값조정(좌측) / 설명 서술칸(나머지 우측 끝까지 자동조절) */}
-                                <div style={{ display: 'flex', alignItems: 'center', width: '100%', gap: '12px', marginTop: '2px' }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                                {/* Line 2: [Item ID] ------------------ [Quantity / Amount] */}
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '8px' }}>
+                                  <input
+                                    type="text"
+                                    className={styles.slotRenameInputRefactored}
+                                    style={{ flex: 1, minWidth: 0, fontSize: '10.5px', padding: '3px 6px', height: '22px', boxSizing: 'border-box' }}
+                                    value={item.id || ''}
+                                    placeholder="Item ID..."
+                                    title="Unique Item ID"
+                                    onChange={e => {
+                                      const storage = { ...(targetChar.inventory?.storage || {}) };
+                                      storage[storageKey][idx].id = e.target.value.trim();
+                                      handleUpdateNestedField('inventory', 'storage', storage);
+                                    }}
+                                  />
+
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                                     {itemType === 'general' && (
                                       <div className={styles.itemQtyBox}>
                                         <input
@@ -819,22 +937,24 @@ export default function InventoryTab({
                                       </div>
                                     )}
                                   </div>
-
-                                  {itemType !== 'currency' && (
-                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                      <AutoGrowingTextArea
-                                        className={styles.itemDescInputRefactored}
-                                        value={item.desc || ''}
-                                        placeholder="Description..."
-                                        onChange={val => {
-                                          const storage = { ...(targetChar.inventory?.storage || {}) };
-                                          storage[storageKey][idx].desc = val;
-                                          handleUpdateNestedField('inventory', 'storage', storage);
-                                        }}
-                                      />
-                                    </div>
-                                  )}
                                 </div>
+
+                                {/* Line 3: [Description] */}
+                                {itemType !== 'currency' && (
+                                  <div style={{ width: '100%', marginTop: '1px' }}>
+                                    <AutoGrowingTextArea
+                                      className={styles.itemDescInputRefactored}
+                                      value={item.desc || ''}
+                                      placeholder="Description..."
+                                      onChange={val => {
+                                        const storage = { ...(targetChar.inventory?.storage || {}) };
+                                        storage[storageKey][idx].desc = val;
+                                        handleUpdateNestedField('inventory', 'storage', storage);
+                                      }}
+                                    />
+                                  </div>
+                                )}
+
                               </div>
                             </div>
                           );

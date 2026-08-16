@@ -1,15 +1,14 @@
-// src/tracker/StatusSection.jsx
 import React, { useState, useRef, useEffect } from 'react';
 import { useRPG } from '../core/RPGControl';
 import styles from './StatusSection.module.css';
 import StatusComponent from './StatusComponent';
 import PlayerComponent from './PlayerComponent';
 import CharListEditor from '../editor/CharListEditor';
-import { DEFAULT_STATUS_SCHEMAS, DEFAULT_STATUS, getDefaultCharacters } from '../core/PromptSchema';
+import { getDefaultCharacters } from '../core/PromptSchema';
 import { LockIcon, GearIcon, ProfileTabIcon, RelationsTabIcon, InventoryTabIcon, QuestsTabIcon } from '../Icons';
-import { AutoGrowingTextArea, resolveSillyTavernAvatarUrl } from '../utils';
+import { AutoGrowingTextArea, resolveSillyTavernAvatarUrl, ToggleSwitch, AccordionArrow } from '../utils';
 
-// Dynamically loads Cropper.js library with multiple fallback paths
+// Helper for dynamic loading of Cropper.js
 async function ensureCropperLoaded() {
   if (window.Cropper) return true;
 
@@ -40,7 +39,7 @@ async function ensureCropperLoaded() {
         return true;
       }
     } catch (e) {
-      // Continue trying next fallback path
+      // Fall through to next path
     }
   }
   return false;
@@ -297,7 +296,9 @@ export default function StatusSection({ onOpenEditor }) {
     <div className={styles.container}>
       <div className={styles.topActionBar}>
         <button
-          className={styles.topActionBtn}
+          type="button"
+          className="rpg-btn"
+          style={{ flex: 1 }}
           onClick={() => {
             const newChar = JSON.parse(JSON.stringify(getDefaultCharacters()[0]));
             newChar.id = `char_${Date.now()}`;
@@ -313,7 +314,7 @@ export default function StatusSection({ onOpenEditor }) {
         >
           + Add Character
         </button>
-        <button className={styles.topActionBtn} onClick={() => setShowCharList(true)}>
+        <button type="button" className="rpg-btn" style={{ flex: 1 }} onClick={() => setShowCharList(true)}>
           Character List
         </button>
       </div>
@@ -361,7 +362,6 @@ export default function StatusSection({ onOpenEditor }) {
                 liveAvatarUrl = resolveSillyTavernAvatarUrl(matched.avatar, 'Card');
               }
             } else {
-              // 실리터번에서 카드가 삭제되었거나 찾을 수 없는 경우 안전하게 null로 폴백
               if (!isCropped) {
                 liveAvatarUrl = null;
               }
@@ -373,7 +373,6 @@ export default function StatusSection({ onOpenEditor }) {
               liveAvatarUrl = resolveSillyTavernAvatarUrl(userAvatarFile, 'Persona');
             }
           } else {
-            // Unsynced character states return null to prevent console 404
             if (!isCropped) {
               liveAvatarUrl = null;
             }
@@ -397,39 +396,24 @@ export default function StatusSection({ onOpenEditor }) {
 
             <header className={styles.blockHeader}>
               <div className={styles.headerLeft} onClick={() => toggleCollapse(char.id)}>
-                <button
-                  type="button"
-                  className={`${styles.collapseArrowBtn} ${!isCollapsed ? styles.arrowExpanded : ''}`}
-                >
-                  ▶
-                </button>
+                <AccordionArrow isExpanded={!isCollapsed} />
                 <span className={styles.charName}>{liveName}</span>
               </div>
 
               <div className={styles.headerSwitches}>
-                <label className={styles.switchRow} title="Enable Inventory and Quests Tab">
-                  <span>Player</span>
-                  <div className={styles.switchContainer}>
-                    <input
-                      type="checkbox"
-                      checked={isPlayerActive}
-                      onChange={() => patchCharacterField(char.id, ['activePlayer'], !isPlayerActive)}
-                    />
-                    <span className={styles.switchSlider} />
-                  </div>
-                </label>
+                <ToggleSwitch
+                  label="Player"
+                  checked={isPlayerActive}
+                  onChange={() => patchCharacterField(char.id, ['activePlayer'], !isPlayerActive)}
+                  title="Enable Inventory and Quests Tab"
+                />
 
-                <label className={styles.switchRow} title="Inject status into AI context">
-                  <span>Inject</span>
-                  <div className={styles.switchContainer}>
-                    <input
-                      type="checkbox"
-                      checked={isInjectionActive}
-                      onChange={() => patchCharacterField(char.id, ['activeInjection'], !isInjectionActive)}
-                    />
-                    <span className={styles.switchSlider} />
-                  </div>
-                </label>
+                <ToggleSwitch
+                  label="Inject"
+                  checked={isInjectionActive}
+                  onChange={() => patchCharacterField(char.id, ['activeInjection'], !isInjectionActive)}
+                  title="Inject status into AI context"
+                />
 
                 <button
                   type="button"
@@ -451,7 +435,7 @@ export default function StatusSection({ onOpenEditor }) {
                 <div className={styles.uniformControlGrid}>
                   <button
                     type="button"
-                    className={`${styles.iconGridBtn} ${charTabs.profile ? styles.activeGridBtn : ''}`}
+                    className={`rpg-btn-icon ${charTabs.profile ? 'active' : ''}`}
                     onClick={() => handleToggleInlineTab(char.id, 'profile')}
                     title="Profile"
                   >
@@ -460,7 +444,7 @@ export default function StatusSection({ onOpenEditor }) {
 
                   <button
                     type="button"
-                    className={`${styles.iconGridBtn} ${charTabs.relations ? styles.activeGridBtn : ''}`}
+                    className={`rpg-btn-icon ${charTabs.relations ? 'active' : ''}`}
                     onClick={() => handleToggleInlineTab(char.id, 'relations')}
                     title="Relations"
                   >
@@ -471,7 +455,7 @@ export default function StatusSection({ onOpenEditor }) {
                     <>
                       <button
                         type="button"
-                        className={`${styles.iconGridBtn} ${charTabs.inventory ? styles.activeGridBtn : ''}`}
+                        className={`rpg-btn-icon ${charTabs.inventory ? 'active' : ''}`}
                         onClick={() => handleToggleInlineTab(char.id, 'inventory')}
                         title="Inventory"
                       >
@@ -480,7 +464,7 @@ export default function StatusSection({ onOpenEditor }) {
 
                       <button
                         type="button"
-                        className={`${styles.iconGridBtn} ${charTabs.quests ? styles.activeGridBtn : ''}`}
+                        className={`rpg-btn-icon ${charTabs.quests ? 'active' : ''}`}
                         onClick={() => handleToggleInlineTab(char.id, 'quests')}
                         title="Quest"
                       >
@@ -673,19 +657,24 @@ export default function StatusSection({ onOpenEditor }) {
       })}
 
       {cropModal.isOpen && (
-        <div className={styles.cropOverlay}>
-          <div className={styles.cropModal}>
-            <header className={styles.cropHeader}>
-              <span className={styles.cropTitle}>Set the crop position of the avatar image</span>
+        <div className="rpg-modal-overlay high-priority">
+          <div
+            className="rpg-modal-container"
+            style={{ width: '500px', height: 'auto', maxHeight: '90vh' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <header className="rpg-modal-header">
+              <h4>Set the crop position of the avatar image</h4>
               <button
                 type="button"
-                className={styles.cropCloseBtn}
+                className="rpg-modal-close-btn"
                 onClick={() => setCropModal({ isOpen: false, imageSrc: '', charId: null })}
               >
                 ×
               </button>
             </header>
-            <div className={styles.cropBody}>
+
+            <div className="rpg-modal-body" style={{ background: '#0c0d12', padding: '16px' }}>
               <div className={styles.cropperCanvasWrapper}>
                 <img
                   ref={cropperImgRef}
@@ -696,30 +685,35 @@ export default function StatusSection({ onOpenEditor }) {
                 />
               </div>
             </div>
-            <footer className={styles.cropFooter}>
-              {(targetCharCard?.syncedCardAvatar || targetCharCard?.id === 'char_user' || targetCharCard?.activePlayer) && (
+
+            <footer className="rpg-modal-footer">
+              <div className="rpg-modal-footer-left">
+                {(targetCharCard?.syncedCardAvatar || targetCharCard?.id === 'char_user' || targetCharCard?.activePlayer) && (
+                  <button
+                    type="button"
+                    className="rpg-modal-btn reset"
+                    onClick={handleResetToOriginalImage}
+                  >
+                    Reset to Original Card
+                  </button>
+                )}
+              </div>
+              <div className="rpg-modal-footer-right">
                 <button
                   type="button"
-                  className={styles.cropResetBtn}
-                  onClick={handleResetToOriginalImage}
+                  className="rpg-modal-btn"
+                  onClick={() => setCropModal({ isOpen: false, imageSrc: '', charId: null })}
                 >
-                  Reset to Original Card
+                  Cancel
                 </button>
-              )}
-              <button
-                type="button"
-                className={styles.cropCancelBtn}
-                onClick={() => setCropModal({ isOpen: false, imageSrc: '', charId: null })}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className={styles.cropSaveBtn}
-                onClick={handleSaveCrop}
-              >
-                Save Crop
-              </button>
+                <button
+                  type="button"
+                  className="rpg-modal-btn save"
+                  onClick={handleSaveCrop}
+                >
+                  Save Crop
+                </button>
+              </div>
             </footer>
           </div>
         </div>

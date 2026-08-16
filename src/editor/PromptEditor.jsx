@@ -1,8 +1,7 @@
-// src/editor/PromptEditor.jsx
-
 import React, { useState, useEffect } from 'react';
 import { useRPG } from '../core/RPGControl';
 import styles from './PromptEditor.module.css';
+import statusStyles from './StatusEditor.module.css';
 import {
   DEFAULT_PROMPT_HEADER_MERGED,
   DEFAULT_PROMPT_FOOTER_MERGED,
@@ -18,6 +17,9 @@ import {
   DEFAULT_WORLD_EVENTS_PROMPT
 } from '../core/PromptSchema';
 import { getDynamicSchemaExample } from '../core/ActivePrompt';
+import { ToggleSwitch, AccordionArrow, AutoGrowingTextArea } from '../utils';
+import { StatusSpecConfig } from './StatusSpecsTab';
+import { RelationMetricConfig } from './RelationsTab';
 
 export default function PromptEditor({ onClose }) {
   const { trackerData, updateTrackerData } = useRPG();
@@ -60,37 +62,84 @@ export default function PromptEditor({ onClose }) {
   const [localDefObj, setLocalDefObj] = useState({});
   const [localWorldSchema, setLocalWorldSchema] = useState({});
 
+  const [expandedDefIds, setExpandedDefIds] = useState({});
+  const [globalSyncToggles, setGlobalSyncToggles] = useState({});
+
   const characters = (trackerData.characters && trackerData.characters.length > 0)
     ? trackerData.characters
     : getDefaultCharacters();
 
   const getUniqueFields = () => {
-    const status = new Set();
-    const profiles = new Set();
-    const relations = new Set();
+    const statusMap = new Map();
+    const profileMap = new Map();
+    const relationMap = new Map();
 
     characters.forEach(char => {
       (char.statusSchema || []).forEach(s => {
-        if (s.name) status.add(s.name);
+        const idKey = s.id || s.name;
+        if (idKey && !statusMap.has(idKey)) {
+          statusMap.set(idKey, {
+            id: s.id || idKey,
+            name: s.name || idKey,
+            type: s.type || 'consumable',
+            color: s.color || (s.type === 'stacking' ? '#3498db' : '#e74c3c'),
+            min: s.min !== undefined ? s.min : 0,
+            max: s.max !== undefined ? s.max : 100
+          });
+        }
       });
 
       if (char.profile) {
-        Object.keys(char.profile).forEach(k => profiles.add(k));
+        Object.keys(char.profile).forEach(k => {
+          if (!profileMap.has(k)) {
+            profileMap.set(k, { id: k, name: k });
+          }
+        });
       }
 
       if (char.relations) {
         Object.values(char.relations).forEach(rel => {
           if (rel.values) {
-            Object.keys(rel.values).forEach(m => relations.add(m));
+            Object.entries(rel.values).forEach(([mName, mVal]) => {
+              if (!relationMap.has(mName)) {
+                const isObj = typeof mVal === 'object' && mVal !== null;
+                relationMap.set(mName, {
+                  id: mName,
+                  name: mName,
+                  min: isObj && mVal.min !== undefined ? mVal.min : -100,
+                  max: isObj && mVal.max !== undefined ? mVal.max : 100,
+                  colorPositive: isObj && mVal.colorPositive ? mVal.colorPositive : '#2ecc71',
+                  colorNegative: isObj && mVal.colorNegative ? mVal.colorNegative : '#e74c3c'
+                });
+              }
+            });
           }
         });
       }
     });
 
+    const TYPE_PRIORITY = {
+      consumable: 0,
+      stacking: 1,
+      integer: 2,
+      text: 3
+    };
+
+    const sortStatus = (a, b) => {
+      const pA = TYPE_PRIORITY[a.type] !== undefined ? TYPE_PRIORITY[a.type] : 99;
+      const pB = TYPE_PRIORITY[b.type] !== undefined ? TYPE_PRIORITY[b.type] : 99;
+      if (pA !== pB) {
+        return pA - pB;
+      }
+      return a.id.localeCompare(b.id, undefined, { numeric: true, sensitivity: 'base' });
+    };
+
+    const sortById = (a, b) => a.id.localeCompare(b.id, undefined, { numeric: true, sensitivity: 'base' });
+
     return {
-      status: Array.from(status),
-      profiles: Array.from(profiles),
-      relations: Array.from(relations)
+      status: Array.from(statusMap.values()).sort(sortStatus),
+      profiles: Array.from(profileMap.values()).sort(sortById),
+      relations: Array.from(relationMap.values()).sort(sortById)
     };
   };
 
@@ -143,6 +192,8 @@ export default function PromptEditor({ onClose }) {
   ];
   const WEATHER_OPTS = [
     { v: '1', l: 'Text', ex: 'Clear/Cloudy/Rain/Snow' },
+    { v: '2', l: 'Emoji only', ex: '☀️/⛅/🌧️/❄️' },
+    { v: '3', l: 'Emoji + Text', ex: '☀️ Clear / ⛅ Cloudy / 🌧️ Rain / ❄️ Snow' },
     { v: 'custom', l: 'Custom', ex: '' }
   ];
 
@@ -155,6 +206,145 @@ export default function PromptEditor({ onClose }) {
       }
     }
     setLocalWorldSchema(prev => ({ ...prev, ...updates }));
+  };
+
+  const handleToggleGlobalSync = (fieldKey, checked) => {
+    setGlobalSyncToggles(prev => ({ ...prev, [fieldKey]: checked }));
+  };
+
+  const handleRenameFieldUnified = (category, oldId, newNameRaw) => {
+    const trimmed = newNameRaw.trim();
+    if (!trimmed || trimmed === oldId) return;
+
+    const cleanNewId = trimmed.replace(/[^\p{L}\p{N}_]/gu, '_').replace(/_+/g, '_').replace(/^_+|_+$/g, '');
+    if (!cleanNewId) return;
+
+    const updatedCharacters = characters.map(char => {
+      const cloned = JSON.parse(JSON.stringify(char));
+
+      if (category === 'status') {
+        if (Array.isArray(cloned.statusSchema)) {
+          cloned.statusSchema = cloned.statusSchema.map(s =>
+            (s.id === oldId || s.name === oldId) ? { ...s, id: cleanNewId, name: trimmed } : s
+          );
+        }
+        if (cloned.status && cloned.status[oldId] !== undefined) {
+          cloned.status[cleanNewId] = cloned.status[oldId];
+          delete cloned.status[oldId];
+        }
+      } else if (category === 'profile') {
+        if (cloned.profile && cloned.profile[oldId] !== undefined) {
+          const nextProf = {}; const nextLocks = {}; const nextInjects = {};
+          Object.keys(cloned.profile).forEach(k => {
+            const targetKey = (k === oldId) ? cleanNewId : k;
+            nextProf[targetKey] = cloned.profile[k];
+            if (cloned.profileLocks) nextLocks[targetKey] = cloned.profileLocks[k];
+            if (cloned.profileInjects) nextInjects[targetKey] = cloned.profileInjects[k];
+          });
+          cloned.profile = nextProf; cloned.profileLocks = nextLocks; cloned.profileInjects = nextInjects;
+        }
+      } else if (category === 'relation') {
+        if (cloned.relations) {
+          Object.values(cloned.relations).forEach(rData => {
+            if (rData.values && rData.values[oldId] !== undefined) {
+              rData.values[cleanNewId] = rData.values[oldId];
+              delete rData.values[oldId];
+            }
+            if (rData.targetValues && rData.targetValues[oldId] !== undefined) {
+              rData.targetValues[cleanNewId] = rData.targetValues[oldId];
+              delete rData.targetValues[oldId];
+            }
+          });
+        }
+      }
+
+      return cloned;
+    });
+
+    const oldGuideKey = `${category}_${oldId}`;
+    const newGuideKey = `${category}_${cleanNewId}`;
+    const nextDefObj = { ...localDefObj };
+    if (nextDefObj[oldGuideKey] !== undefined) {
+      nextDefObj[newGuideKey] = nextDefObj[oldGuideKey];
+      delete nextDefObj[oldGuideKey];
+    }
+
+    setLocalDefObj(nextDefObj);
+    updateTrackerData({
+      ...trackerData,
+      characters: updatedCharacters,
+      globalDefinitions: nextDefObj
+    });
+
+    setExpandedDefIds(prev => {
+      const next = { ...prev };
+      if (next[oldGuideKey] !== undefined) {
+        next[newGuideKey] = next[oldGuideKey];
+        delete next[oldGuideKey];
+      }
+      return next;
+    });
+
+    setGlobalSyncToggles(prev => {
+      const next = { ...prev };
+      if (next[oldGuideKey] !== undefined) {
+        next[newGuideKey] = next[oldGuideKey];
+        delete next[oldGuideKey];
+      }
+      return next;
+    });
+  };
+
+  const handleUpdateStatusProperty = (fieldId, propKey, value) => {
+    const isGlobalSyncOn = globalSyncToggles[`status_${fieldId}`] === true;
+    if (!isGlobalSyncOn) return;
+
+    const updatedCharacters = characters.map(char => {
+      const cloned = JSON.parse(JSON.stringify(char));
+      if (Array.isArray(cloned.statusSchema)) {
+        cloned.statusSchema = cloned.statusSchema.map(s => {
+          if (s.id === fieldId || s.name === fieldId) {
+            return { ...s, [propKey]: value };
+          }
+          return s;
+        });
+      }
+      return cloned;
+    });
+
+    updateTrackerData({
+      ...trackerData,
+      characters: updatedCharacters
+    });
+  };
+
+  const handleUpdateRelationProperty = (metricId, propKey, value) => {
+    const isGlobalSyncOn = globalSyncToggles[`relation_${metricId}`] === true;
+    if (!isGlobalSyncOn) return;
+
+    const updatedCharacters = characters.map(char => {
+      const cloned = JSON.parse(JSON.stringify(char));
+      if (cloned.relations) {
+        Object.values(cloned.relations).forEach(rData => {
+          if (rData.values && rData.values[metricId]) {
+            const old = rData.values[metricId];
+            const currentObj = typeof old === 'object' && old !== null ? old : { value: old || 0 };
+            rData.values[metricId] = { ...currentObj, [propKey]: value };
+          }
+          if (rData.targetValues && rData.targetValues[metricId]) {
+            const old = rData.targetValues[metricId];
+            const currentObj = typeof old === 'object' && old !== null ? old : { value: old || 0 };
+            rData.targetValues[metricId] = { ...currentObj, [propKey]: value };
+          }
+        });
+      }
+      return cloned;
+    });
+
+    updateTrackerData({
+      ...trackerData,
+      characters: updatedCharacters
+    });
   };
 
   const handleSave = () => {
@@ -174,7 +364,7 @@ export default function PromptEditor({ onClose }) {
       weatherPrompt: localWeatherPrompt,
       worldEventsPrompt: localWorldEventsPrompt
     });
-    alert("Prompt configurations saved successfully.");
+    alert("Prompt configurations and field definitions saved successfully.");
     onClose();
   };
 
@@ -251,60 +441,69 @@ export default function PromptEditor({ onClose }) {
   };
 
   const clearDefinitions = () => {
-    if (window.confirm("Clear all field definitions?")) {
+    if (window.confirm("Clear all field guidelines? (Field styles and values are preserved)")) {
       setLocalDefObj({});
     }
   };
 
-  const previewSchema = getDynamicSchemaExample({ guidePrompts: localGuidePrompts, characters });
+  const toggleDefAccordion = (fullKey) => {
+    setExpandedDefIds(prev => ({ ...prev, [fullKey]: !prev[fullKey] }));
+  };
+
+  const previewSchema = getDynamicSchemaExample({ guidePrompts: localGuidePrompts, characters, worldSchema: localWorldSchema });
 
   return (
-    <div className={styles.overlay}>
-      <div className={styles.modal} onClick={e => e.stopPropagation()}>
-        <header className={styles.header}>
+    <div className="rpg-modal-overlay">
+      <div className="rpg-modal-container" onClick={e => e.stopPropagation()}>
+        <header className="rpg-modal-header">
           <h4>Prompt Editor</h4>
-          <button className={styles.closeBtn} onClick={onClose}>×</button>
+          <button type="button" className="rpg-modal-close-btn" onClick={onClose}>×</button>
         </header>
 
-        <div className={styles.editorTabs}>
+        <div className="rpg-tab-nav">
           <button
-            className={`${styles.tabBtn} ${activeTab === 'system' ? styles.tabBtnActive : ''}`}
+            type="button"
+            className={`rpg-tab-btn ${activeTab === 'system' ? 'active' : ''}`}
             onClick={() => setActiveTab('system')}
           >
             System Prompt
           </button>
           <button
-            className={`${styles.tabBtn} ${activeTab === 'addons' ? styles.tabBtnActive : ''}`}
+            type="button"
+            className={`rpg-tab-btn ${activeTab === 'addons' ? 'active' : ''}`}
             onClick={() => setActiveTab('addons')}
           >
             Add-ons
           </button>
           <button
-            className={`${styles.tabBtn} ${activeTab === 'definitions' ? styles.tabBtnActive : ''}`}
+            type="button"
+            className={`rpg-tab-btn ${activeTab === 'definitions' ? 'active' : ''}`}
             onClick={() => setActiveTab('definitions')}
           >
             Field Definitions
           </button>
         </div>
 
-        <div className={styles.body} style={{ padding: '16px', overflowY: 'auto' }}>
+        <div className="rpg-modal-body">
+          {/* SYSTEM PROMPT TAB */}
           {activeTab === 'system' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-
+            <div className={styles.sectionStack}>
               {/* 1. MERGED MODE */}
-              <div style={{ border: '1px solid var(--rpg-border)', borderRadius: '4px', padding: '12px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <div style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => setIsMergedOpen(!isMergedOpen)}>
-                    <span style={{ color: 'var(--rpg-highlight)' }}>{isMergedOpen ? '▼' : '▶'}</span>
-                    <strong style={{ color: 'var(--rpg-highlight)' }}>System Prompt (Merged Mode)</strong>
+              <div className={styles.promptCard}>
+                <div className={styles.promptCardHeader}>
+                  <div className={styles.accordionHeader} onClick={() => setIsMergedOpen(!isMergedOpen)}>
+                    <AccordionArrow isExpanded={isMergedOpen} />
+                    <strong>System Prompt (Merged Mode)</strong>
                   </div>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button className={styles.cancelBtn} style={{ fontSize: '11px', padding: '4px 10px' }} onClick={() => { setLocalMergedHeader(DEFAULT_PROMPT_HEADER_MERGED); setLocalMergedFooter(DEFAULT_PROMPT_FOOTER_MERGED); }}>reset</button>
-                    <button className={isEditMerged ? styles.saveBtn : styles.cancelBtn} style={{ fontSize: '11px', padding: '4px 10px' }} onClick={() => setIsEditMerged(!isEditMerged)}>edit</button>
+                  <div className={styles.buttonGroup}>
+                    <button type="button" className="rpg-btn" onClick={() => { setLocalMergedHeader(DEFAULT_PROMPT_HEADER_MERGED); setLocalMergedFooter(DEFAULT_PROMPT_FOOTER_MERGED); }}>Reset</button>
+                    <button type="button" className={`rpg-btn ${isEditMerged ? 'rpg-btn-primary' : ''}`} onClick={() => setIsEditMerged(!isEditMerged)}>
+                      {isEditMerged ? 'Done' : 'Edit'}
+                    </button>
                   </div>
                 </div>
                 {isMergedOpen && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div className={styles.textareaStack}>
                     <textarea
                       className={styles.textarea}
                       style={{ minHeight: '140px', opacity: isEditMerged ? 1 : 0.7 }}
@@ -312,7 +511,7 @@ export default function PromptEditor({ onClose }) {
                       onChange={e => setLocalMergedHeader(e.target.value)}
                       readOnly={!isEditMerged}
                     />
-                    <div style={{ fontSize: '11px', textAlign: 'center', opacity: 0.5, color: 'var(--rpg-text)' }}>[Hybrid State & Schema JSON will be injected here]</div>
+                    <div className={styles.slotNotice}>[Hybrid State & Schema JSON will be injected here]</div>
                     <textarea
                       className={styles.textarea}
                       style={{ minHeight: '140px', opacity: isEditMerged ? 1 : 0.7 }}
@@ -325,19 +524,21 @@ export default function PromptEditor({ onClose }) {
               </div>
 
               {/* 2. SEPARATED MODE */}
-              <div style={{ border: '1px solid var(--rpg-border)', borderRadius: '4px', padding: '12px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <div style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => setIsReadOnlyOpen(!isReadOnlyOpen)}>
-                    <span style={{ color: 'var(--rpg-highlight)' }}>{isReadOnlyOpen ? '▼' : '▶'}</span>
-                    <strong style={{ color: 'var(--rpg-highlight)' }}>System Prompt (Separated Mode)</strong>
+              <div className={styles.promptCard}>
+                <div className={styles.promptCardHeader}>
+                  <div className={styles.accordionHeader} onClick={() => setIsReadOnlyOpen(!isReadOnlyOpen)}>
+                    <AccordionArrow isExpanded={isReadOnlyOpen} />
+                    <strong>System Prompt (Separated Mode)</strong>
                   </div>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button className={styles.cancelBtn} style={{ fontSize: '11px', padding: '4px 10px' }} onClick={() => setLocalReadOnlyPrompt(DEFAULT_READONLY_CONTEXT_HEADER)}>reset</button>
-                    <button className={isEditReadOnly ? styles.saveBtn : styles.cancelBtn} style={{ fontSize: '11px', padding: '4px 10px' }} onClick={() => setIsEditReadOnly(!isEditReadOnly)}>edit</button>
+                  <div className={styles.buttonGroup}>
+                    <button type="button" className="rpg-btn" onClick={() => setLocalReadOnlyPrompt(DEFAULT_READONLY_CONTEXT_HEADER)}>Reset</button>
+                    <button type="button" className={`rpg-btn ${isEditReadOnly ? 'rpg-btn-primary' : ''}`} onClick={() => setIsEditReadOnly(!isEditReadOnly)}>
+                      {isEditReadOnly ? 'Done' : 'Edit'}
+                    </button>
                   </div>
                 </div>
                 {isReadOnlyOpen && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div className={styles.textareaStack}>
                     <textarea
                       className={styles.textarea}
                       style={{ minHeight: '160px', opacity: isEditReadOnly ? 1 : 0.7 }}
@@ -345,25 +546,27 @@ export default function PromptEditor({ onClose }) {
                       onChange={e => setLocalReadOnlyPrompt(e.target.value)}
                       readOnly={!isEditReadOnly}
                     />
-                    <div style={{ fontSize: '11px', textAlign: 'center', opacity: 0.5, color: 'var(--rpg-text)' }}>[Live RPG Status (Values only) will be appended here]</div>
+                    <div className={styles.slotNotice}>[Live RPG Status (Values only) will be appended here]</div>
                   </div>
                 )}
               </div>
 
               {/* 3. MANUAL UPDATE MODE */}
-              <div style={{ border: '1px solid var(--rpg-border)', borderRadius: '4px', padding: '12px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <div style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => setIsSepOpen(!isSepOpen)}>
-                    <span style={{ color: 'var(--rpg-highlight)' }}>{isSepOpen ? '▼' : '▶'}</span>
-                    <strong style={{ color: 'var(--rpg-highlight)' }}>System Prompt (Manual Update Mode)</strong>
+              <div className={styles.promptCard}>
+                <div className={styles.promptCardHeader}>
+                  <div className={styles.accordionHeader} onClick={() => setIsSepOpen(!isSepOpen)}>
+                    <AccordionArrow isExpanded={isSepOpen} />
+                    <strong>System Prompt (Manual Update Mode)</strong>
                   </div>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button className={styles.cancelBtn} style={{ fontSize: '11px', padding: '4px 10px' }} onClick={() => { setLocalSepHeader(DEFAULT_PROMPT_HEADER_SEP); setLocalSepFooter(DEFAULT_PROMPT_FOOTER_SEP); }}>reset</button>
-                    <button className={isEditSep ? styles.saveBtn : styles.cancelBtn} style={{ fontSize: '11px', padding: '4px 10px' }} onClick={() => setIsEditSep(!isEditSep)}>edit</button>
+                  <div className={styles.buttonGroup}>
+                    <button type="button" className="rpg-btn" onClick={() => { setLocalSepHeader(DEFAULT_PROMPT_HEADER_SEP); setLocalSepFooter(DEFAULT_PROMPT_FOOTER_SEP); }}>Reset</button>
+                    <button type="button" className={`rpg-btn ${isEditSep ? 'rpg-btn-primary' : ''}`} onClick={() => setIsEditSep(!isEditSep)}>
+                      {isEditSep ? 'Done' : 'Edit'}
+                    </button>
                   </div>
                 </div>
                 {isSepOpen && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div className={styles.textareaStack}>
                     <textarea
                       className={styles.textarea}
                       style={{ minHeight: '140px', opacity: isEditSep ? 1 : 0.7 }}
@@ -371,7 +574,7 @@ export default function PromptEditor({ onClose }) {
                       onChange={e => setLocalSepHeader(e.target.value)}
                       readOnly={!isEditSep}
                     />
-                    <div style={{ fontSize: '11px', textAlign: 'center', opacity: 0.5, color: 'var(--rpg-text)' }}>[Hybrid State & Schema JSON will be injected here]</div>
+                    <div className={styles.slotNotice}>[Hybrid State & Schema JSON will be injected here]</div>
                     <textarea
                       className={styles.textarea}
                       style={{ minHeight: '140px', opacity: isEditSep ? 1 : 0.7 }}
@@ -384,15 +587,15 @@ export default function PromptEditor({ onClose }) {
               </div>
 
               {/* SCHEMA PROMPT PREVIEW */}
-              <div style={{ border: '1px solid var(--rpg-border)', borderRadius: '4px', padding: '12px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <div style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => setIsSchemaOpen(!isSchemaOpen)}>
-                    <span style={{ color: 'var(--rpg-highlight)' }}>{isSchemaOpen ? '▼' : '▶'}</span>
-                    <strong style={{ color: 'var(--rpg-highlight)' }}>Schema Prompt Preview</strong>
+              <div className={styles.promptCard}>
+                <div className={styles.promptCardHeader}>
+                  <div className={styles.accordionHeader} onClick={() => setIsSchemaOpen(!isSchemaOpen)}>
+                    <AccordionArrow isExpanded={isSchemaOpen} />
+                    <strong>Schema Prompt Preview</strong>
                   </div>
                 </div>
                 {isSchemaOpen && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div className={styles.textareaStack}>
                     <textarea
                       className={styles.textarea}
                       style={{ minHeight: '180px', opacity: 0.8, fontFamily: 'monospace', fontSize: '11px' }}
@@ -403,21 +606,17 @@ export default function PromptEditor({ onClose }) {
                 )}
 
                 {/* SWITCHES */}
-                <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div className={styles.switchesContainer}>
                   {['status', 'profile'].map(guideId => {
                     const guide = localGuidePrompts.find(g => g.id === guideId);
                     if (!guide) return null;
                     return (
-                      <div key={guideId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: 'var(--rpg-bg)', border: '1px solid var(--rpg-border)', borderRadius: '4px' }}>
-                        <span style={{ fontSize: '13px', color: 'var(--rpg-text)' }}>Update {guideId.charAt(0).toUpperCase() + guideId.slice(1)}</span>
-                        <label className={styles.switch} style={{ margin: 0 }}>
-                          <input
-                            type="checkbox"
-                            checked={guide.enabled}
-                            onChange={(e) => handleGuideToggle(guideId, e.target.checked)}
-                          />
-                          <span className={styles.slider}></span>
-                        </label>
+                      <div key={guideId} className={styles.switchCardRow}>
+                        <span className={styles.switchTitle}>Update {guideId.charAt(0).toUpperCase() + guideId.slice(1)}</span>
+                        <ToggleSwitch
+                          checked={guide.enabled}
+                          onChange={(checked) => handleGuideToggle(guideId, checked)}
+                        />
                       </div>
                     );
                   })}
@@ -426,22 +625,19 @@ export default function PromptEditor({ onClose }) {
                     const guide = localGuidePrompts.find(g => g.id === 'relations');
                     if (!guide) return null;
                     return (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', background: 'var(--rpg-bg)', border: '1px solid var(--rpg-border)', borderRadius: '4px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: '13px', color: 'var(--rpg-text)' }}>Update Relations</span>
-                          <label className={styles.switch} style={{ margin: 0 }}>
-                            <input
-                              type="checkbox"
-                              checked={guide.enabled}
-                              onChange={(e) => handleGuideToggle('relations', e.target.checked)}
-                            />
-                            <span className={styles.slider}></span>
-                          </label>
+                      <div className={styles.relationsConfigCard}>
+                        <div className={styles.switchCardRow} style={{ padding: 0, background: 'transparent', border: 'none' }}>
+                          <span className={styles.switchTitle}>Update Relations</span>
+                          <ToggleSwitch
+                            checked={guide.enabled}
+                            onChange={(checked) => handleGuideToggle('relations', checked)}
+                          />
                         </div>
-                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                          <span style={{ fontSize: '11px', color: 'var(--rpg-text)', opacity: 0.8, whiteSpace: 'nowrap' }}>Field type</span>
+                        <div className={styles.inlineFormRow}>
+                          <span className={styles.formSubLabel}>Field type</span>
                           <select
-                            style={{ flex: 1, height: '28px', boxSizing: 'border-box', margin: 0, verticalAlign: 'middle', lineHeight: 'normal', background: 'rgba(0,0,0,0.2)', color: 'var(--rpg-text)', border: '1px solid var(--rpg-border)', borderRadius: '4px', fontSize: '11px', padding: '0 6px', outline: 'none' }}
+                            className="rpg-select-custom"
+                            style={{ flex: 1, height: '28px' }}
                             value={localWorldSchema.relationsFieldType || 'integer'}
                             onChange={e => handleWorldSchemaChange('relationsFieldType', e.target.value)}
                           >
@@ -458,22 +654,18 @@ export default function PromptEditor({ onClose }) {
                     const guide = localGuidePrompts.find(g => g.id === guideId);
                     if (!guide) return null;
                     return (
-                      <div key={guideId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: 'var(--rpg-bg)', border: '1px solid var(--rpg-border)', borderRadius: '4px' }}>
-                        <span style={{ fontSize: '13px', color: 'var(--rpg-text)' }}>Update {guideId.charAt(0).toUpperCase() + guideId.slice(1)}</span>
-                        <label className={styles.switch} style={{ margin: 0 }}>
-                          <input
-                            type="checkbox"
-                            checked={guide.enabled}
-                            onChange={(e) => handleGuideToggle(guideId, e.target.checked)}
-                          />
-                          <span className={styles.slider}></span>
-                        </label>
+                      <div key={guideId} className={styles.switchCardRow}>
+                        <span className={styles.switchTitle}>Update {guideId.charAt(0).toUpperCase() + guideId.slice(1)}</span>
+                        <ToggleSwitch
+                          checked={guide.enabled}
+                          onChange={(checked) => handleGuideToggle(guideId, checked)}
+                        />
                       </div>
                     );
                   })}
 
-                  <div style={{ padding: '12px', background: 'var(--rpg-bg)', border: '1px solid var(--rpg-border)', borderRadius: '4px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <div style={{ fontWeight: 'bold', fontSize: '13px', color: 'var(--rpg-highlight)', marginBottom: '4px' }}>World State</div>
+                  <div className={styles.worldStateGroupCard}>
+                    <div className={styles.groupCardHeader}>World State</div>
 
                     {[
                       { id: 'world_date', name: 'Update Date', selectKey: 'dateSelect', customKey: 'dateCustom', opts: DATE_OPTS },
@@ -483,28 +675,27 @@ export default function PromptEditor({ onClose }) {
                       const guide = localGuidePrompts.find(g => g.id === f.id);
                       if (!guide) return null;
                       return (
-                        <div key={f.id} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontSize: '13px', color: 'var(--rpg-text)' }}>{f.name}</span>
-                            <label className={styles.switch} style={{ margin: 0 }}>
-                              <input
-                                type="checkbox"
-                                checked={guide.enabled}
-                                onChange={(e) => handleGuideToggle(f.id, e.target.checked)}
-                              />
-                              <span className={styles.slider}></span>
-                            </label>
+                        <div key={f.id} className={styles.worldStateSubRow}>
+                          <div className={styles.switchCardRow} style={{ padding: 0, background: 'transparent', border: 'none' }}>
+                            <span className={styles.switchTitle}>{f.name}</span>
+                            <ToggleSwitch
+                              checked={guide.enabled}
+                              onChange={(checked) => handleGuideToggle(f.id, checked)}
+                            />
                           </div>
-                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <div className={styles.inlineFormRow}>
                             <select
-                              style={{ flex: 1, height: '28px', boxSizing: 'border-box', margin: 0, verticalAlign: 'middle', lineHeight: 'normal', background: 'rgba(0,0,0,0.2)', color: 'var(--rpg-text)', border: '1px solid var(--rpg-border)', borderRadius: '4px', fontSize: '11px', padding: '0 6px', outline: 'none' }}
+                              className="rpg-select-custom"
+                              style={{ flex: 1, height: '28px' }}
                               value={localWorldSchema[f.selectKey] || '1'}
                               onChange={e => handleWorldSchemaChange(f.selectKey, e.target.value, f.opts)}
                             >
                               {f.opts.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
                             </select>
                             <input
-                              style={{ flex: 2, height: '28px', boxSizing: 'border-box', margin: 0, verticalAlign: 'middle', lineHeight: 'normal', background: 'rgba(0,0,0,0.2)', color: 'var(--rpg-text)', border: '1px solid var(--rpg-border)', borderRadius: '4px', fontSize: '11px', padding: '0 8px', outline: 'none' }}
+                              type="text"
+                              className={styles.defInput}
+                              style={{ flex: 2, height: '28px' }}
                               value={localWorldSchema[f.customKey] || ''}
                               onChange={e => handleWorldSchemaChange(f.customKey, e.target.value)}
                               readOnly={localWorldSchema[f.selectKey] !== 'custom'}
@@ -519,16 +710,12 @@ export default function PromptEditor({ onClose }) {
                       const guide = localGuidePrompts.find(g => g.id === 'world_location');
                       if (!guide) return null;
                       return (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: '13px', color: 'var(--rpg-text)' }}>Update Location</span>
-                          <label className={styles.switch} style={{ margin: 0 }}>
-                            <input
-                              type="checkbox"
-                              checked={guide.enabled}
-                              onChange={(e) => handleGuideToggle('world_location', e.target.checked)}
-                            />
-                            <span className={styles.slider}></span>
-                          </label>
+                        <div className={styles.switchCardRow} style={{ padding: '4px 0', background: 'transparent', border: 'none' }}>
+                          <span className={styles.switchTitle}>Update Location</span>
+                          <ToggleSwitch
+                            checked={guide.enabled}
+                            onChange={(checked) => handleGuideToggle('world_location', checked)}
+                          />
                         </div>
                       );
                     })()}
@@ -537,43 +724,40 @@ export default function PromptEditor({ onClose }) {
                       const guide = localGuidePrompts.find(g => g.id === 'world_events');
                       if (!guide) return null;
                       return (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: '13px', color: 'var(--rpg-text)' }}>Update Events</span>
-                          <label className={styles.switch} style={{ margin: 0 }}>
-                            <input
-                              type="checkbox"
-                              checked={guide.enabled}
-                              onChange={(e) => handleGuideToggle('world_events', e.target.checked)}
-                            />
-                            <span className={styles.slider}></span>
-                          </label>
+                        <div className={styles.switchCardRow} style={{ padding: '4px 0', background: 'transparent', border: 'none' }}>
+                          <span className={styles.switchTitle}>Update Events</span>
+                          <ToggleSwitch
+                            checked={guide.enabled}
+                            onChange={(checked) => handleGuideToggle('world_events', checked)}
+                          />
                         </div>
                       );
                     })()}
                   </div>
                 </div>
               </div>
-
             </div>
           )}
 
+          {/* ADD-ONS TAB */}
           {activeTab === 'addons' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-
+            <div className={styles.sectionStack}>
               {/* 1. BASE NPC GENERATION PROMPT */}
-              <div style={{ border: '1px solid var(--rpg-border)', borderRadius: '4px', padding: '12px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <div style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => setIsAddCharOpen(!isAddCharOpen)}>
-                    <span style={{ color: 'var(--rpg-highlight)' }}>{isAddCharOpen ? '▼' : '▶'}</span>
-                    <strong style={{ color: 'var(--rpg-highlight)' }}>NPC Generation Base Prompt</strong>
+              <div className={styles.promptCard}>
+                <div className={styles.promptCardHeader}>
+                  <div className={styles.accordionHeader} onClick={() => setIsAddCharOpen(!isAddCharOpen)}>
+                    <AccordionArrow isExpanded={isAddCharOpen} />
+                    <strong>NPC Generation Base Prompt</strong>
                   </div>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button className={styles.cancelBtn} style={{ fontSize: '11px', padding: '4px 10px' }} onClick={() => setLocalAddCharPrompt(DEFAULT_ADD_CHAR_PROMPT)}>reset</button>
-                    <button className={isEditAddChar ? styles.saveBtn : styles.cancelBtn} style={{ fontSize: '11px', padding: '4px 10px' }} onClick={() => setIsEditAddChar(!isEditAddChar)}>edit</button>
+                  <div className={styles.buttonGroup}>
+                    <button type="button" className="rpg-btn" onClick={() => setLocalAddCharPrompt(DEFAULT_ADD_CHAR_PROMPT)}>Reset</button>
+                    <button type="button" className={`rpg-btn ${isEditAddChar ? 'rpg-btn-primary' : ''}`} onClick={() => setIsEditAddChar(!isEditAddChar)}>
+                      {isEditAddChar ? 'Done' : 'Edit'}
+                    </button>
                   </div>
                 </div>
                 {isAddCharOpen && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
+                  <div className={styles.textareaStack}>
                     <textarea
                       className={styles.textarea}
                       style={{ minHeight: '100px', opacity: isEditAddChar ? 1 : 0.7 }}
@@ -586,19 +770,21 @@ export default function PromptEditor({ onClose }) {
               </div>
 
               {/* 2. BASE PLAYER GENERATION PROMPT */}
-              <div style={{ border: '1px solid var(--rpg-border)', borderRadius: '4px', padding: '12px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <div style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => setIsAddPlayerCharOpen(!isAddPlayerCharOpen)}>
-                    <span style={{ color: 'var(--rpg-highlight)' }}>{isAddPlayerCharOpen ? '▼' : '▶'}</span>
-                    <strong style={{ color: 'var(--rpg-highlight)' }}>Player Generation Base Prompt</strong>
+              <div className={styles.promptCard}>
+                <div className={styles.promptCardHeader}>
+                  <div className={styles.accordionHeader} onClick={() => setIsAddPlayerCharOpen(!isAddPlayerCharOpen)}>
+                    <AccordionArrow isExpanded={isAddPlayerCharOpen} />
+                    <strong>Player Generation Base Prompt</strong>
                   </div>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button className={styles.cancelBtn} style={{ fontSize: '11px', padding: '4px 10px' }} onClick={() => setLocalAddPlayerCharPrompt(DEFAULT_ADD_PLAYER_CHAR_PROMPT)}>reset</button>
-                    <button className={isEditAddPlayerChar ? styles.saveBtn : styles.cancelBtn} style={{ fontSize: '11px', padding: '4px 10px' }} onClick={() => setIsEditAddPlayerChar(!isEditAddPlayerChar)}>edit</button>
+                  <div className={styles.buttonGroup}>
+                    <button type="button" className="rpg-btn" onClick={() => setLocalAddPlayerCharPrompt(DEFAULT_ADD_PLAYER_CHAR_PROMPT)}>Reset</button>
+                    <button type="button" className={`rpg-btn ${isEditAddPlayerChar ? 'rpg-btn-primary' : ''}`} onClick={() => setIsEditAddPlayerChar(!isEditAddPlayerChar)}>
+                      {isEditAddPlayerChar ? 'Done' : 'Edit'}
+                    </button>
                   </div>
                 </div>
                 {isAddPlayerCharOpen && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
+                  <div className={styles.textareaStack}>
                     <textarea
                       className={styles.textarea}
                       style={{ minHeight: '100px', opacity: isEditAddPlayerChar ? 1 : 0.7 }}
@@ -611,19 +797,21 @@ export default function PromptEditor({ onClose }) {
               </div>
 
               {/* 3. WORLD EVENTS ADDON PROMPT */}
-              <div style={{ border: '1px solid var(--rpg-border)', borderRadius: '4px', padding: '12px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <div style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => setIsWorldEventsOpen(!isWorldEventsOpen)}>
-                    <span style={{ color: 'var(--rpg-highlight)' }}>{isWorldEventsOpen ? '▼' : '▶'}</span>
-                    <strong style={{ color: 'var(--rpg-highlight)' }}>World Events Instruction</strong>
+              <div className={styles.promptCard}>
+                <div className={styles.promptCardHeader}>
+                  <div className={styles.accordionHeader} onClick={() => setIsWorldEventsOpen(!isWorldEventsOpen)}>
+                    <AccordionArrow isExpanded={isWorldEventsOpen} />
+                    <strong>World Events Instruction</strong>
                   </div>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button className={styles.cancelBtn} style={{ fontSize: '11px', padding: '4px 10px' }} onClick={() => setLocalWorldEventsPrompt(DEFAULT_WORLD_EVENTS_PROMPT)}>reset</button>
-                    <button className={isEditWorldEvents ? styles.saveBtn : styles.cancelBtn} style={{ fontSize: '11px', padding: '4px 10px' }} onClick={() => setIsEditWorldEvents(!isEditWorldEvents)}>edit</button>
+                  <div className={styles.buttonGroup}>
+                    <button type="button" className="rpg-btn" onClick={() => setLocalWorldEventsPrompt(DEFAULT_WORLD_EVENTS_PROMPT)}>Reset</button>
+                    <button type="button" className={`rpg-btn ${isEditWorldEvents ? 'rpg-btn-primary' : ''}`} onClick={() => setIsEditWorldEvents(!isEditWorldEvents)}>
+                      {isEditWorldEvents ? 'Done' : 'Edit'}
+                    </button>
                   </div>
                 </div>
                 {isWorldEventsOpen && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
+                  <div className={styles.textareaStack}>
                     <textarea
                       className={styles.textarea}
                       style={{ minHeight: '80px', opacity: isEditWorldEvents ? 1 : 0.7 }}
@@ -636,19 +824,21 @@ export default function PromptEditor({ onClose }) {
               </div>
 
               {/* 4. DYNAMIC WEATHER ADDON PROMPT */}
-              <div style={{ border: '1px solid var(--rpg-border)', borderRadius: '4px', padding: '12px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <div style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => setIsWeatherOpen(!isWeatherOpen)}>
-                    <span style={{ color: 'var(--rpg-highlight)' }}>{isWeatherOpen ? '▼' : '▶'}</span>
-                    <strong style={{ color: 'var(--rpg-highlight)' }}>Dynamic Weather Instruction</strong>
+              <div className={styles.promptCard}>
+                <div className={styles.promptCardHeader}>
+                  <div className={styles.accordionHeader} onClick={() => setIsWeatherOpen(!isWeatherOpen)}>
+                    <AccordionArrow isExpanded={isWeatherOpen} />
+                    <strong>Dynamic Weather Instruction</strong>
                   </div>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button className={styles.cancelBtn} style={{ fontSize: '11px', padding: '4px 10px' }} onClick={() => setLocalWeatherPrompt(DEFAULT_WEATHER_PROMPT)}>reset</button>
-                    <button className={isEditWeather ? styles.saveBtn : styles.cancelBtn} style={{ fontSize: '11px', padding: '4px 10px' }} onClick={() => setIsEditWeather(!isEditWeather)}>edit</button>
+                  <div className={styles.buttonGroup}>
+                    <button type="button" className="rpg-btn" onClick={() => setLocalWeatherPrompt(DEFAULT_WEATHER_PROMPT)}>Reset</button>
+                    <button type="button" className={`rpg-btn ${isEditWeather ? 'rpg-btn-primary' : ''}`} onClick={() => setIsEditWeather(!isEditWeather)}>
+                      {isEditWeather ? 'Done' : 'Edit'}
+                    </button>
                   </div>
                 </div>
                 {isWeatherOpen && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
+                  <div className={styles.textareaStack}>
                     <textarea
                       className={styles.textarea}
                       style={{ minHeight: '80px', opacity: isEditWeather ? 1 : 0.7 }}
@@ -661,19 +851,21 @@ export default function PromptEditor({ onClose }) {
               </div>
 
               {/* 5. CYOA MODE ADDON PROMPT */}
-              <div style={{ border: '1px solid var(--rpg-border)', borderRadius: '4px', padding: '12px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <div style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => setIsCyoaOpen(!isCyoaOpen)}>
-                    <span style={{ color: 'var(--rpg-highlight)' }}>{isCyoaOpen ? '▼' : '▶'}</span>
-                    <strong style={{ color: 'var(--rpg-highlight)' }}>CYOA Mode Instruction</strong>
+              <div className={styles.promptCard}>
+                <div className={styles.promptCardHeader}>
+                  <div className={styles.accordionHeader} onClick={() => setIsCyoaOpen(!isCyoaOpen)}>
+                    <AccordionArrow isExpanded={isCyoaOpen} />
+                    <strong>CYOA Mode Instruction</strong>
                   </div>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button className={styles.cancelBtn} style={{ fontSize: '11px', padding: '4px 10px' }} onClick={() => setLocalCyoaPrompt(DEFAULT_CYOA_PROMPT)}>reset</button>
-                    <button className={isEditCyoa ? styles.saveBtn : styles.cancelBtn} style={{ fontSize: '11px', padding: '4px 10px' }} onClick={() => setIsEditCyoa(!isEditCyoa)}>edit</button>
+                  <div className={styles.buttonGroup}>
+                    <button type="button" className="rpg-btn" onClick={() => setLocalCyoaPrompt(DEFAULT_CYOA_PROMPT)}>Reset</button>
+                    <button type="button" className={`rpg-btn ${isEditCyoa ? 'rpg-btn-primary' : ''}`} onClick={() => setIsEditCyoa(!isEditCyoa)}>
+                      {isEditCyoa ? 'Done' : 'Edit'}
+                    </button>
                   </div>
                 </div>
                 {isCyoaOpen && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
+                  <div className={styles.textareaStack}>
                     <textarea
                       className={styles.textarea}
                       style={{ minHeight: '80px', opacity: isEditCyoa ? 1 : 0.7 }}
@@ -684,81 +876,204 @@ export default function PromptEditor({ onClose }) {
                   </div>
                 )}
               </div>
-
             </div>
           )}
 
+          {/* FIELD DEFINITIONS TAB */}
           {activeTab === 'definitions' && (
             <div className={styles.section} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', marginTop: '8px' }}>
-                <label className={styles.label} style={{ margin: 0 }}>Field Definitions</label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
+                <label className={styles.label} style={{ margin: 0, fontSize: '13.5px' }}>
+                  Field Definitions & Global Guidelines
+                </label>
                 <button
+                  type="button"
+                  className="rpg-btn-sm"
                   onClick={clearDefinitions}
-                  style={{ background: 'transparent', border: 'none', color: 'var(--rpg-highlight)', fontSize: '11px', cursor: 'pointer', fontWeight: 'bold' }}
+                  title="Clear all AI guidelines"
                 >
-                  Clear All
+                  Clear Guidelines
                 </button>
               </div>
-              <p style={{ fontSize: '11px', opacity: 0.6, margin: 0, color: 'var(--rpg-text)' }}>Define guidelines for your fields. Leave empty to skip injection.</p>
 
+              <div style={{ fontSize: '11px', opacity: 0.7, margin: 0, color: 'var(--rpg-text)', lineHeight: '1.4' }}>
+                <div>Set guidelines for the AI.</div>
+                <div>※ Turn on 'Global' switch only when you want to overwrite styles and types to all characters.</div>
+              </div>
+
+              {/* 1. STATUS GROUP */}
               {uniqueFields.status.length > 0 && (
                 <div className={styles.defGroup}>
-                  <h5 className={styles.defGroupTitle}>Stat</h5>
-                  {uniqueFields.status.map(f => (
-                    <div key={`status_${f}`} className={styles.defRow}>
-                      <span className={styles.defLabel}>{f}</span>
-                      <input
-                        className={styles.defInput}
-                        value={localDefObj[`status_${f}`] || ''}
-                        onChange={e => setLocalDefObj({ ...localDefObj, [`status_${f}`]: e.target.value })}
-                        placeholder={`Guide for ${f}...`}
-                      />
-                    </div>
-                  ))}
+                  <h5 className={styles.defGroupTitle}>Status Fields</h5>
+                  {uniqueFields.status.map(item => {
+                    const fullKey = `status_${item.id}`;
+                    const isExpanded = !!expandedDefIds[fullKey];
+                    const isGlobalOn = globalSyncToggles[fullKey] || false;
+
+                    return (
+                      <div key={fullKey} className={`${statusStyles.schemaItem} ${isExpanded ? statusStyles.itemExpanded : ''}`}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', padding: '8px 10px', background: 'rgba(0, 0, 0, 0.15)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
+                              <AccordionArrow
+                                isExpanded={isExpanded}
+                                onClick={() => toggleDefAccordion(fullKey)}
+                              />
+                              <input
+                                type="text"
+                                className={statusStyles.nameInput}
+                                style={{ width: '140px', fontWeight: 'bold', color: 'var(--rpg-highlight)' }}
+                                defaultValue={item.name || item.id}
+                                placeholder="Field Name"
+                                onBlur={(e) => handleRenameFieldUnified('status', item.id, e.target.value)}
+                              />
+                            </div>
+
+                            <ToggleSwitch
+                              label="Global"
+                              checked={isGlobalOn}
+                              onChange={(checked) => handleToggleGlobalSync(fullKey, checked)}
+                              title="When enabled, edits to style/type below will overwrite all characters"
+                            />
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', width: '100%', paddingLeft: '22px', boxSizing: 'border-box' }}>
+                            <AutoGrowingTextArea
+                              className={styles.defInput}
+                              value={localDefObj[fullKey] || ''}
+                              onChange={(val) => setLocalDefObj({ ...localDefObj, [fullKey]: val })}
+                              placeholder={`AI Guide for ${item.name || item.id}...`}
+                              style={{ width: '100%' }}
+                            />
+                          </div>
+                        </div>
+
+                        {isExpanded && (
+                          <div className={statusStyles.itemFields} style={{ opacity: isGlobalOn ? 1 : 0.65 }}>
+                            <StatusSpecConfig
+                              type={item.type}
+                              min={item.min}
+                              max={item.max}
+                              color={item.color}
+                              disabled={!isGlobalOn}
+                              onChange={(propKey, value) => handleUpdateStatusProperty(item.id, propKey, value)}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
 
+              {/* 2. PROFILE GROUP */}
               {uniqueFields.profiles.length > 0 && (
                 <div className={styles.defGroup}>
-                  <h5 className={styles.defGroupTitle}>Profile</h5>
-                  {uniqueFields.profiles.map(f => (
-                    <div key={`profile_${f}`} className={styles.defRow}>
-                      <span className={styles.defLabel}>{f}</span>
-                      <input
-                        className={styles.defInput}
-                        value={localDefObj[`profile_${f}`] || ''}
-                        onChange={e => setLocalDefObj({ ...localDefObj, [`profile_${f}`]: e.target.value })}
-                        placeholder={`Guide for ${f}...`}
-                      />
-                    </div>
-                  ))}
+                  <h5 className={styles.defGroupTitle}>Profile Fields</h5>
+                  {uniqueFields.profiles.map(item => {
+                    const fullKey = `profile_${item.id}`;
+                    return (
+                      <div key={fullKey} className={statusStyles.schemaItem}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', padding: '8px 10px', background: 'rgba(0, 0, 0, 0.15)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+                            <span style={{ width: '18px', textAlign: 'center', opacity: 0.4, fontSize: '10px' }}>•</span>
+                            <input
+                              type="text"
+                              className={statusStyles.nameInput}
+                              style={{ width: '140px', fontWeight: 'bold', color: 'var(--rpg-highlight)' }}
+                              defaultValue={item.name || item.id}
+                              placeholder="Field Name"
+                              onBlur={(e) => handleRenameFieldUnified('profile', item.id, e.target.value)}
+                            />
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', width: '100%', paddingLeft: '18px', boxSizing: 'border-box' }}>
+                            <AutoGrowingTextArea
+                              className={styles.defInput}
+                              value={localDefObj[fullKey] || ''}
+                              onChange={(val) => setLocalDefObj({ ...localDefObj, [fullKey]: val })}
+                              placeholder={`AI Guide for ${item.name || item.id}...`}
+                              style={{ width: '100%' }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
 
+              {/* 3. RELATIONS GROUP */}
               {uniqueFields.relations.length > 0 && (
                 <div className={styles.defGroup}>
-                  <h5 className={styles.defGroupTitle}>Relations</h5>
-                  {uniqueFields.relations.map(f => (
-                    <div key={`relation_${f}`} className={styles.defRow}>
-                      <span className={styles.defLabel}>{f}</span>
-                      <input
-                        className={styles.defInput}
-                        value={localDefObj[`relation_${f}`] || ''}
-                        onChange={e => setLocalDefObj({ ...localDefObj, [`relation_${f}`]: e.target.value })}
-                        placeholder={`Guide for ${f}...`}
-                      />
-                    </div>
-                  ))}
+                  <h5 className={styles.defGroupTitle}>Relationship Metrics</h5>
+                  {uniqueFields.relations.map(item => {
+                    const fullKey = `relation_${item.id}`;
+                    const isExpanded = !!expandedDefIds[fullKey];
+                    const isGlobalOn = globalSyncToggles[fullKey] || false;
+
+                    return (
+                      <div key={fullKey} className={`${statusStyles.schemaItem} ${isExpanded ? statusStyles.itemExpanded : ''}`}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', padding: '8px 10px', background: 'rgba(0, 0, 0, 0.15)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
+                              <AccordionArrow
+                                isExpanded={isExpanded}
+                                onClick={() => toggleDefAccordion(fullKey)}
+                              />
+                              <input
+                                type="text"
+                                className={statusStyles.nameInput}
+                                style={{ width: '140px', fontWeight: 'bold', color: 'var(--rpg-highlight)' }}
+                                defaultValue={item.name || item.id}
+                                placeholder="Metric Name"
+                                onBlur={(e) => handleRenameFieldUnified('relation', item.id, e.target.value)}
+                              />
+                            </div>
+
+                            <ToggleSwitch
+                              label="Global"
+                              checked={isGlobalOn}
+                              onChange={(checked) => handleToggleGlobalSync(fullKey, checked)}
+                              title="When enabled, metric colors/ranges will overwrite all characters"
+                            />
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', width: '100%', paddingLeft: '22px', boxSizing: 'border-box' }}>
+                            <AutoGrowingTextArea
+                              className={styles.defInput}
+                              value={localDefObj[fullKey] || ''}
+                              onChange={(val) => setLocalDefObj({ ...localDefObj, [fullKey]: val })}
+                              placeholder={`AI Guide for ${item.name || item.id}...`}
+                              style={{ width: '100%' }}
+                            />
+                          </div>
+                        </div>
+
+                        {isExpanded && (
+                          <div className={statusStyles.itemFields} style={{ opacity: isGlobalOn ? 1 : 0.65, padding: '8px 10px' }}>
+                            <RelationMetricConfig
+                              colorNegative={item.colorNegative}
+                              colorPositive={item.colorPositive}
+                              min={item.min}
+                              max={item.max}
+                              disabled={!isGlobalOn}
+                              onChange={(propKey, value) => handleUpdateRelationProperty(item.id, propKey, value)}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
           )}
         </div>
 
-        <footer className={styles.footer} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button className={styles.cancelBtn} style={{ fontSize: '11px', padding: '6px 12px' }} onClick={handleExport}>Export</button>
-            <button className={styles.cancelBtn} style={{ fontSize: '11px', padding: '6px 12px' }} onClick={handleImportClick}>Import</button>
+        <footer className="rpg-modal-footer">
+          <div className="rpg-modal-footer-left">
+            <button type="button" className="rpg-modal-btn" onClick={handleExport}>Export</button>
+            <button type="button" className="rpg-modal-btn" onClick={handleImportClick}>Import</button>
             <input
               type="file"
               id="prompt-import-file"
@@ -767,9 +1082,9 @@ export default function PromptEditor({ onClose }) {
               onChange={handleImportFile}
             />
           </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button className={styles.cancelBtn} onClick={onClose}>Cancel</button>
-            <button className={styles.saveBtn} onClick={handleSave}>Save Changes</button>
+          <div className="rpg-modal-footer-right">
+            <button type="button" className="rpg-modal-btn" onClick={onClose}>Cancel</button>
+            <button type="button" className="rpg-modal-btn save" onClick={handleSave}>Save Changes</button>
           </div>
         </footer>
       </div>

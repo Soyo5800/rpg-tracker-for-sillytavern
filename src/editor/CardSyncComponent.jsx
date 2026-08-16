@@ -1,4 +1,3 @@
-// src/editor/CardSyncComponent.jsx
 import React, { useState, useRef, useEffect } from 'react';
 import { resolveSillyTavernAvatarUrl } from '../utils';
 
@@ -7,7 +6,7 @@ export async function savePresetToSillyTavernCard(avatarFile, presetData) {
   if (!avatarFile) return false;
 
   const context = window.SillyTavern?.getContext?.() || {};
-  // 그룹 채팅 내 스코프된 배열이 아닌, 실리터번의 글로벌 캐릭터 전체 배열을 최우선 참조
+  // 그룹 채팅 스코프 배열이 아닌 글로벌 캐릭터 전체 배열을 최우선 참조
   const globalCharacters = Array.isArray(window.characters)
     ? window.characters
     : (Array.isArray(context.characters) ? context.characters : []);
@@ -20,7 +19,7 @@ export async function savePresetToSillyTavernCard(avatarFile, presetData) {
   const char = globalCharacters[charIndex];
 
   try {
-    // 1순위: SillyTavern 공식 writeExtensionField API 사용 (절대 인덱스 charIndex 전달)
+    // 1순위: SillyTavern 공식 writeExtensionField API 사용 (절대 인덱스 전달)
     if (window.RPGBridge && typeof window.RPGBridge.writeExtensionFieldNatively === 'function') {
       const success = await window.RPGBridge.writeExtensionFieldNatively(charIndex, 'rpg_tracker', presetData);
       if (success) {
@@ -200,20 +199,8 @@ export default function CardSyncComponent({ onSync, isSynced }) {
     <div ref={dropdownRef} style={{ position: 'relative', display: 'inline-block' }}>
       <button
         type="button"
-        style={{
-          background: 'rgba(255, 255, 255, 0.05)',
-          border: '1px solid var(--rpg-border)',
-          color: 'var(--rpg-text)',
-          fontSize: '11px',
-          fontWeight: 'bold',
-          padding: '4px 10px',
-          borderRadius: '4px',
-          cursor: 'pointer',
-          height: '28px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-        }}
+        className="rpg-btn"
+        style={{ height: '28px', gap: '6px' }}
         onClick={handleOpenDropdown}
       >
         <span>Sync Card</span>
@@ -266,8 +253,8 @@ export default function CardSyncComponent({ onSync, isSynced }) {
                     borderBottom: isUnsync ? '1px solid rgba(255, 255, 255, 0.1)' : 'none',
                     fontWeight: isUnsync ? 'bold' : 'normal',
                   }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'}
-                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                   onClick={() => {
                     onSync(t);
                     setShowDropdown(false);

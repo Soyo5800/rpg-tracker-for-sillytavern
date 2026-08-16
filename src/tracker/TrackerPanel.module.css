@@ -1,5 +1,3 @@
-/* src/tracker/TrackerPanel.module.css */
-
 .panelContainer {
   position: fixed !important;
   top: 0 !important;
@@ -42,6 +40,13 @@
   to { transform: translateX(0); }
 }
 
+.panelInner {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
 .collapseButton {
   position: absolute;
   top: 50%;
@@ -56,7 +61,7 @@
   align-items: center;
   justify-content: center;
   outline: none;
-  box-shadow: 2px 0 8px rgba(0,0,0,0.3);
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.3);
   padding: 0;
   z-index: 1001;
 }
@@ -134,32 +139,16 @@
 }
 
 .headerBtn {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--rpg-border);
-  color: var(--rpg-text);
-  width: 85px;
-  height: 24px;
-  box-sizing: border-box;
-  border-radius: 4px;
-  font-size: 10.5px;
-  font-weight: bold;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
-}
-
-.headerBtn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: var(--rpg-highlight);
-  color: var(--rpg-highlight);
-}
-
-.headerBtn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+  width: 82px !important;
+  height: 22px !important;
+  font-size: 10px;
+  padding: 0 4px !important;
+  white-space: nowrap !important;
+  box-sizing: border-box !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 2px !important;
 }
 
 .headerBtnIcon {
@@ -211,37 +200,6 @@
   min-height: 0;
 }
 
-.panelNav {
-  display: flex;
-  background: rgba(0, 0, 0, 0.15);
-  border-bottom: 1px solid var(--rpg-border);
-  flex-shrink: 0;
-  width: 100%;
-}
-
-.panelNav button {
-  flex: 1;
-  background: transparent;
-  border: none;
-  border-bottom: 2px solid transparent;
-  color: var(--rpg-text);
-  opacity: 0.6;
-  padding: 12px 0;
-  font-size: 11px;
-  cursor: pointer;
-  transition: opacity 0.2s, border-color 0.2s, color 0.2s;
-}
-
-.panelNav button:hover {
-  opacity: 0.9;
-}
-
-.panelNav button.activeTab {
-  opacity: 1;
-  border-color: var(--rpg-highlight);
-  color: var(--rpg-highlight);
-}
-
 .panelBody {
   flex: 1;
   overflow-y: auto;
@@ -269,48 +227,6 @@
   background: rgba(255, 255, 255, 0.35);
 }
 
-.sectionPlaceholder {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.sectionPlaceholder h4 {
-  margin: 0;
-  font-size: 13px;
-  color: var(--rpg-highlight);
-}
-
-.desc {
-  font-size: 11px;
-  opacity: 0.7;
-  line-height: 1.5;
-  margin: 0;
-}
-
-.infoRow {
-  display: flex;
-  justify-content: space-between;
-  font-size: 12px;
-  background: rgba(255, 255, 255, 0.02);
-  padding: 8px;
-  border-radius: 4px;
-  border: 1px solid var(--rpg-border);
-}
-
-@media (max-width: 1000px) {
-  .panelContainer {
-    width: 85vw !important;
-    max-width: 100vw !important;
-  }
-  .panelContainer.left {
-    width: 85vw !important;
-  }
-  .panelContainer.right {
-    width: 85vw !important;
-  }
-}
-
 .statusDot {
   width: 8px;
   height: 8px;
@@ -328,4 +244,17 @@
 .statusDotDisconnected {
   background-color: #ff4757;
   box-shadow: 0 0 8px #ff4757;
+}
+
+@media (max-width: 1000px) {
+  .panelContainer {
+    width: 85vw !important;
+    max-width: 100vw !important;
+  }
+  .panelContainer.left {
+    width: 85vw !important;
+  }
+  .panelContainer.right {
+    width: 85vw !important;
+  }
 }

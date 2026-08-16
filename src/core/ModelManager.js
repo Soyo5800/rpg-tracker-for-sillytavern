@@ -1,8 +1,7 @@
-// src/core/ModelManager.js
 import { getContext, extension_settings } from "../../../../../extensions.js";
 import { generateQuietPrompt, setExtensionPrompt, extension_prompt_types, extension_prompt_roles } from "../../../../../../script.js";
-import { buildDefinitionPromptWrapper, buildStaticDefinitionsPrompt, buildDynamicValuesPrompt, buildAddonSection } from "./ActivePrompt.js";
-import { DEFAULT_PROMPT_HEADER_MERGED, DEFAULT_PROMPT_FOOTER_MERGED, DEFAULT_PROMPT_HEADER_SEP, DEFAULT_PROMPT_FOOTER_SEP, DEFAULT_READONLY_CONTEXT_HEADER } from "./PromptSchema.js";
+import { buildDefinitionPromptWrapper, buildCleanStatusPrompt, buildStaticDefinitionsPrompt, buildAddonSection } from "./ActivePrompt.js";
+import { DEFAULT_PROMPT_HEADER_MERGED, DEFAULT_PROMPT_FOOTER_MERGED, DEFAULT_READONLY_CONTEXT_HEADER } from "./PromptSchema.js";
 
 /**
  * Restores extension prompt configuration based on active update mode.
@@ -14,17 +13,30 @@ export function restoreExtensionPromptForCurrentMode(extensionName) {
     const mode = currentSettings.updateMode || 'merged';
     const trackerData = window.RPGBridge?.currentTrackerData;
 
-    if (!currentSettings.enabled || mode === 'isolated' || !trackerData) {
+    if (!currentSettings.enabled || !trackerData) {
         setExtensionPrompt(`${extensionName}_def`, '', extension_prompt_types.IN_PROMPT, 0, false);
         return;
     }
 
+    if (mode === 'isolated') {
+        const addonSection = buildAddonSection(trackerData);
+        if (addonSection && addonSection.trim() !== '') {
+            setExtensionPrompt(`${extensionName}_def`, addonSection.trim(), extension_prompt_types.IN_CHAT, 0, false, extension_prompt_roles.SYSTEM || 0);
+        } else {
+            setExtensionPrompt(`${extensionName}_def`, '', extension_prompt_types.IN_PROMPT, 0, false);
+        }
+        return;
+    }
+
     if (mode === 'separated') {
+        const cleanStatusPrompt = buildCleanStatusPrompt(trackerData);
         const staticDefs = buildStaticDefinitionsPrompt(trackerData) || '';
-        const statusPrompt = buildDynamicValuesPrompt(trackerData);
         const readOnlyHeader = trackerData.systemPrompt_readonly !== undefined ? trackerData.systemPrompt_readonly : DEFAULT_READONLY_CONTEXT_HEADER;
         const addonSection = buildAddonSection(trackerData);
-        const readOnlyPrompt = `${readOnlyHeader}\n\n${statusPrompt}\n${staticDefs}\n${addonSection}`;
+        
+        const readOnlyPrompt = [readOnlyHeader, cleanStatusPrompt, staticDefs, addonSection]
+            .filter(part => part && part.trim() !== '')
+            .join('\n\n');
 
         setExtensionPrompt(`${extensionName}_def`, readOnlyPrompt, extension_prompt_types.IN_CHAT, 0, false, extension_prompt_roles.SYSTEM || 0);
     } else if (mode === 'merged') {

@@ -1,9 +1,9 @@
-// src/editor/CharListEditor.jsx
 import React, { useState, useEffect } from 'react';
 import { useRPG } from '../core/RPGControl';
 import styles from './CharListEditor.module.css';
-import { DEFAULT_STATUS_SCHEMAS, DEFAULT_STATUS, getDefaultCharacters } from '../core/PromptSchema';
+import { getDefaultCharacters } from '../core/PromptSchema';
 import { PresetSaveIcon, PresetLoadIcon, GearIcon } from '../Icons';
+import { SortButtons } from '../utils';
 
 export default function CharListEditor({ onClose, onOpenStatusEditor }) {
   const { trackerData, updateTrackerData, settings, updateSettings } = useRPG();
@@ -20,6 +20,7 @@ export default function CharListEditor({ onClose, onOpenStatusEditor }) {
   const [currentPresetId, setCurrentPresetId] = useState(trackerData.currentPresetId || '');
   const [currentPresetName, setCurrentPresetName] = useState(trackerData.currentPresetName || 'New Preset');
 
+  // Load packaged server preset configurations
   useEffect(() => {
     const loadPackagedPresets = async () => {
       try {
@@ -40,7 +41,6 @@ export default function CharListEditor({ onClose, onOpenStatusEditor }) {
 
   const safeSaveToLocalStorage = (id, data) => {
     try {
-      // LocalStorage 용량 초과 방지를 위해 Base64 아바타 이미지 데이터를 제거하고 텍스트/스키마 위주로 저장
       const cleanData = JSON.parse(JSON.stringify(data));
       if (Array.isArray(cleanData)) {
         cleanData.forEach(char => {
@@ -121,7 +121,6 @@ export default function CharListEditor({ onClose, onOpenStatusEditor }) {
   const handleAddCharacter = () => {
     const existingIds = characters.map(c => c.id);
     const newId = getNextAvailableId(existingIds);
-    // Clone standard template character to ensure complete schema support
     const newChar = JSON.parse(JSON.stringify(getDefaultCharacters()[0]));
     newChar.id = newId;
     newChar.name = "New Character";
@@ -263,10 +262,9 @@ export default function CharListEditor({ onClose, onOpenStatusEditor }) {
     }
   };
 
-  // 단독 다이렉트 삭제 및 자동 대체(Fallback) 처리기
   const handleDeletePresetById = (presetId, presetName, e) => {
     if (e) {
-      e.stopPropagation(); // 클릭 전파를 막아 뒤에 있는 로드 트리거를 차단
+      e.stopPropagation();
     }
 
     if (window.confirm(`Are you sure you want to delete preset "${presetName}"?`)) {
@@ -276,16 +274,13 @@ export default function CharListEditor({ onClose, onOpenStatusEditor }) {
       const newPresets = currentPresets.filter(p => p.id !== presetId);
       updateSettings({ presets: newPresets });
 
-      // 삭제한 프리셋이 현재 활성 상태인 경우의 대응 처리
       if (currentPresetId === presetId) {
         if (newPresets.length === 0) {
-          // 남은 대안 프리셋이 아예 없는 경우 완전히 초기화
           const defaultChars = getDefaultCharacters();
           setCurrentPresetId('');
           setCurrentPresetName('New Preset');
           setLocalCharacters(defaultChars);
         } else {
-          // 남은 캐시 목록 중 최상단 프리셋을 즉시 대체 로드
           const fallbackPreset = newPresets[0];
           handleLoadPreset(fallbackPreset);
         }
@@ -388,11 +383,11 @@ export default function CharListEditor({ onClose, onOpenStatusEditor }) {
   ];
 
   return (
-    <div className={styles.overlay}>
-      <div className={styles.modal} onClick={e => e.stopPropagation()}>
-        <header className={styles.header}>
+    <div className="rpg-modal-overlay">
+      <div className="rpg-modal-container" onClick={e => e.stopPropagation()}>
+        <header className="rpg-modal-header">
           <h4>Character List</h4>
-          <button className={styles.closeBtn} onClick={onClose}>×</button>
+          <button type="button" className="rpg-modal-close-btn" onClick={onClose}>×</button>
         </header>
 
         <div className={styles.presetBar}>
@@ -419,7 +414,6 @@ export default function CharListEditor({ onClose, onOpenStatusEditor }) {
                     const isDeletable = preset.type !== 'file' && preset.type !== 'server';
                     return (
                       <div key={preset.id} className={styles.presetDropdownItem}>
-                        {/* 왼쪽: 로드 클릭 구역 */}
                         <div className={styles.presetDropdownItemLoadArea} onClick={() => handleLoadPreset(preset)}>
                           <span className={styles.presetItemName}>{preset.name}</span>
                           <div className={styles.presetItemBadges}>
@@ -431,11 +425,10 @@ export default function CharListEditor({ onClose, onOpenStatusEditor }) {
                             </span>
                           </div>
                         </div>
-                        {/* 오른쪽: 캐시 프리셋 개별 삭제 단추 */}
                         {isDeletable && (
                           <button
                             type="button"
-                            className={styles.presetItemDeleteBtn}
+                            className="rpg-btn-del-text"
                             title="Delete Preset"
                             onClick={(e) => handleDeletePresetById(preset.id, preset.name, e)}
                           >
@@ -451,7 +444,7 @@ export default function CharListEditor({ onClose, onOpenStatusEditor }) {
           </div>
           <button
             type="button"
-            className={styles.iconBtn}
+            className="rpg-btn-icon"
             title="Save Preset"
             onClick={handleSavePreset}
           >
@@ -459,7 +452,7 @@ export default function CharListEditor({ onClose, onOpenStatusEditor }) {
           </button>
           <button
             type="button"
-            className={styles.iconBtn}
+            className="rpg-btn-icon"
             title="Load Preset"
             onClick={() => setShowDropdown(!showDropdown)}
           >
@@ -467,23 +460,25 @@ export default function CharListEditor({ onClose, onOpenStatusEditor }) {
           </button>
         </div>
 
-        <div className={styles.body}>
+        <div className="rpg-modal-body">
           {characters.map((char, index) => (
             <div key={char.id} className={styles.charItem}>
-              <div className={styles.dragControls}>
-                <button type="button" disabled={index === 0} onClick={() => handleMove(index, 'up')}>▲</button>
-                <button type="button" disabled={index === characters.length - 1} onClick={() => handleMove(index, 'down')}>▼</button>
-              </div>
+              <SortButtons
+                onMoveUp={() => handleMove(index, 'up')}
+                onMoveDown={() => handleMove(index, 'down')}
+                isFirst={index === 0}
+                isLast={index === characters.length - 1}
+              />
               <input
                 type="text"
                 className={styles.nameInput}
                 value={char.name}
                 onChange={(e) => handleNameChange(char.id, e.target.value)}
               />
-              <div className={styles.actions} style={{ display: 'flex', gap: '4px' }}>
+              <div className={styles.actions}>
                 <button
                   type="button"
-                  className={styles.iconBtn}
+                  className="rpg-btn-icon"
                   title="Edit Character"
                   onClick={() => onOpenStatusEditor(char.id)}
                 >
@@ -491,7 +486,7 @@ export default function CharListEditor({ onClose, onOpenStatusEditor }) {
                 </button>
                 <button
                   type="button"
-                  className={`${styles.iconBtn} ${styles.deleteBtn}`}
+                  className="rpg-btn-del"
                   title="Delete Character"
                   onClick={() => handleDelete(char.id)}
                 >
@@ -500,12 +495,14 @@ export default function CharListEditor({ onClose, onOpenStatusEditor }) {
               </div>
             </div>
           ))}
-          <button className={styles.addBtn} onClick={handleAddCharacter}>+ Add Character</button>
+          <button type="button" className="rpg-btn-dashed" onClick={handleAddCharacter}>
+            + Add Character
+          </button>
         </div>
 
-        <footer className={styles.footer}>
-          <div className={styles.footerLeft}>
-            <button type="button" className={`${styles.footerBtn} ${styles.reset}`} onClick={handleResetToDefault}>
+        <footer className="rpg-modal-footer">
+          <div className="rpg-modal-footer-left">
+            <button type="button" className="rpg-modal-btn reset" onClick={handleResetToDefault}>
               Reset
             </button>
           </div>
@@ -518,19 +515,18 @@ export default function CharListEditor({ onClose, onOpenStatusEditor }) {
             onChange={handleImportLocalFile}
           />
 
-          <div className={styles.footerRight}>
-            <button type="button" className={styles.footerBtn} onClick={handleExportLocalFile}>
+          <div className="rpg-modal-footer-right">
+            <button type="button" className="rpg-modal-btn" onClick={handleExportLocalFile}>
               Export
             </button>
             <button
               type="button"
-              className={styles.footerBtn}
-              style={{ margin: '0 6px' }}
+              className="rpg-modal-btn"
               onClick={() => document.getElementById('hidden-preset-file-picker').click()}
             >
               Import
             </button>
-            <button type="button" className={`${styles.footerBtn} ${styles.save}`} onClick={handleGlobalSave}>
+            <button type="button" className="rpg-modal-btn save" onClick={handleGlobalSave}>
               Save
             </button>
           </div>

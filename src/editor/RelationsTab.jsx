@@ -1,10 +1,72 @@
-// src/editor/RelationsTab.jsx
 import React, { useState } from 'react';
 import styles from './StatusEditor.module.css';
+import { ToggleSwitch, SortButtons, AccordionArrow } from '../utils';
+
+// 관계 메트릭 세부 속성 설정 폼 (PromptEditor와 공용으로 사용)
+export function RelationMetricConfig({
+  colorNegative = '#e74c3c',
+  colorPositive = '#2ecc71',
+  min = -100,
+  max = 100,
+  disabled = false,
+  onChange
+}) {
+  return (
+    <div className={styles.metricConfigRow} style={{ borderTop: 'none', paddingTop: 0 }}>
+      <div className={styles.flexCenterGroupSmall} title="Negative Color">
+        <span className={styles.metricLimitLabel}>Col(-):</span>
+        <input
+          type="color"
+          disabled={disabled}
+          value={colorNegative}
+          onChange={(e) => onChange && onChange('colorNegative', e.target.value)}
+          className={styles.colorPickerInput}
+        />
+      </div>
+
+      <div className={styles.flexCenterGroupSmall} title="Positive Color">
+        <span className={styles.metricLimitLabel}>Col(+):</span>
+        <input
+          type="color"
+          disabled={disabled}
+          value={colorPositive}
+          onChange={(e) => onChange && onChange('colorPositive', e.target.value)}
+          className={styles.colorPickerInput}
+        />
+      </div>
+
+      <div className={styles.flexCenterGroupSmall}>
+        <span className={styles.metricLimitLabel}>Min:</span>
+        <input
+          type="number"
+          disabled={disabled}
+          value={min !== undefined && min !== null ? min : -100}
+          onChange={(e) => onChange && onChange('min', Number(e.target.value))}
+          className={styles.metricLimitInput}
+        />
+      </div>
+
+      <div className={styles.flexCenterGroupSmall}>
+        <span className={styles.metricLimitLabel}>Max:</span>
+        <input
+          type="number"
+          disabled={disabled}
+          value={max !== undefined && max !== null ? max : 100}
+          onChange={(e) => onChange && onChange('max', Number(e.target.value))}
+          className={styles.metricLimitInput}
+        />
+      </div>
+    </div>
+  );
+}
 
 export default function RelationsTab({
-  charId, targetChar, localCharacters, setLocalCharacters,
-  expandedIds, setExpandedIds
+  charId,
+  targetChar,
+  localCharacters,
+  setLocalCharacters,
+  expandedIds,
+  setExpandedIds
 }) {
   const [relationPreset, setRelationPreset] = useState('-100~100');
   const [relationMin, setRelationMin] = useState(-100);
@@ -17,7 +79,22 @@ export default function RelationsTab({
 
       if (action === 'add') {
         if (!nextRelations[targetName]) {
-          nextRelations[targetName] = { text: '', targetText: '', isLocked: false, isInject: true, values: { 'Affection': { value: 0, min: relationMin, max: relationMax, colorNegative: '#e74c3c', colorPositive: '#2ecc71' } }, targetValues: {} };
+          nextRelations[targetName] = {
+            text: '',
+            targetText: '',
+            isLocked: false,
+            isInject: true,
+            values: {
+              'Affection': {
+                value: 0,
+                min: relationMin,
+                max: relationMax,
+                colorNegative: '#e74c3c',
+                colorPositive: '#2ecc71'
+              }
+            },
+            targetValues: {}
+          };
         }
         return { ...c, relations: nextRelations };
       }
@@ -55,7 +132,10 @@ export default function RelationsTab({
         delete nextValues[data.metric];
         targetData.values = nextValues;
       } else if (action === 'addMetric') {
-        targetData.values = { ...(targetData.values || {}), [data.metric]: { value: 0, min: relationMin, max: relationMax, colorNegative: '#e74c3c', colorPositive: '#2ecc71' } };
+        targetData.values = {
+          ...(targetData.values || {}),
+          [data.metric]: { value: 0, min: relationMin, max: relationMax, colorNegative: '#e74c3c', colorPositive: '#2ecc71' }
+        };
       }
       nextRelations[targetName] = targetData;
       return { ...c, relations: nextRelations };
@@ -69,8 +149,8 @@ export default function RelationsTab({
     setLocalCharacters(localCharacters.map(c => {
       if (targetCharObj && c.id === targetCharObj.id) {
         const nextRelations = { ...(c.relations || {}) };
-        const myDataInTarget = nextRelations[myName] 
-          ? JSON.parse(JSON.stringify(nextRelations[myName])) 
+        const myDataInTarget = nextRelations[myName]
+          ? JSON.parse(JSON.stringify(nextRelations[myName]))
           : { text: '', isLocked: false, isInject: true, values: {} };
 
         if (action === 'updateField') {
@@ -96,7 +176,10 @@ export default function RelationsTab({
           delete nextValues[data.metric];
           myDataInTarget.values = nextValues;
         } else if (action === 'addMetric') {
-          myDataInTarget.values = { ...(myDataInTarget.values || {}), [data.metric]: { value: 0, min: relationMin, max: relationMax, colorNegative: '#e74c3c', colorPositive: '#2ecc71' } };
+          myDataInTarget.values = {
+            ...(myDataInTarget.values || {}),
+            [data.metric]: { value: 0, min: relationMin, max: relationMax, colorNegative: '#e74c3c', colorPositive: '#2ecc71' }
+          };
         }
         nextRelations[myName] = myDataInTarget;
         return { ...c, relations: nextRelations };
@@ -104,8 +187,8 @@ export default function RelationsTab({
 
       if (!targetCharObj && c.id === charId) {
         const nextRelations = { ...(c.relations || {}) };
-        const targetData = nextRelations[targetName] 
-          ? JSON.parse(JSON.stringify(nextRelations[targetName])) 
+        const targetData = nextRelations[targetName]
+          ? JSON.parse(JSON.stringify(nextRelations[targetName]))
           : { text: '', targetText: '', isLocked: false, isInject: true, values: {}, targetValues: {} };
 
         if (action === 'updateField') {
@@ -136,7 +219,10 @@ export default function RelationsTab({
           delete nextValues[data.metric];
           targetData.targetValues = nextValues;
         } else if (action === 'addMetric') {
-          targetData.targetValues = { ...(targetData.targetValues || {}), [data.metric]: { value: 0, min: relationMin, max: relationMax, colorNegative: '#e74c3c', colorPositive: '#2ecc71' } };
+          targetData.targetValues = {
+            ...(targetData.targetValues || {}),
+            [data.metric]: { value: 0, min: relationMin, max: relationMax, colorNegative: '#e74c3c', colorPositive: '#2ecc71' }
+          };
         }
         nextRelations[targetName] = targetData;
         return { ...c, relations: nextRelations };
@@ -183,30 +269,51 @@ export default function RelationsTab({
             value={relationPreset}
             onChange={e => {
               setRelationPreset(e.target.value);
-              if (e.target.value === '-100~100') { setRelationMin(-100); setRelationMax(100); }
+              if (e.target.value === '-100~100') {
+                setRelationMin(-100);
+                setRelationMax(100);
+              }
             }}
-            className={styles.presetSelect}
+            className="rpg-select-custom"
           >
             <option value="-100~100">-100~100</option>
             <option value="custom">custom</option>
           </select>
           <div className={styles.metricLimitWrapper}>
             <span className={styles.metricLimitLabel}>min</span>
-            <input type="number" value={relationMin} disabled={relationPreset !== 'custom'} onChange={e => setRelationMin(Number(e.target.value))} className={styles.limitInput} />
+            <input
+              type="number"
+              value={relationMin}
+              disabled={relationPreset !== 'custom'}
+              onChange={e => setRelationMin(Number(e.target.value))}
+              className={styles.limitInput}
+            />
             <span className={styles.metricLimitLabel}>max</span>
-            <input type="number" value={relationMax} disabled={relationPreset !== 'custom'} onChange={e => setRelationMax(Number(e.target.value))} className={styles.limitInput} />
+            <input
+              type="number"
+              value={relationMax}
+              disabled={relationPreset !== 'custom'}
+              onChange={e => setRelationMax(Number(e.target.value))}
+              className={styles.limitInput}
+            />
           </div>
-          <button className={styles.addQuickFieldBtn} onClick={() => {
-            const existingTargets = Object.keys(targetChar.relations || {});
-            let baseName = 'NewTarget';
-            let name = baseName;
-            let counter = 1;
-            while (existingTargets.includes(name)) {
-              name = `${baseName}_${counter}`;
-              counter++;
-            }
-            handleUpdateRelations(name, 'add');
-          }}>+ Add Target</button>
+          <button
+            type="button"
+            className="rpg-btn-sm"
+            onClick={() => {
+              const existingTargets = Object.keys(targetChar.relations || {});
+              let baseName = 'NewTarget';
+              let name = baseName;
+              let counter = 1;
+              while (existingTargets.includes(name)) {
+                name = `${baseName}_${counter}`;
+                counter++;
+              }
+              handleUpdateRelations(name, 'add');
+            }}
+          >
+            + Add Target
+          </button>
         </div>
       </div>
 
@@ -218,28 +325,25 @@ export default function RelationsTab({
           const existingCharNames = localCharacters.map(c => c.name?.trim().toLowerCase());
           const isRealCharacter = existingCharNames.includes(targetName?.trim().toLowerCase());
 
-          let targetText = "";
+          let targetText = '';
           let targetMetricsSource = {};
           if (isRealCharacter) {
             const targetCharObj = localCharacters.find(c => c.name?.trim().toLowerCase() === targetName.trim().toLowerCase());
             const counterRelation = targetCharObj?.relations?.[targetChar.name || 'New Character'] || {};
-            targetText = counterRelation.text || "";
+            targetText = counterRelation.text || '';
             targetMetricsSource = counterRelation.values || {};
           } else {
-            targetText = data.targetText || "";
+            targetText = data.targetText || '';
             targetMetricsSource = data.targetValues || {};
           }
 
           return (
             <div key={targetName} className={styles.relationCard}>
               <div className={styles.relationCardHeader}>
-                <button
-                  type="button"
-                  className={`${styles.accordionToggleBtn} ${isExpanded ? styles.activeToggle : ''}`}
+                <AccordionArrow
+                  isExpanded={isExpanded}
                   onClick={() => setExpandedIds(prev => ({ ...prev, [`relation_${targetName}`]: !prev[`relation_${targetName}`] }))}
-                >
-                  ▶
-                </button>
+                />
                 <input
                   type="text"
                   defaultValue={targetName}
@@ -248,7 +352,8 @@ export default function RelationsTab({
                     if (!newName) { e.target.value = targetName; return; }
                     if (newName !== targetName && (targetChar.relations || {})[newName] !== undefined) {
                       alert(`The relation target "${newName}" already exists.`);
-                      e.target.value = targetName; return;
+                      e.target.value = targetName;
+                      return;
                     }
                     if (newName !== targetName) {
                       const nextRelations = { ...(targetChar.relations || {}) };
@@ -261,42 +366,56 @@ export default function RelationsTab({
                   style={{ flex: 1, fontWeight: 'bold', marginLeft: '6px' }}
                 />
                 <div className={styles.flexItemLine}>
-                  <button type="button" className={`${styles.sortBtn} ${styles.miniSortBtn}`} disabled={rIdx === 0} onClick={() => handleReorderRelation(targetName, 'up')}>▲</button>
-                  <button type="button" className={`${styles.sortBtn} ${styles.miniSortBtn}`} disabled={rIdx === totalRelations - 1} onClick={() => handleReorderRelation(targetName, 'down')}>▼</button>
+                  <SortButtons
+                    isFirst={rIdx === 0}
+                    isLast={rIdx === totalRelations - 1}
+                    onMoveUp={() => handleReorderRelation(targetName, 'up')}
+                    onMoveDown={() => handleReorderRelation(targetName, 'down')}
+                  />
                   {isRealCharacter && <span className={styles.syncBadge}>Synced</span>}
-                  <label className={styles.switchRow} title="Toggle Prompt Injection">
-                    <span>Inject</span>
-                    <div className={styles.switchLabel}>
-                      <input
-                        type="checkbox"
-                        className={styles.switchInput}
-                        checked={data.isInject !== false}
-                        onChange={e => {
-                          const nextRelations = { ...(targetChar.relations || {}) };
-                          nextRelations[targetName] = { ...data, isInject: e.target.checked };
-                          setLocalCharacters(localCharacters.map(c => c.id === charId ? { ...c, relations: nextRelations } : c));
-                        }}
-                      />
-                      <span className={styles.switchSlider}></span>
-                    </div>
-                  </label>
-                  <button type="button" className={styles.removeInlineBtn} onClick={() => handleUpdateRelations(targetName, 'remove')}>X</button>
+
+                  <ToggleSwitch
+                    label="Inject"
+                    title="Toggle Prompt Injection"
+                    checked={data.isInject !== false}
+                    onChange={(checked) => {
+                      const nextRelations = { ...(targetChar.relations || {}) };
+                      nextRelations[targetName] = { ...data, isInject: checked };
+                      setLocalCharacters(localCharacters.map(c => c.id === charId ? { ...c, relations: nextRelations } : c));
+                    }}
+                  />
+
+                  <button
+                    type="button"
+                    className="rpg-btn-del"
+                    onClick={() => handleUpdateRelations(targetName, 'remove')}
+                  >
+                    ×
+                  </button>
                 </div>
               </div>
 
               {isExpanded && (
                 <>
-                  {/* 주체 ➔ 대상 영역 */}
+                  {/* Subject -> Target Perspective */}
                   <div className={styles.sectionWrapper} style={{ borderLeft: '3px solid var(--rpg-text)', marginBottom: '10px' }}>
                     <div className={styles.sectionHeaderLine}>
-                      <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--rpg-text)' }}>{targetChar.name} ➔ {targetName}</span>
-                      <button className={styles.addQuickFieldBtn} onClick={() => {
-                        const existingMetrics = Object.keys(data.values || {});
-                        let mName = 'NewMetric';
-                        let counter = 1;
-                        while (existingMetrics.includes(mName)) { mName = `NewMetric_${counter++}`; }
-                        handleUpdateRelations(targetName, 'addMetric', { metric: mName });
-                      }}>+ Add Metric</button>
+                      <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--rpg-text)' }}>
+                        {targetChar.name} ➔ {targetName}
+                      </span>
+                      <button
+                        type="button"
+                        className="rpg-btn-sm"
+                        onClick={() => {
+                          const existingMetrics = Object.keys(data.values || {});
+                          let mName = 'NewMetric';
+                          let counter = 1;
+                          while (existingMetrics.includes(mName)) { mName = `NewMetric_${counter++}`; }
+                          handleUpdateRelations(targetName, 'addMetric', { metric: mName });
+                        }}
+                      >
+                        + Add Metric
+                      </button>
                     </div>
 
                     <textarea
@@ -316,7 +435,6 @@ export default function RelationsTab({
 
                       return (
                         <div key={mName} className={styles.metricBlock} style={{ marginTop: '6px' }}>
-                          {/* Row 1: 명칭 (왼쪽 정렬) / 현재값 + 삭제버튼 (오른쪽 끝 정렬) */}
                           <div className={styles.metricHeaderRow}>
                             <input
                               type="text"
@@ -327,7 +445,11 @@ export default function RelationsTab({
                                 const cleanId = trimmed.replace(/[^\p{L}\p{N}_]/gu, '_').replace(/_+/g, '_').replace(/^_+|_+$/g, '');
                                 const newId = cleanId || `NewMetric_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
                                 if (newId !== mName) {
-                                  if ((data.values || {})[newId] !== undefined) { alert(`Metric "${trimmed}" exists.`); e.target.value = mName; return; }
+                                  if ((data.values || {})[newId] !== undefined) {
+                                    alert(`Metric "${trimmed}" already exists.`);
+                                    e.target.value = mName;
+                                    return;
+                                  }
                                   handleUpdateRelations(targetName, 'renameMetric', { oldKey: mName, newKey: newId });
                                 }
                               }}
@@ -340,44 +462,47 @@ export default function RelationsTab({
                                 onChange={e => handleUpdateRelations(targetName, 'updateMetricValue', { field: mName, value: Number(e.target.value) })}
                                 className={styles.metricValueInput}
                               />
-                              <button type="button" className={styles.removeInlineBtn} onClick={() => handleUpdateRelations(targetName, 'removeMetric', { metric: mName })} style={{ padding: '2px 5px', fontSize: '9px' }}>×</button>
+                              <button
+                                type="button"
+                                className="rpg-btn-del"
+                                onClick={() => handleUpdateRelations(targetName, 'removeMetric', { metric: mName })}
+                              >
+                                ×
+                              </button>
                             </div>
                           </div>
-                          {/* Row 2: 색상 선택기 및 Min, Max 범위 입력 */}
-                          <div className={styles.metricConfigRow}>
-                            <div className={styles.flexCenterGroupSmall} title="Negative Color">
-                              <span className={styles.metricLimitLabel}>Col(-):</span>
-                              <input type="color" value={mColorNegative} onChange={e => handleUpdateRelations(targetName, 'updateMetricConfig', { metric: mName, config: { colorNegative: e.target.value } })} className={styles.colorPickerInput} />
-                            </div>
-                            <div className={styles.flexCenterGroupSmall} title="Positive Color">
-                              <span className={styles.metricLimitLabel}>Col(+):</span>
-                              <input type="color" value={mColorPositive} onChange={e => handleUpdateRelations(targetName, 'updateMetricConfig', { metric: mName, config: { colorPositive: e.target.value } })} className={styles.colorPickerInput} />
-                            </div>
-                            <div className={styles.flexCenterGroupSmall}>
-                              <span className={styles.metricLimitLabel}>Min:</span>
-                              <input type="number" value={mMin} onChange={e => handleUpdateRelations(targetName, 'updateMetricConfig', { metric: mName, config: { min: Number(e.target.value) } })} className={styles.metricLimitInput} />
-                            </div>
-                            <div className={styles.flexCenterGroupSmall}>
-                              <span className={styles.metricLimitLabel}>Max:</span>
-                              <input type="number" value={mMax} onChange={e => handleUpdateRelations(targetName, 'updateMetricConfig', { metric: mName, config: { max: Number(e.target.value) } })} className={styles.metricLimitInput} />
-                            </div>
-                          </div>
+
+                          <RelationMetricConfig
+                            colorNegative={mColorNegative}
+                            colorPositive={mColorPositive}
+                            min={mMin}
+                            max={mMax}
+                            onChange={(key, val) => handleUpdateRelations(targetName, 'updateMetricConfig', { metric: mName, config: { [key]: val } })}
+                          />
                         </div>
                       );
                     })}
                   </div>
 
-                  {/* 대상 ➔ 주체 영역 */}
+                  {/* Target -> Subject Perspective */}
                   <div className={styles.sectionWrapper} style={{ borderLeft: '3px solid var(--rpg-text)' }}>
                     <div className={styles.sectionHeaderLine}>
-                      <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--rpg-text)' }}>{targetName} ➔ {targetChar.name}</span>
-                      <button className={styles.addQuickFieldBtn} onClick={() => {
-                        const existingTargetMetrics = Object.keys(targetMetricsSource || {});
-                        let mName = 'NewMetric';
-                        let counter = 1;
-                        while (existingTargetMetrics.includes(mName)) { mName = `NewMetric_${counter++}`; }
-                        handleUpdateTargetRelation(targetName, 'addMetric', { metric: mName });
-                      }}>+ Add Metric</button>
+                      <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--rpg-text)' }}>
+                        {targetName} ➔ {targetChar.name}
+                      </span>
+                      <button
+                        type="button"
+                        className="rpg-btn-sm"
+                        onClick={() => {
+                          const existingTargetMetrics = Object.keys(targetMetricsSource || {});
+                          let mName = 'NewMetric';
+                          let counter = 1;
+                          while (existingTargetMetrics.includes(mName)) { mName = `NewMetric_${counter++}`; }
+                          handleUpdateTargetRelation(targetName, 'addMetric', { metric: mName });
+                        }}
+                      >
+                        + Add Metric
+                      </button>
                     </div>
 
                     <textarea
@@ -397,7 +522,6 @@ export default function RelationsTab({
 
                       return (
                         <div key={tmName} className={styles.metricBlock} style={{ marginTop: '6px' }}>
-                          {/* Row 1: 명칭 (왼쪽 정렬) / 현재값 + 삭제버튼 (오른쪽 끝 정렬) */}
                           <div className={styles.metricHeaderRow}>
                             <input
                               type="text"
@@ -408,7 +532,11 @@ export default function RelationsTab({
                                 const cleanId = trimmed.replace(/[^\p{L}\p{N}_]/gu, '_').replace(/_+/g, '_').replace(/^_+|_+$/g, '');
                                 const newId = cleanId || `NewMetric_${Date.now()}`;
                                 if (newId !== tmName) {
-                                  if ((targetMetricsSource || {})[newId] !== undefined) { alert(`Metric "${trimmed}" exists.`); e.target.value = tmName; return; }
+                                  if ((targetMetricsSource || {})[newId] !== undefined) {
+                                    alert(`Metric "${trimmed}" already exists.`);
+                                    e.target.value = tmName;
+                                    return;
+                                  }
                                   handleUpdateTargetRelation(targetName, 'renameMetric', { oldKey: tmName, newKey: newId });
                                 }
                               }}
@@ -421,28 +549,23 @@ export default function RelationsTab({
                                 onChange={e => handleUpdateTargetRelation(targetName, 'updateMetricValue', { field: tmName, value: Number(e.target.value) })}
                                 className={styles.metricValueInput}
                               />
-                              <button type="button" className={styles.removeInlineBtn} onClick={() => handleUpdateTargetRelation(targetName, 'removeMetric', { metric: tmName })} style={{ padding: '2px 5px', fontSize: '9px' }}>×</button>
+                              <button
+                                type="button"
+                                className="rpg-btn-del"
+                                onClick={() => handleUpdateTargetRelation(targetName, 'removeMetric', { metric: tmName })}
+                              >
+                                ×
+                              </button>
                             </div>
                           </div>
-                          {/* Row 2: 색상 선택기 및 Min, Max 범위 입력 */}
-                          <div className={styles.metricConfigRow}>
-                            <div className={styles.flexCenterGroupSmall} title="Negative Color">
-                              <span className={styles.metricLimitLabel}>Col(-):</span>
-                              <input type="color" value={tmColorNegative} onChange={e => handleUpdateTargetRelation(targetName, 'updateMetricConfig', { metric: tmName, config: { colorNegative: e.target.value } })} className={styles.colorPickerInput} />
-                            </div>
-                            <div className={styles.flexCenterGroupSmall} title="Positive Color">
-                              <span className={styles.metricLimitLabel}>Col(+):</span>
-                              <input type="color" value={tmColorPositive} onChange={e => handleUpdateTargetRelation(targetName, 'updateMetricConfig', { metric: tmName, config: { colorPositive: e.target.value } })} className={styles.colorPickerInput} />
-                            </div>
-                            <div className={styles.flexCenterGroupSmall}>
-                              <span className={styles.metricLimitLabel}>Min:</span>
-                              <input type="number" value={tmMin} onChange={e => handleUpdateTargetRelation(targetName, 'updateMetricConfig', { metric: tmName, config: { min: Number(e.target.value) } })} className={styles.metricLimitInput} />
-                            </div>
-                            <div className={styles.flexCenterGroupSmall}>
-                              <span className={styles.metricLimitLabel}>Max:</span>
-                              <input type="number" value={tmMax} onChange={e => handleUpdateTargetRelation(targetName, 'updateMetricConfig', { metric: tmName, config: { max: Number(e.target.value) } })} className={styles.metricLimitInput} />
-                            </div>
-                          </div>
+
+                          <RelationMetricConfig
+                            colorNegative={tmColorNegative}
+                            colorPositive={tmColorPositive}
+                            min={tmMin}
+                            max={tmMax}
+                            onChange={(key, val) => handleUpdateTargetRelation(targetName, 'updateMetricConfig', { metric: tmName, config: { [key]: val } })}
+                          />
                         </div>
                       );
                     })}

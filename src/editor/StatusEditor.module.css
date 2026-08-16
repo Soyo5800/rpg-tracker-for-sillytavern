@@ -1,63 +1,3 @@
-/* src/editor/StatusEditor.module.css */
-
-.addCharMainBtn {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px dashed var(--rpg-border);
-  color: var(--rpg-text);
-  padding: 8px 16px;
-  border-radius: 6px;
-  font-size: 12px;
-  font-weight: bold;
-  cursor: pointer;
-  width: 100%;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
-}
-
-.addCharMainBtn:hover {
-  background: var(--rpg-highlight-bg);
-  border-color: var(--rpg-highlight);
-  color: var(--rpg-highlight);
-}
-
-.editorOverlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background: rgba(0, 0, 0, 0.75);
-  z-index: 2000 !important;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-}
-
-.editorModal {
-  background: var(--rpg-bg);
-  border: 1px solid var(--rpg-border);
-  border-radius: 10px;
-  width: 540px;
-  height: 680px;
-  max-width: 100%;
-  max-height: 90vh;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.65);
-  color: var(--rpg-text);
-  overflow: hidden;
-}
-
-.editorHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 20px;
-  border-bottom: 1px solid var(--rpg-border);
-  flex-shrink: 0;
-  height: 54px;
-}
-
 .headerNav {
   display: flex;
   align-items: center;
@@ -65,26 +5,15 @@
   width: 90%;
 }
 
-.closeBtn {
-  background: transparent;
-  border: none;
-  font-size: 24px;
+.charNameInput {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--rpg-border);
   color: var(--rpg-text);
-  cursor: pointer;
-  opacity: 0.6;
-}
-
-.closeBtn:hover {
-  opacity: 1;
-}
-
-.editorBody {
-  flex: 1;
-  overflow-y: auto;
-  padding: 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
+  font-size: 16px;
+  font-weight: bold;
+  outline: none;
+  padding: 4px 8px;
+  border-radius: 4px;
 }
 
 .statEditorDetail {
@@ -111,17 +40,6 @@
   margin: 0;
   font-size: 12px;
   opacity: 0.8;
-}
-
-.addQuickFieldBtn {
-  background: var(--rpg-highlight-bg);
-  border: 1px solid var(--rpg-highlight);
-  color: var(--rpg-highlight);
-  font-size: 10.5px;
-  font-weight: bold;
-  padding: 4px 10px;
-  border-radius: 4px;
-  cursor: pointer;
 }
 
 .emptySectionText {
@@ -158,121 +76,10 @@
   gap: 8px;
 }
 
-.accordionToggleBtn {
-  background: transparent;
-  border: none;
-  color: var(--rpg-text);
-  font-size: 10px;
-  cursor: pointer;
-  transform: rotate(0deg);
-  transition: transform 0.2s ease;
-  padding: 3px;
-}
-
-.activeToggle {
-  transform: rotate(90deg);
-}
-
 .headerRightZone {
   display: flex;
   align-items: center;
   gap: 5px;
-}
-
-.sortBtn {
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid var(--rpg-border);
-  color: var(--rpg-text);
-  font-size: 9px;
-  width: 20px;
-  height: 20px;
-  border-radius: 3px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.sortBtn:disabled {
-  opacity: 0.15;
-  cursor: not-allowed;
-}
-
-.sortBtn:not(:disabled):hover {
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.switchRow {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 11px;
-  opacity: 0.7;
-  cursor: pointer;
-  margin-right: 4px;
-}
-
-.switchLabel {
-  position: relative;
-  display: inline-block;
-  width: 28px;
-  height: 14px;
-}
-
-.switchInput {
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.switchSlider {
-  position: absolute;
-  cursor: pointer;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(255, 255, 255, 0.08);
-  transition: 0.2s;
-  border-radius: 14px;
-  border: 1px solid var(--rpg-border);
-}
-
-.switchSlider:before {
-  position: absolute;
-  content: "";
-  height: 8px;
-  width: 8px;
-  left: 2px;
-  bottom: 2px;
-  background-color: var(--rpg-text);
-  transition: 0.2s;
-  border-radius: 50%;
-}
-
-.switchInput:checked + .switchSlider {
-  background-color: var(--rpg-highlight-bg);
-  border-color: var(--rpg-highlight);
-}
-
-.switchInput:checked + .switchSlider:before {
-  transform: translateX(14px);
-  background-color: var(--rpg-highlight);
-}
-
-.removeInlineBtn {
-  background: rgba(231, 76, 60, 0.15);
-  border: 1px solid rgba(231, 76, 60, 0.3);
-  color: #e74c3c;
-  font-size: 10.5px;
-  padding: 2px 6px;
-  border-radius: 3px;
-  cursor: pointer;
-  font-weight: bold;
-}
-
-.removeInlineBtn:hover {
-  background: rgba(231, 76, 60, 0.25);
 }
 
 .itemFields {
@@ -299,8 +106,7 @@
   min-width: 70px;
 }
 
-.inlineRow input,
-.inlineRow select {
+.inlineRow input {
   flex: 1;
   background: rgba(0, 0, 0, 0.2);
   border: 1px solid var(--rpg-border);
@@ -312,8 +118,7 @@
   transition: border-color 0.15s ease;
 }
 
-.inlineRow input:focus,
-.inlineRow select:focus {
+.inlineRow input:focus {
   border: 1px solid var(--rpg-highlight) !important;
   outline: none;
 }
@@ -335,90 +140,9 @@
   opacity: 0.7;
 }
 
-.editorFooter {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 18px;
-  background: rgba(0, 0, 0, 0.2);
-  border-top: 1px solid var(--rpg-border);
-  border-radius: 0 0 10px 10px;
-  flex-shrink: 0;
-  height: 54px;
+.appearanceSection {
+  margin-top: 10px;
 }
-
-.footerLeft { display: flex; gap: 6px; }
-.footerRight { display: flex; }
-
-.footerBtn {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--rpg-border);
-  color: var(--rpg-text);
-  font-size: 11.5px;
-  font-weight: bold;
-  padding: 7px 14px;
-  border-radius: 5px;
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
-}
-
-.footerBtn:hover {
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.footerBtn.reset {
-  color: #e74c3c;
-  border-color: rgba(231, 76, 60, 0.25);
-}
-
-.footerBtn.reset:hover {
-  background: rgba(231, 76, 60, 0.1);
-  border-color: #e74c3c;
-}
-
-.footerBtn.save {
-  background: var(--rpg-highlight-bg);
-  border: 1px solid var(--rpg-highlight);
-  color: var(--rpg-highlight);
-}
-
-.footerBtn.save:hover { opacity: 0.9; }
-
-.editorTabs {
-  display: flex;
-  background: rgba(0, 0, 0, 0.15);
-  border-bottom: 1px solid var(--rpg-border);
-  flex-shrink: 0;
-}
-
-.tabBtn {
-  flex: 1;
-  background: transparent;
-  border: none;
-  color: var(--rpg-text);
-  opacity: 0.6;
-  padding: 10px;
-  font-size: 12px;
-  font-weight: bold;
-  cursor: pointer;
-  text-align: center;
-  transition: all 0.15s;
-  border-bottom: 2px solid transparent;
-}
-
-.tabBtn:hover {
-  opacity: 1;
-  background: rgba(255, 255, 255, 0.02);
-}
-
-.tabBtnActive {
-  opacity: 1;
-  color: var(--rpg-highlight);
-  border-bottom: 2px solid var(--rpg-highlight);
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.appearanceSection { margin-top: 10px; }
 
 .relationsTabBody,
 .inventoryTabBody {
@@ -463,7 +187,6 @@
   color: var(--rpg-text) !important;
 }
 
-/* 관계 수치 조정을 위한 메트릭 단위 블록 */
 .metricBlock {
   background: rgba(0, 0, 0, 0.15);
   border: 1px solid rgba(255, 255, 255, 0.04);
@@ -516,32 +239,9 @@
   padding-top: 4px;
 }
 
-.invActionBar {
-  display: flex;
-  gap: 6px;
+.invSection {
   margin-bottom: 10px;
 }
-
-.invActionBtn {
-  flex: 1;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--rpg-border);
-  color: var(--rpg-text);
-  padding: 6px;
-  font-size: 11px;
-  font-weight: bold;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.invActionBtn:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: var(--rpg-highlight);
-  color: var(--rpg-highlight);
-}
-
-.invSection { margin-bottom: 10px; }
 
 .invSectionTitle {
   font-size: 11.5px;
@@ -550,7 +250,8 @@
   margin-bottom: 6px;
 }
 
-.invEquipGrid, .invStorageGrid {
+.invEquipGrid,
+.invStorageGrid {
   display: grid;
   grid-template-columns: 1fr;
   gap: 8px;
@@ -651,67 +352,11 @@
   margin: 0;
 }
 
-.itemDeleteBtn {
-  background: transparent;
-  border: none;
-  color: rgba(255, 255, 255, 0.4);
-  font-size: 14px;
-  cursor: pointer;
-  line-height: 1;
-  width: 58px;
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-end;
-  padding-right: 2px;
-}
-
-.itemDeleteBtn:hover { color: #e74c3c; }
-
-input[type=number]::-webkit-outer-spin-button,
-input[type=number]::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-input[type=number] {
-  -moz-appearance: textfield;
-}
-
 .invItemRow textarea,
 .invItemRow input {
   touch-action: auto !important;
   user-select: text !important;
   -webkit-user-select: text !important;
-}
-
-.accordionArrow {
-  font-size: 10px;
-  display: inline-block;
-  transition: transform 0.15s ease-out;
-  margin-right: 8px;
-  color: var(--rpg-text);
-  line-height: 1;
-}
-
-.activeArrow {
-  transform: rotate(90deg);
-}
-
-.miniAddBtn {
-  background: var(--rpg-highlight-bg);
-  border: 1px solid var(--rpg-highlight);
-  color: var(--rpg-highlight);
-  font-size: 9.5px;
-  font-weight: bold;
-  padding: 2px 6px;
-  border-radius: 3px;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: all 0.12s;
-}
-
-.miniAddBtn:hover {
-  opacity: 0.9;
 }
 
 .itemTypeSelectWrapper {
@@ -755,30 +400,9 @@ input[type=number] {
   font-weight: bold;
 }
 
-.charNameInput {
-  background: rgba(0,0,0,0.2);
-  border: 1px solid var(--rpg-border);
-  color: var(--rpg-text);
-  font-size: 16px;
-  font-weight: bold;
-  outline: none;
-  padding: 4px 8px;
-  border-radius: 4px;
-}
-
-.presetSelect {
-  background: rgba(0,0,0,0.3);
-  border: 1px solid var(--rpg-border);
-  color: var(--rpg-text);
-  border-radius: 4px;
-  padding: 2px 4px;
-  font-size: 11px;
-  outline: none;
-}
-
 .limitInput {
   width: 45px;
-  background: rgba(0,0,0,0.3);
+  background: rgba(0, 0, 0, 0.3);
   border: 1px solid var(--rpg-border);
   color: var(--rpg-text);
   border-radius: 4px;
@@ -789,7 +413,7 @@ input[type=number] {
 }
 
 .nameInput {
-  background: rgba(0,0,0,0.2);
+  background: rgba(0, 0, 0, 0.2);
   border: 1px solid var(--rpg-border);
   color: var(--rpg-text);
   font-size: 11px;
@@ -802,7 +426,7 @@ input[type=number] {
 .descTextarea {
   width: 100%;
   min-height: 50px;
-  background: rgba(0,0,0,0.3);
+  background: rgba(0, 0, 0, 0.3);
   border: 1px solid var(--rpg-border);
   color: var(--rpg-text);
   border-radius: 4px;
@@ -815,7 +439,7 @@ input[type=number] {
 .metricNameInput {
   flex: 1;
   min-width: 80px;
-  background: rgba(0,0,0,0.2);
+  background: rgba(0, 0, 0, 0.2);
   border: 1px solid var(--rpg-border);
   color: var(--rpg-text);
   padding: 5px 8px;
@@ -827,7 +451,7 @@ input[type=number] {
 
 .metricLimitInput {
   width: 40px;
-  background: rgba(0,0,0,0.3);
+  background: rgba(0, 0, 0, 0.3);
   color: var(--rpg-text);
   border: 1px solid var(--rpg-border);
   border-radius: 3px;
@@ -843,11 +467,6 @@ input[type=number] {
   background: transparent;
   cursor: pointer;
   padding: 0;
-}
-
-.miniSortBtn {
-  padding: 2px 4px;
-  font-size: 9px;
 }
 
 .syncBadge {
@@ -905,7 +524,7 @@ input[type=number] {
 
 .slotRenameInputRefactored {
   width: 100%;
-  background: rgba(0,0,0,0.2);
+  background: rgba(0, 0, 0, 0.2);
   border: 1px solid var(--rpg-border);
   color: var(--rpg-text);
   font-size: 11px;
@@ -971,24 +590,6 @@ input[type=number] {
   color: var(--rpg-text);
 }
 
-.flatHeaderAddBtn {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--rpg-border);
-  color: var(--rpg-text);
-  font-size: 10.5px;
-  font-weight: bold;
-  padding: 4px 10px;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.flatHeaderAddBtn:hover {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: var(--rpg-highlight);
-  color: var(--rpg-highlight);
-}
-
 .accordionSeparator {
   height: 1px;
   background: rgba(255, 255, 255, 0.15);
@@ -1024,48 +625,4 @@ input[type=number] {
   align-items: center;
   gap: 12px;
   flex-shrink: 0;
-}
-
-.itemTypeSelect {
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  appearance: none;
-  height: 22px;
-  line-height: 22px;
-  background: rgba(0, 0, 0, 0.45) !important;
-  color: var(--rpg-text);
-  border: 1px solid var(--rpg-border);
-  border-radius: 4px;
-  font-size: 10.5px;
-  padding: 0 18px 0 6px !important;
-  outline: none;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  box-sizing: border-box;
-  background-image: url("data:image/svg+xml;utf8,<svg fill='white' height='20' viewBox='0 0 24 24' width='20' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5z'/><path d='M0 0h24v24H0z' fill='none'/></svg>");
-  background-repeat: no-repeat;
-  background-position: right 4px center;
-  background-size: 14px;
-  vertical-align: middle;
-  margin: 0;
-}
-
-.inlineRow select {
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  appearance: none;
-  background: rgba(0, 0, 0, 0.3) !important;
-  color: var(--rpg-text);
-  border: 1px solid var(--rpg-border);
-  border-radius: 4px;
-  font-size: 11.5px;
-  padding: 5px 24px 5px 10px !important;
-  outline: none;
-  cursor: pointer;
-  box-sizing: border-box;
-  background-image: url("data:image/svg+xml;utf8,<svg fill='white' height='20' viewBox='0 0 24 24' width='20' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5z'/><path d='M0 0h24v24H0z' fill='none'/></svg>");
-  background-repeat: no-repeat;
-  background-position: right 6px center;
-  background-size: 16px;
 }

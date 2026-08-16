@@ -1,9 +1,8 @@
-// src/tracker/FuncSection.jsx
-
 import React, { useState, useEffect } from 'react';
 import { useRPG } from '../core/RPGControl';
 import styles from './FuncSection.module.css';
 import { DEFAULT_ADD_CHAR_PROMPT, DEFAULT_ADD_PLAYER_CHAR_PROMPT } from '../core/PromptSchema.js';
+import { ToggleSwitch } from '../utils';
 
 export default function FuncSection() {
   const { trackerData, updateTrackerData, settings, updateSettings, isChatConnected } = useRPG();
@@ -113,7 +112,7 @@ export default function FuncSection() {
   return (
     <div className={styles.container}>
 
-      {/* Tracker API Model Selection Section */}
+      {/* 1. Tracker API Model */}
       <div className={styles.sectionBlock}>
         <div className={styles.sectionHeader}>
           <span className={styles.sectionTitle}>Tracker API Model</span>
@@ -134,14 +133,10 @@ export default function FuncSection() {
               Use a fast/lite model for status extraction & background updates.
             </span>
           </div>
-          <label className={styles.switch}>
-            <input
-              type="checkbox"
-              checked={settings.useCustomModel || false}
-              onChange={(e) => updateSettings({ useCustomModel: e.target.checked })}
-            />
-            <span className={styles.slider} />
-          </label>
+          <ToggleSwitch
+            checked={settings.useCustomModel || false}
+            onChange={(checked) => updateSettings({ useCustomModel: checked })}
+          />
         </div>
 
         {settings.useCustomModel && (
@@ -152,7 +147,7 @@ export default function FuncSection() {
               </span>
               <button
                 type="button"
-                className={styles.modeToggleBtn}
+                className="rpg-btn-sm"
                 onClick={() => setIsManualInputMode(!isManualInputMode)}
               >
                 {isManualInputMode ? 'Select from List' : 'Custom Model'}
@@ -169,7 +164,7 @@ export default function FuncSection() {
               />
             ) : (
               <select
-                className={styles.selectInput}
+                className={`${styles.selectInput} rpg-select-custom`}
                 value={settings.customModel || ''}
                 onChange={(e) => updateSettings({ customModel: e.target.value })}
               >
@@ -185,7 +180,7 @@ export default function FuncSection() {
         )}
       </div>
 
-      {/* Context Message Limit Setting */}
+      {/* 2. Context Limit */}
       <div className={styles.sectionBlock}>
         <div className={styles.sectionHeader}>
           <span className={styles.sectionTitle}>Context Limit Setting</span>
@@ -209,7 +204,47 @@ export default function FuncSection() {
         </div>
       </div>
 
-      {/* Character Generator */}
+      {/* 3. Active Add-ons */}
+      <div className={styles.sectionBlock}>
+        <div className={styles.sectionHeader}>
+          <span className={styles.sectionTitle}>Active Add-ons</span>
+        </div>
+
+        <div className={styles.toggleRow}>
+          <div className={styles.labelGroup}>
+            <span className={styles.itemLabel}>World Events</span>
+            <span className={styles.itemSubText}>Inject guidelines for generating dynamic global events.</span>
+          </div>
+          <ToggleSwitch
+            checked={addons.worldEvents || false}
+            onChange={(checked) => handleAddonToggle('worldEvents', checked)}
+          />
+        </div>
+
+        <div className={styles.toggleRow}>
+          <div className={styles.labelGroup}>
+            <span className={styles.itemLabel}>Dynamic Weather</span>
+            <span className={styles.itemSubText}>Inject guidelines for weather changes and atmosphere descriptions.</span>
+          </div>
+          <ToggleSwitch
+            checked={addons.weather || false}
+            onChange={(checked) => handleAddonToggle('weather', checked)}
+          />
+        </div>
+
+        <div className={styles.toggleRow}>
+          <div className={styles.labelGroup}>
+            <span className={styles.itemLabel}>CYOA Mode</span>
+            <span className={styles.itemSubText}>Instruct AI to present interactive choices at response end.</span>
+          </div>
+          <ToggleSwitch
+            checked={addons.cyoa || false}
+            onChange={(checked) => handleAddonToggle('cyoa', checked)}
+          />
+        </div>
+      </div>
+
+      {/* 4. Character Generator */}
       <div className={styles.sectionBlock}>
         <div className={styles.sectionHeader}>
           <span className={styles.sectionTitle}>Character Generator</span>
@@ -227,70 +262,20 @@ export default function FuncSection() {
         <div className={styles.buttonGroup}>
           <button
             type="button"
-            className={styles.actionBtn}
+            className="rpg-btn"
+            style={{ flex: 1, padding: '7px 10px' }}
             onClick={() => handleSendGenerationRequest('npc')}
           >
             Generate NPC
           </button>
           <button
             type="button"
-            className={styles.actionBtn}
+            className="rpg-btn"
+            style={{ flex: 1, padding: '7px 10px' }}
             onClick={() => handleSendGenerationRequest('player')}
           >
             Generate Player
           </button>
-        </div>
-      </div>
-
-      {/* Active Features & Rules */}
-      <div className={styles.sectionBlock}>
-        <div className={styles.sectionHeader}>
-          <span className={styles.sectionTitle}>Active Add-ons</span>
-        </div>
-
-        <div className={styles.toggleRow}>
-          <div className={styles.labelGroup}>
-            <span className={styles.itemLabel}>World Events</span>
-            <span className={styles.itemSubText}>Inject guidelines for generating dynamic global events.</span>
-          </div>
-          <label className={styles.switch}>
-            <input
-              type="checkbox"
-              checked={addons.worldEvents || false}
-              onChange={(e) => handleAddonToggle('worldEvents', e.target.checked)}
-            />
-            <span className={styles.slider} />
-          </label>
-        </div>
-
-        <div className={styles.toggleRow}>
-          <div className={styles.labelGroup}>
-            <span className={styles.itemLabel}>Dynamic Weather</span>
-            <span className={styles.itemSubText}>Inject guidelines for weather changes and atmosphere descriptions.</span>
-          </div>
-          <label className={styles.switch}>
-            <input
-              type="checkbox"
-              checked={addons.weather || false}
-              onChange={(e) => handleAddonToggle('weather', e.target.checked)}
-            />
-            <span className={styles.slider} />
-          </label>
-        </div>
-
-        <div className={styles.toggleRow}>
-          <div className={styles.labelGroup}>
-            <span className={styles.itemLabel}>CYOA Mode</span>
-            <span className={styles.itemSubText}>Instruct AI to present interactive choices at response end.</span>
-          </div>
-          <label className={styles.switch}>
-            <input
-              type="checkbox"
-              checked={addons.cyoa || false}
-              onChange={(e) => handleAddonToggle('cyoa', e.target.checked)}
-            />
-            <span className={styles.slider} />
-          </label>
         </div>
       </div>
 

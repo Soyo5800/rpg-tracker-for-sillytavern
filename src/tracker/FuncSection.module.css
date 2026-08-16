@@ -1,5 +1,3 @@
-/* src/tracker/FuncSection.module.css */
-
 .container {
   display: flex;
   flex-direction: column;
@@ -46,24 +44,6 @@
 
 .refreshBtn:hover {
   opacity: 1;
-  color: var(--rpg-highlight);
-}
-
-.modeToggleBtn {
-  background: transparent;
-  border: 1px solid var(--rpg-border);
-  color: var(--rpg-text);
-  border-radius: 4px;
-  padding: 2px 8px;
-  font-size: 10.5px;
-  font-weight: bold;
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
-}
-
-.modeToggleBtn:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: var(--rpg-highlight);
   color: var(--rpg-highlight);
 }
 
@@ -141,19 +121,11 @@
 
 .selectInput {
   width: 100%;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid var(--rpg-border);
-  color: var(--rpg-text);
-  border-radius: 4px;
-  padding: 6px 8px;
+  height: 28px;
+  padding: 4px 8px;
   font-size: 11.5px;
-  outline: none;
-  cursor: pointer;
+  color: var(--rpg-text);
   box-sizing: border-box;
-}
-
-.selectInput:focus {
-  border-color: var(--rpg-highlight);
 }
 
 .buttonGroup {
@@ -162,80 +134,9 @@
   margin-top: 4px;
 }
 
-.actionBtn {
-  flex: 1;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--rpg-border);
-  color: var(--rpg-text);
-  padding: 7px 10px;
-  font-size: 11.5px;
-  font-weight: bold;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.actionBtn:hover {
-  background: var(--rpg-highlight-bg);
-  border-color: var(--rpg-highlight);
-  color: var(--rpg-highlight);
-}
-
 .toggleRow {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 4px 0;
-}
-
-/* Custom Toggle Switch */
-.switch {
-  position: relative;
-  display: inline-block;
-  width: 32px;
-  height: 18px;
-  flex-shrink: 0;
-}
-
-.switch input {
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.slider {
-  position: absolute;
-  cursor: pointer;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.4);
-  border: 1px solid var(--rpg-border);
-  transition: 0.2s;
-  border-radius: 20px;
-}
-
-.slider:before {
-  position: absolute;
-  content: "";
-  height: 12px;
-  width: 12px;
-  left: 2px;
-  bottom: 2px;
-  background-color: var(--rpg-text);
-  transition: 0.2s;
-  border-radius: 50%;
-  opacity: 0.5;
-}
-
-.switch input:checked + .slider {
-  background-color: rgba(255, 255, 255, 0.1);
-  border-color: var(--rpg-highlight);
-}
-
-.switch input:checked + .slider:before {
-  transform: translateX(14px);
-  background-color: var(--rpg-highlight);
-  opacity: 1;
 }

@@ -1,8 +1,9 @@
+// src/tracker/StatusComponent.jsx
 import React from 'react';
 import styles from './StatusComponent.module.css';
 import { LockIcon } from '../Icons';
 import { useRPG } from '../core/RPGControl';
-import { AutoGrowingTextArea } from '../utils';
+import { AutoGrowingTextArea, AccordionArrow } from '../utils';
 
 export default function StatusComponent({ char, characters = [], activeTabs, onOpenEditor }) {
   const { patchCharacterField, uiState, updateUiState } = useRPG();
@@ -30,6 +31,7 @@ export default function StatusComponent({ char, characters = [], activeTabs, onO
   return (
     <div className={styles.tabContentStack}>
 
+      {/* Profile Tab Content */}
       {activeTabs.profile && (
         <div className={styles.inlineTabContent}>
           <div className={styles.inlineHeaderLabelRow}>
@@ -63,13 +65,14 @@ export default function StatusComponent({ char, characters = [], activeTabs, onO
         </div>
       )}
 
+      {/* Relations Tab Content */}
       {activeTabs.relations && (
         <div className={styles.inlineTabContent}>
           <div className={styles.inlineHeaderLabelRow}>
             <span className={styles.inlineSheetTitle}>Relations</span>
             <button
               type="button"
-              className={styles.quickAddBtn}
+              className="rpg-btn-sm"
               onClick={() => onOpenEditor && onOpenEditor('relations')}
             >
               Open Editor
@@ -126,13 +129,10 @@ export default function StatusComponent({ char, characters = [], activeTabs, onO
                 <div key={targetName} className={styles.relationTargetCard}>
                   <div className={styles.relationTargetHeader}>
                     <div className={styles.targetHeaderLeft}>
-                      <button
-                        type="button"
-                        className={`${styles.accordionToggleBtn} ${isExpanded ? styles.activeToggle : ''}`}
+                      <AccordionArrow
+                        isExpanded={isExpanded}
                         onClick={() => toggleTarget(targetName)}
-                      >
-                        ▶
-                      </button>
+                      />
                       <strong className={styles.targetNameText}>
                         {targetName}
                       </strong>
@@ -149,6 +149,7 @@ export default function StatusComponent({ char, characters = [], activeTabs, onO
 
                   {isExpanded && (
                     <>
+                      {/* Perspective: Current Character -> Target */}
                       <div className={styles.relationSectionMyPerspective}>
                         <span className={styles.relationSectionSubTitle}>{char.name || 'Character'} ➔ {targetName}</span>
                         <div className={styles.relationDescriptionArea}>
@@ -208,6 +209,7 @@ export default function StatusComponent({ char, characters = [], activeTabs, onO
                         )}
                       </div>
 
+                      {/* Perspective: Target -> Current Character */}
                       <div className={styles.relationSectionTargetPerspective}>
                         <span className={styles.relationSectionSubTitle}>{targetName} ➔ {char.name || 'Character'}</span>
                         <div className={styles.relationDescriptionArea}>

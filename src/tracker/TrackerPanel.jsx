@@ -1,5 +1,3 @@
-// src/tracker/TrackerPanel.jsx
-
 import React, { useState } from 'react';
 import { useRPG } from '../core/RPGControl';
 import styles from './TrackerPanel.module.css';
@@ -16,7 +14,6 @@ export default function TrackerPanel() {
   const {
     settings,
     updateSettings,
-    trackerData,
     isChatConnected,
     revertToOriginalTurnState,
     uiState,
@@ -42,9 +39,24 @@ export default function TrackerPanel() {
     updateSettings({ isPanelOpen: false });
   };
 
+  const handleManualUpdateClick = async () => {
+    if (!isChatConnected) {
+      alert("Not connected to a chat room. Please connect to a chat room to use this feature.");
+      return;
+    }
+    if (window.RPGBridge && typeof window.RPGBridge.triggerManualUpdate === 'function') {
+      try {
+        await window.RPGBridge.triggerManualUpdate();
+      } catch (e) {
+        console.error('[RPG Tracker] Manual update failed', e);
+      }
+    }
+  };
+
   return (
     <div className={`${styles.panelContainer} ${styles[panelPosition]}`}>
       <button
+        type="button"
         className={`${styles.collapseButton} ${styles[panelPosition]}`}
         onClick={handleClose}
         title="Collapse Panel"
@@ -55,14 +67,7 @@ export default function TrackerPanel() {
         />
       </button>
 
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          flex: 1,
-          minHeight: 0
-        }}
-      >
+      <div className={styles.panelInner}>
         <header className={styles.panelHeader}>
           <div className={styles.headerLeftArea}>
             <div className={styles.brand}>
@@ -78,14 +83,16 @@ export default function TrackerPanel() {
           <div className={styles.headerRightArea}>
             <div className={styles.headerButtonRow}>
               <button
-                className={styles.headerBtn}
+                type="button"
+                className={`rpg-btn ${styles.headerBtn}`}
                 onClick={() => setShowPromptEditor(true)}
               >
                 <PenIcon className={styles.headerBtnIcon} />
                 <span>Prompt</span>
               </button>
               <button
-                className={styles.headerBtn}
+                type="button"
+                className={`rpg-btn ${styles.headerBtn}`}
                 onClick={() => setShowSettings(true)}
               >
                 <GearIcon className={styles.headerBtnIcon} />
@@ -96,32 +103,22 @@ export default function TrackerPanel() {
             <div className={styles.headerButtonRow}>
               {(settings.updateMode === 'isolated' || settings.updateMode === 'separated') && (
                 <button
-                  className={styles.headerBtn}
-                  onClick={async () => {
-                    if (!isChatConnected) {
-                      alert("Not connected to a chat room. Please connect to a chat room to use this feature.");
-                      return;
-                    }
-                    if (window.RPGBridge && typeof window.RPGBridge.triggerManualUpdate === 'function') {
-                      try {
-                        await window.RPGBridge.triggerManualUpdate();
-                      } catch (e) {
-                        console.error('[RPG Tracker] Manual update failed', e);
-                      }
-                    }
-                  }}
+                  type="button"
+                  className={`rpg-btn ${styles.headerBtn}`}
+                  onClick={handleManualUpdateClick}
                 >
                   <PlayIcon className={styles.headerBtnIcon} />
                   <span>Update</span>
                 </button>
               )}
               <button
-                className={styles.headerBtn}
+                type="button"
+                className={`rpg-btn ${styles.headerBtn}`}
                 title="Revert to Original Turn State"
                 onClick={revertToOriginalTurnState}
               >
                 <ResetArrowIcon className={styles.headerBtnIcon} />
-                <span>Turn Back</span>
+                <span>TurnBack</span>
               </button>
             </div>
           </div>
@@ -129,11 +126,12 @@ export default function TrackerPanel() {
 
         <div className={styles.scrollContainer}>
           <div className={styles.contentWrapper}>
-            <nav className={styles.panelNav}>
+            <nav className="rpg-tab-nav">
               {['status', 'world', 'function'].map((tab) => (
                 <button
                   key={tab}
-                  className={activeTab === tab ? styles.activeTab : ''}
+                  type="button"
+                  className={`rpg-tab-btn ${activeTab === tab ? 'active' : ''}`}
                   onClick={() => setActiveTab(tab)}
                 >
                   {tab === 'status' && 'Status'}

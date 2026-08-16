@@ -1,0 +1,349 @@
+/* --------------------------------------------------------------------------
+   [1] 기본 및 소형 액션 버튼 (Action Buttons)
+   -------------------------------------------------------------------------- */
+.rpg-btn {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--rpg-border);
+  color: var(--rpg-text);
+  font-size: 11px;
+  font-weight: bold;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  line-height: 1.2;
+  box-sizing: border-box;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  user-select: none;
+}
+
+.rpg-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: var(--rpg-highlight);
+  color: var(--rpg-highlight);
+}
+
+.rpg-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.rpg-btn-primary {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--rpg-highlight);
+  color: var(--rpg-highlight);
+}
+
+.rpg-btn-primary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.rpg-btn-sm {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--rpg-border);
+  color: var(--rpg-text);
+  font-size: 10px;
+  font-weight: bold;
+  padding: 2px 7px;
+  border-radius: 3px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  line-height: 1.2;
+  box-sizing: border-box;
+  transition: all 0.15s ease;
+}
+
+.rpg-btn-sm:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--rpg-highlight);
+  color: var(--rpg-highlight);
+}
+
+.rpg-btn-dashed {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px dashed var(--rpg-border);
+  color: var(--rpg-text);
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: bold;
+  cursor: pointer;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  box-sizing: border-box;
+}
+
+.rpg-btn-dashed:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--rpg-highlight);
+  color: var(--rpg-highlight);
+}
+
+.rpg-btn-icon {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--rpg-border);
+  color: var(--rpg-text);
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.rpg-btn-icon:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--rpg-highlight);
+  color: var(--rpg-highlight);
+}
+
+.rpg-btn-icon.active {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-color: var(--rpg-highlight) !important;
+  color: var(--rpg-highlight) !important;
+}
+
+/* --------------------------------------------------------------------------
+   [2] 삭제 및 위험 버튼 (Danger / Remove Buttons)
+   -------------------------------------------------------------------------- */
+.rpg-btn-del {
+  background: rgba(231, 76, 60, 0.12);
+  border: 1px solid rgba(231, 76, 60, 0.3);
+  color: #e74c3c;
+  font-size: 10.5px;
+  font-weight: bold;
+  padding: 2px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.rpg-btn-del:hover {
+  background: rgba(231, 76, 60, 0.25);
+  border-color: #e74c3c;
+  color: #ff6b6b;
+}
+
+.rpg-btn-del-text {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s ease;
+}
+
+.rpg-btn-del-text:hover {
+  color: #e74c3c;
+}
+
+/* --------------------------------------------------------------------------
+   [3] 정렬 및 아코디언 버튼 (Sort & Accordion Buttons)
+   -------------------------------------------------------------------------- */
+.rpg-btn-sort {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--rpg-border);
+  color: var(--rpg-text);
+  font-size: 9px;
+  width: 20px;
+  height: 20px;
+  border-radius: 3px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: all 0.15s ease;
+}
+
+.rpg-btn-sort:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--rpg-highlight);
+}
+
+.rpg-btn-sort:disabled {
+  opacity: 0.15;
+  cursor: not-allowed;
+}
+
+.rpg-accordion-arrow {
+  background: transparent;
+  border: none;
+  color: var(--rpg-text);
+  font-size: 10px;
+  cursor: pointer;
+  padding: 2px 4px;
+  line-height: 1;
+  display: inline-block;
+  transform: rotate(0deg);
+  transition: transform 0.18s ease-out;
+}
+
+.rpg-accordion-arrow.expanded {
+  transform: rotate(90deg);
+}
+
+/* --------------------------------------------------------------------------
+   [4] 탭 네비게이션 (Tab Navigation System)
+   -------------------------------------------------------------------------- */
+.rpg-tab-nav {
+  display: flex;
+  background: rgba(0, 0, 0, 0.15);
+  border-bottom: 1px solid var(--rpg-border);
+  flex-shrink: 0;
+  width: 100%;
+}
+
+.rpg-tab-btn {
+  flex: 1;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--rpg-text);
+  opacity: 0.6;
+  padding: 10px 0;
+  font-size: 11.5px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: center;
+  outline: none;
+}
+
+.rpg-tab-btn:hover {
+  opacity: 0.9;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.rpg-tab-btn.active {
+  opacity: 1 !important;
+  color: var(--rpg-highlight) !important;
+  border-bottom-color: var(--rpg-highlight) !important;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* --------------------------------------------------------------------------
+   [5] 토글 스위치 (Switch Toggle System)
+   -------------------------------------------------------------------------- */
+.rpg-switch-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  opacity: 0.8;
+  cursor: pointer;
+  user-select: none;
+}
+
+.rpg-switch {
+  position: relative;
+  display: inline-block;
+  width: 28px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.rpg-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+
+.rpg-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--rpg-border);
+  border-radius: 14px;
+  transition: 0.2s ease;
+}
+
+.rpg-slider:before {
+  position: absolute;
+  content: "";
+  height: 8px;
+  width: 8px;
+  left: 2px;
+  bottom: 2px;
+  background-color: var(--rpg-text);
+  border-radius: 50%;
+  transition: 0.2s ease;
+}
+
+.rpg-switch input:checked + .rpg-slider {
+  background-color: rgba(255, 255, 255, 0.15);
+  border-color: var(--rpg-highlight);
+}
+
+.rpg-switch input:checked + .rpg-slider:before {
+  transform: translateX(14px);
+  background-color: var(--rpg-highlight);
+}
+
+.rpg-switch input:disabled + .rpg-slider {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* --------------------------------------------------------------------------
+   [6] 전역 인풋 및 셀렉트 설정 (Input & Select System)
+   -------------------------------------------------------------------------- */
+input[type=number]::-webkit-outer-spin-button,
+input[type=number]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type=number] {
+  -moz-appearance: textfield;
+}
+
+.rpg-select-custom {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background: rgba(0, 0, 0, 0.35) !important;
+  color: var(--rpg-text);
+  border: 1px solid var(--rpg-border);
+  border-radius: 4px;
+  font-size: 11px;
+  padding: 3px 20px 3px 8px !important;
+  outline: none;
+  cursor: pointer;
+  box-sizing: border-box;
+  background-image: url("data:image/svg+xml;utf8,<svg fill='white' height='20' viewBox='0 0 24 24' width='20' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5z'/><path d='M0 0h24v24H0z' fill='none'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 4px center;
+  background-size: 14px;
+}
+
+.rpg-select-custom:focus {
+  border-color: var(--rpg-highlight);
+}

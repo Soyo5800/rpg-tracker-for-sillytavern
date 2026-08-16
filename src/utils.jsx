@@ -1,4 +1,3 @@
-// src/utils.jsx
 import React, { useRef, useEffect, useState } from 'react';
 
 /**
@@ -104,5 +103,79 @@ export function AutoGrowingTextArea({ value, onChange, placeholder, className, s
       rows={1}
       disabled={disabled}
     />
+  );
+}
+
+/**
+ * Standardized Toggle Switch Component
+ */
+export function ToggleSwitch({ checked, onChange, label, disabled = false, title, className = '' }) {
+  return (
+    <label className={`rpg-switch-row ${className}`.trim()} title={title}>
+      {label && <span>{label}</span>}
+      <div className="rpg-switch">
+        <input
+          type="checkbox"
+          checked={Boolean(checked)}
+          disabled={disabled}
+          onChange={(e) => onChange && onChange(e.target.checked, e)}
+        />
+        <span className="rpg-slider" />
+      </div>
+    </label>
+  );
+}
+
+/**
+ * Standardized Order Sorting Button Pair (Up/Down)
+ */
+export function SortButtons({ onMoveUp, onMoveDown, isFirst = false, isLast = false, disabled = false }) {
+  return (
+    <div style={{ display: 'inline-flex', gap: '2px', alignItems: 'center' }}>
+      <button
+        type="button"
+        className="rpg-btn-sort"
+        disabled={disabled || isFirst}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (onMoveUp) onMoveUp(e);
+        }}
+        title="Move Up"
+      >
+        ▲
+      </button>
+      <button
+        type="button"
+        className="rpg-btn-sort"
+        disabled={disabled || isLast}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (onMoveDown) onMoveDown(e);
+        }}
+        title="Move Down"
+      >
+        ▼
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Standardized Accordion Collapse/Expand Arrow Button
+ */
+export function AccordionArrow({ isExpanded, onClick, className = '', title, style }) {
+  return (
+    <button
+      type="button"
+      className={`rpg-accordion-arrow ${isExpanded ? 'expanded' : ''} ${className}`.trim()}
+      onClick={(e) => {
+        e.stopPropagation();
+        if (onClick) onClick(e);
+      }}
+      title={title}
+      style={style}
+    >
+      ▶
+    </button>
   );
 }

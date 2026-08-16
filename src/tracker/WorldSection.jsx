@@ -1,5 +1,3 @@
-// src/tracker/WorldSection.jsx
-
 import React from 'react';
 import { useRPG } from '../core/RPGControl';
 import styles from './WorldSection.module.css';
@@ -169,7 +167,7 @@ export default function WorldSection() {
         <div className={styles.eventsSection}>
           <div className={styles.sectionHeader}>
             <span className={styles.eventsSectionTitle}>World Events</span>
-            <button type="button" className={styles.addBtn} onClick={handleAddEvent}>
+            <button type="button" className="rpg-btn-sm" onClick={handleAddEvent}>
               + Add Event
             </button>
           </div>
@@ -185,7 +183,7 @@ export default function WorldSection() {
                       <span className={styles.eventNumber}>Event {idx + 1}</span>
                       <button
                         type="button"
-                        className={styles.removeBtn}
+                        className="rpg-btn-del-text"
                         onClick={() => handleDeleteEvent(idx)}
                         title="Remove Event"
                       >

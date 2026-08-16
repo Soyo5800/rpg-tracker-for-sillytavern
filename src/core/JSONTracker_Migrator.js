@@ -63,7 +63,6 @@ export function migrateCharacterSchema(char) {
         return migrated;
     }
 
-    // 구버전 세이브 데이터에서 누락된 미세 제어 자물쇠 보완
     if (char && char.inventory) {
         if (!char.inventory.equipmentLocks) {
             char.inventory.equipmentLocks = {};
@@ -77,14 +76,13 @@ export function migrateCharacterSchema(char) {
 }
 
 /**
- * Sanitize, clean and migrate legacy tracker structures and handle internal mappings
+ * Sanitize, clean, migrate legacy tracker structures and auto-prune orphaned definitions and keys
  */
 export function sanitizeTrackerData(trackerData) {
     if (!trackerData) return trackerData;
 
     const data = trackerData;
 
-    // 월드 이벤트 데이터 정규화 필터 적용
     if (data.worldState && Array.isArray(data.worldState.events)) {
         data.worldState.events = data.worldState.events.map((evt, idx) => {
             if (typeof evt === 'string') {
@@ -107,7 +105,11 @@ export function sanitizeTrackerData(trackerData) {
         }).filter(Boolean);
     }
 
-    const nextGlobalDefs = data.globalDefinitions ? { ...data.globalDefinitions } : null;
+    const nextGlobalDefs = data.globalDefinitions ? { ...data.globalDefinitions } : {};
+
+    const validActiveStatusKeys = new Set();
+    const validActiveProfileKeys = new Set();
+    const validActiveRelationKeys = new Set();
 
     if (Array.isArray(data.characters)) {
         data.characters.forEach((char, idx) => {
@@ -130,8 +132,8 @@ export function sanitizeTrackerData(trackerData) {
                 delete char.stats;
             }
 
-            const nextStatus = {};
             const schemaIdMapping = {};
+            const activeSchemaIds = new Set();
 
             if (Array.isArray(char.statusSchema)) {
                 char.statusSchema.forEach(schema => {
@@ -151,6 +153,9 @@ export function sanitizeTrackerData(trackerData) {
                         schemaIdMapping[`stat_${lowerName}`] = newId;
                         schemaIdMapping[`status_${lowerName}`] = newId;
 
+                        activeSchemaIds.add(schema.id);
+                        validActiveStatusKeys.add(schema.id);
+
                         if (nextGlobalDefs && oldId) {
                             const legacyGuideId1 = oldId;
                             const legacyGuideId2 = `stat_${cleanId}`;
@@ -165,30 +170,78 @@ export function sanitizeTrackerData(trackerData) {
                         }
                     } else if (schema.id && !schema.name) {
                         schema.name = schema.id;
+                        activeSchemaIds.add(schema.id);
+                        validActiveStatusKeys.add(schema.id);
                     } else if (!schema.id && !schema.name) {
                         schema.id = generateUniqueId('status');
                         schema.name = schema.id;
+                        activeSchemaIds.add(schema.id);
+                        validActiveStatusKeys.add(schema.id);
                     }
                 });
             }
 
             if (char.status) {
+                const nextStatus = {};
                 Object.entries(char.status).forEach(([key, val]) => {
-                    let cleanVal = val;
-                    if (typeof val === 'string' && val.includes('(type:')) {
-                        const meta = parseMetadata(val);
-                        const parsedInt = parseInt(meta.value, 10);
-                        cleanVal = !isNaN(parsedInt) ? parsedInt : meta.value;
-                    }
                     const targetId = schemaIdMapping[key] || key;
-                    nextStatus[targetId] = cleanVal;
+                    if (activeSchemaIds.has(targetId)) {
+                        let cleanVal = val;
+                        if (typeof val === 'string' && val.includes('(type:')) {
+                            const meta = parseMetadata(val);
+                            const parsedInt = parseInt(meta.value, 10);
+                            cleanVal = !isNaN(parsedInt) ? parsedInt : meta.value;
+                        }
+                        nextStatus[targetId] = cleanVal;
+                    }
                 });
                 char.status = nextStatus;
+            }
+
+            if (char.profile) {
+                const validProfileKeys = new Set(Object.keys(char.profile));
+                validProfileKeys.forEach(k => validActiveProfileKeys.add(k));
+
+                if (char.profileLocks) {
+                    Object.keys(char.profileLocks).forEach(k => {
+                        if (!validProfileKeys.has(k)) delete char.profileLocks[k];
+                    });
+                }
+                if (char.profileInjects) {
+                    Object.keys(char.profileInjects).forEach(k => {
+                        if (!validProfileKeys.has(k)) delete char.profileInjects[k];
+                    });
+                }
+            }
+
+            if (char.relations) {
+                Object.values(char.relations).forEach(r => {
+                    if (r.values) Object.keys(r.values).forEach(m => validActiveRelationKeys.add(m));
+                    if (r.targetValues) Object.keys(r.targetValues).forEach(m => validActiveRelationKeys.add(m));
+                });
             }
         });
     }
 
-    if (nextGlobalDefs) {
+    if (nextGlobalDefs && Object.keys(nextGlobalDefs).length > 0) {
+        Object.keys(nextGlobalDefs).forEach(defKey => {
+            if (defKey.startsWith('status_')) {
+                const fieldId = defKey.replace('status_', '');
+                if (!validActiveStatusKeys.has(fieldId)) {
+                    delete nextGlobalDefs[defKey];
+                }
+            } else if (defKey.startsWith('profile_')) {
+                const fieldId = defKey.replace('profile_', '');
+                if (!validActiveProfileKeys.has(fieldId)) {
+                    delete nextGlobalDefs[defKey];
+                }
+            } else if (defKey.startsWith('relation_')) {
+                const fieldId = defKey.replace('relation_', '');
+                if (!validActiveRelationKeys.has(fieldId)) {
+                    delete nextGlobalDefs[defKey];
+                }
+            }
+        });
         data.globalDefinitions = nextGlobalDefs;
     }
 

@@ -2,7 +2,7 @@ import React from 'react';
 import styles from './PlayerComponent.module.css';
 import { LockIcon, CheckIcon } from '../Icons';
 import { useRPG } from '../core/RPGControl';
-import { AutoGrowingTextArea } from '../utils';
+import { AutoGrowingTextArea, ToggleSwitch } from '../utils';
 
 export default function PlayerComponent({ char, activeTabs, onOpenEditor }) {
   const { patchCharacterField } = useRPG();
@@ -57,7 +57,7 @@ export default function PlayerComponent({ char, activeTabs, onOpenEditor }) {
             <div className={styles.flexCenterGap}>
               <button
                 type="button"
-                className={styles.quickAddBtn}
+                className="rpg-btn-sm"
                 onClick={() => onOpenEditor && onOpenEditor('inventory')}
               >
                 Open Editor
@@ -66,7 +66,6 @@ export default function PlayerComponent({ char, activeTabs, onOpenEditor }) {
           </div>
 
           <div className={styles.sidebarInventoryGrid}>
-            
             <div className={styles.sidebarSection}>
               <div className={styles.sidebarSectionHeader}>
                 <div className={styles.sidebarSectionTitleRow}>
@@ -77,18 +76,12 @@ export default function PlayerComponent({ char, activeTabs, onOpenEditor }) {
                   />
                   <span className={styles.sidebarSectionTitle}>Equipment</span>
                 </div>
-                <label className={styles.switchRow} title="Toggle Prompt Injection">
-                  <span>Inject</span>
-                  <div className={styles.switchLabel}>
-                    <input
-                      type="checkbox"
-                      className={styles.switchInput}
-                      checked={inventory.equipIsInject !== false}
-                      onChange={e => patchCharacterField(char.id, ['inventory', 'equipIsInject'], e.target.checked)}
-                    />
-                    <span className={styles.switchSlider}></span>
-                  </div>
-                </label>
+                <ToggleSwitch
+                  label="Inject"
+                  title="Toggle Prompt Injection"
+                  checked={inventory.equipIsInject !== false}
+                  onChange={(checked) => patchCharacterField(char.id, ['inventory', 'equipIsInject'], checked)}
+                />
               </div>
               <div className={styles.sideBySideRow}>
                 {Object.entries(inventory.equipment || {}).map(([slotKey, item]) => (
@@ -119,18 +112,12 @@ export default function PlayerComponent({ char, activeTabs, onOpenEditor }) {
                 <div className={styles.sidebarSectionTitleRow}>
                   <span className={styles.sidebarSectionTitle}>Storage Containers</span>
                 </div>
-                <label className={styles.switchRow} title="Toggle Prompt Injection">
-                  <span>Inject</span>
-                  <div className={styles.switchLabel}>
-                    <input
-                      type="checkbox"
-                      className={styles.switchInput}
-                      checked={inventory.storageIsInject !== false}
-                      onChange={e => patchCharacterField(char.id, ['inventory', 'storageIsInject'], e.target.checked)}
-                    />
-                    <span className={styles.switchSlider}></span>
-                  </div>
-                </label>
+                <ToggleSwitch
+                  label="Inject"
+                  title="Toggle Prompt Injection"
+                  checked={inventory.storageIsInject !== false}
+                  onChange={(checked) => patchCharacterField(char.id, ['inventory', 'storageIsInject'], checked)}
+                />
               </div>
               <div className={styles.sideBySideRow}>
                 {Object.entries(inventory.storage || {}).map(([storageKey, items]) => {
@@ -189,7 +176,6 @@ export default function PlayerComponent({ char, activeTabs, onOpenEditor }) {
                 })}
               </div>
             </div>
-
           </div>
         </div>
       )}
@@ -217,7 +203,7 @@ export default function PlayerComponent({ char, activeTabs, onOpenEditor }) {
                 <LockIcon
                   isLocked={quests.main?.isLocked}
                   onClick={() => handleUpdateMainQuest('isLocked', !quests.main?.isLocked)}
-                  className={`${styles.lockIcon} ${quests.main ? styles.lockIconActive : ''}`}
+                  className={`${styles.lockIcon} ${quests.main?.isLocked ? styles.lockIconActive : ''}`}
                 />
               </div>
               <div className={quests.main?.isCompleted ? styles.textStrike : ''}>
@@ -233,7 +219,7 @@ export default function PlayerComponent({ char, activeTabs, onOpenEditor }) {
 
           <div className={`${styles.inlineHeaderLabelRow} ${styles.sideQuestHeader}`}>
             <span className={styles.inlineSheetTitle}>Side Quests</span>
-            <button type="button" className={styles.quickAddBtn} onClick={handleAddSideQuest}>
+            <button type="button" className="rpg-btn-sm" onClick={handleAddSideQuest}>
               + Add Side
             </button>
           </div>
@@ -246,7 +232,7 @@ export default function PlayerComponent({ char, activeTabs, onOpenEditor }) {
                 <div key={q.id} className={`${styles.questContentBlock} ${q.isCompleted ? styles.questCompleted : ''}`}>
                   <div className={styles.questSideHeaderRow}>
                     <span className={styles.questSideIndex}>Side Quest {idx + 1}</span>
-                    <button type="button" className={styles.questSideRemoveBtn} onClick={() => handleRemoveSideQuest(q.id)}>
+                    <button type="button" className="rpg-btn-del-text" onClick={() => handleRemoveSideQuest(q.id)}>
                       &times;
                     </button>
                   </div>
