@@ -4,6 +4,20 @@ All notable changes and updates to the RPG Tracker extension are documented in t
 
 ---
 
+## v1.2.6 Update
+
+* Fixed an issue in separated mode where the context limit sent 1 less than configured during update requests. sys outputs are now automatically excluded.
+* Added Global Settings to Prompt Editor: saving while the Global switch is enabled bulk-updates matching field names across all characters.
+* Cleaned up duplicate components.
+
+---
+
+## v1.2.5 Update
+
+* Fixed an issue related to using custom APIs.
+
+---
+
 ## v1.2.4 Update
 
 ### [ Dedicated Tracker API Model ]
