@@ -15,9 +15,18 @@ export function registerContextInterceptor(extensionName) {
         const rawLimit = settings.contextMessageLimit;
         const limit = (rawLimit !== undefined && rawLimit !== null && !isNaN(Number(rawLimit))) ? Math.max(0, Number(rawLimit)) : 4;
 
-        // Separate the quiet prompt instruction from the chat history
-        const instructionMessage = chat[chat.length - 1];
-        const historyMessages = chat.slice(0, chat.length - 1);
+        // Check if the trailing message is a quiet prompt instruction injected by SillyTavern
+        const lastMsg = chat[chat.length - 1];
+        const isQuietInstruction = lastMsg && (
+            lastMsg.is_quiet === true ||
+            (typeof lastMsg.mes === 'string' && (
+                lastMsg.mes.includes("Analyze the recent chat log above") ||
+                lastMsg.mes.includes("Output the generated character's status JSON block only")
+            ))
+        );
+
+        const historyMessages = isQuietInstruction ? chat.slice(0, chat.length - 1) : chat.slice();
+        const instructionMessage = isQuietInstruction ? lastMsg : null;
 
         // Filter out SillyTavern system messages (/sys) and tracker notification logs
         const validChatMessages = historyMessages.filter(msg => {
@@ -30,8 +39,8 @@ export function registerContextInterceptor(extensionName) {
         // Slice exact amount of recent chat messages based on configured limit
         const slicedHistory = limit > 0 ? validChatMessages.slice(-limit) : [];
 
-        // Reconstruct chat array preserving exact history count and trailing instruction
-        const finalChat = [...slicedHistory, instructionMessage];
+        // Reconstruct chat array preserving exact history count and trailing instruction if present
+        const finalChat = instructionMessage ? [...slicedHistory, instructionMessage] : slicedHistory;
         chat.splice(0, chat.length, ...finalChat);
     };
 
