@@ -1,4 +1,3 @@
-// src/tracker/StatusComponent.jsx
 import React from 'react';
 import styles from './StatusComponent.module.css';
 import { LockIcon } from '../Icons';
@@ -83,7 +82,8 @@ export default function StatusComponent({ char, characters = [], activeTabs, onO
             <p className={styles.emptyPlaceholder}>No recorded relations.</p>
           ) : (
             activeRelations.map(([targetName, data]) => {
-              const targetChar = characters.find(c => (c.name || '').trim() === targetName.trim());
+              const cleanTargetName = targetName.trim().toLowerCase();
+              const targetChar = characters.find(c => (c.name || '').trim().toLowerCase() === cleanTargetName);
               const isTargetExist = !!targetChar;
 
               // Unique key for persisting state per character and target relation
@@ -105,7 +105,9 @@ export default function StatusComponent({ char, characters = [], activeTabs, onO
               let targetText = "";
               let targetMetricsSource = {};
               if (isTargetExist) {
-                const counterRelation = targetChar.relations?.[char.name || 'New Character'] || {};
+                const myName = (char.name || 'New Character').trim().toLowerCase();
+                const matchedKey = Object.keys(targetChar.relations || {}).find(k => k.trim().toLowerCase() === myName);
+                const counterRelation = matchedKey ? targetChar.relations[matchedKey] : {};
                 targetText = counterRelation.text || "";
                 targetMetricsSource = counterRelation.values || {};
               } else {

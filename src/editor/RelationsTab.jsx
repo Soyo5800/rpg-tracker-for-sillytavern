@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import styles from './StatusEditor.module.css';
 import { ToggleSwitch, SortButtons, AccordionArrow } from '../utils';
 
-// 관계 메트릭 세부 속성 설정 폼 (PromptEditor와 공용으로 사용)
+// Form component for configuring individual relation metric properties
 export function RelationMetricConfig({
   colorNegative = '#e74c3c',
   colorPositive = '#2ecc71',
@@ -72,6 +72,7 @@ export default function RelationsTab({
   const [relationMin, setRelationMin] = useState(-100);
   const [relationMax, setRelationMax] = useState(100);
 
+  // Update current character's perspective toward target
   const handleUpdateRelations = (targetName, action, data) => {
     setLocalCharacters(localCharacters.map(c => {
       if (c.id !== charId) return c;
@@ -142,15 +143,18 @@ export default function RelationsTab({
     }));
   };
 
+  // Update target's perspective toward current character
   const handleUpdateTargetRelation = (targetName, action, data) => {
     const targetCharObj = localCharacters.find(c => (c.name || '').trim().toLowerCase() === targetName.trim().toLowerCase());
-    const myName = targetChar.name || 'New Character';
+    const myName = (targetChar.name || 'New Character').trim();
 
     setLocalCharacters(localCharacters.map(c => {
+      // If target is an independent character card, update that card directly
       if (targetCharObj && c.id === targetCharObj.id) {
         const nextRelations = { ...(c.relations || {}) };
-        const myDataInTarget = nextRelations[myName]
-          ? JSON.parse(JSON.stringify(nextRelations[myName]))
+        const matchedKey = Object.keys(nextRelations).find(k => k.trim().toLowerCase() === myName.toLowerCase()) || myName;
+        const myDataInTarget = nextRelations[matchedKey]
+          ? JSON.parse(JSON.stringify(nextRelations[matchedKey]))
           : { text: '', isLocked: false, isInject: true, values: {} };
 
         if (action === 'updateField') {
@@ -181,10 +185,11 @@ export default function RelationsTab({
             [data.metric]: { value: 0, min: relationMin, max: relationMax, colorNegative: '#e74c3c', colorPositive: '#2ecc71' }
           };
         }
-        nextRelations[myName] = myDataInTarget;
+        nextRelations[matchedKey] = myDataInTarget;
         return { ...c, relations: nextRelations };
       }
 
+      // If target is a minor NPC without a card, update targetText/targetValues in this character's relation object
       if (!targetCharObj && c.id === charId) {
         const nextRelations = { ...(c.relations || {}) };
         const targetData = nextRelations[targetName]
@@ -322,14 +327,16 @@ export default function RelationsTab({
       ) : (
         relationsList.map(([targetName, data], rIdx) => {
           const isExpanded = !!expandedIds[`relation_${targetName}`];
-          const existingCharNames = localCharacters.map(c => c.name?.trim().toLowerCase());
+          const existingCharNames = localCharacters.map(c => c.name?.trim().toLowerCase()).filter(Boolean);
           const isRealCharacter = existingCharNames.includes(targetName?.trim().toLowerCase());
 
           let targetText = '';
           let targetMetricsSource = {};
           if (isRealCharacter) {
             const targetCharObj = localCharacters.find(c => c.name?.trim().toLowerCase() === targetName.trim().toLowerCase());
-            const counterRelation = targetCharObj?.relations?.[targetChar.name || 'New Character'] || {};
+            const myName = (targetChar.name || 'New Character').trim().toLowerCase();
+            const matchedKey = Object.keys(targetCharObj?.relations || {}).find(k => k.trim().toLowerCase() === myName);
+            const counterRelation = matchedKey ? targetCharObj.relations[matchedKey] : {};
             targetText = counterRelation.text || '';
             targetMetricsSource = counterRelation.values || {};
           } else {

@@ -9855,7 +9855,7 @@ function kr({ char: e, characters: t = [], activeTabs: n, onOpenEditor: r }) {
 				className: A.emptyPlaceholder,
 				children: "No recorded relations."
 			}) : d.map(([n, r]) => {
-				let a = t.find((e) => (e.name || "").trim() === n.trim()), o = !!a, l = s[`${e.id}_${n}`] === !0, u = Object.entries(r.values || {}).map(([e, t]) => {
+				let a = n.trim().toLowerCase(), o = t.find((e) => (e.name || "").trim().toLowerCase() === a), l = !!o, u = s[`${e.id}_${n}`] === !0, d = Object.entries(r.values || {}).map(([e, t]) => {
 					let n = typeof t == "object" && !!t;
 					return {
 						name: e,
@@ -9865,12 +9865,12 @@ function kr({ char: e, characters: t = [], activeTabs: n, onOpenEditor: r }) {
 						colorNegative: n && t.colorNegative ? t.colorNegative : "#e74c3c",
 						colorPositive: n && t.colorPositive ? t.colorPositive : "#2ecc71"
 					};
-				}), d = "", f = {};
-				if (o) {
-					let t = a.relations?.[e.name || "New Character"] || {};
-					d = t.text || "", f = t.values || {};
-				} else d = r.targetText || "", f = r.targetValues || {};
-				let p = Object.entries(f).map(([e, t]) => {
+				}), f = "", p = {};
+				if (l) {
+					let t = (e.name || "New Character").trim().toLowerCase(), n = Object.keys(o.relations || {}).find((e) => e.trim().toLowerCase() === t), r = n ? o.relations[n] : {};
+					f = r.text || "", p = r.values || {};
+				} else f = r.targetText || "", p = r.targetValues || {};
+				let m = Object.entries(p).map(([e, t]) => {
 					let n = typeof t == "object" && !!t;
 					return {
 						name: e,
@@ -9889,14 +9889,14 @@ function kr({ char: e, characters: t = [], activeTabs: n, onOpenEditor: r }) {
 							className: A.targetHeaderLeft,
 							children: [
 								/* @__PURE__ */ (0, j.jsx)(Tr, {
-									isExpanded: l,
+									isExpanded: u,
 									onClick: () => c(n)
 								}),
 								/* @__PURE__ */ (0, j.jsx)("strong", {
 									className: A.targetNameText,
 									children: n
 								}),
-								o && /* @__PURE__ */ (0, j.jsx)("span", {
+								l && /* @__PURE__ */ (0, j.jsx)("span", {
 									className: A.syncBadge,
 									children: "Synced"
 								})
@@ -9913,7 +9913,7 @@ function kr({ char: e, characters: t = [], activeTabs: n, onOpenEditor: r }) {
 								className: `${A.lockIcon} ${r.isLocked ? A.lockIconActive : ""}`
 							})
 						})]
-					}), l && /* @__PURE__ */ (0, j.jsxs)(j.Fragment, { children: [/* @__PURE__ */ (0, j.jsxs)("div", {
+					}), u && /* @__PURE__ */ (0, j.jsxs)(j.Fragment, { children: [/* @__PURE__ */ (0, j.jsxs)("div", {
 						className: A.relationSectionMyPerspective,
 						children: [
 							/* @__PURE__ */ (0, j.jsxs)("span", {
@@ -9934,9 +9934,9 @@ function kr({ char: e, characters: t = [], activeTabs: n, onOpenEditor: r }) {
 									})
 								})
 							}),
-							u.length > 0 && /* @__PURE__ */ (0, j.jsx)("div", {
+							d.length > 0 && /* @__PURE__ */ (0, j.jsx)("div", {
 								className: A.relationMetricsGrid,
-								children: u.map((e) => {
+								children: d.map((e) => {
 									let t = e.min, n = e.max, r = Number(e.value), i = "0%", a = "0%", o = e.colorPositive;
 									if (t < 0 && n > 0) {
 										let s = n - t, c = Math.abs(t) / s * 100;
@@ -9996,15 +9996,15 @@ function kr({ char: e, characters: t = [], activeTabs: n, onOpenEditor: r }) {
 								className: A.relationDescriptionArea,
 								children: /* @__PURE__ */ (0, j.jsx)("div", {
 									className: `${A.textBlockInput} ${A.readOnlyBlock}`,
-									children: d || /* @__PURE__ */ (0, j.jsx)("span", {
+									children: f || /* @__PURE__ */ (0, j.jsx)("span", {
 										className: A.emptyPlaceholderInline,
 										children: "No description defined."
 									})
 								})
 							}),
-							p.length > 0 && /* @__PURE__ */ (0, j.jsx)("div", {
+							m.length > 0 && /* @__PURE__ */ (0, j.jsx)("div", {
 								className: A.relationMetricsGrid,
-								children: p.map((e) => {
+								children: m.map((e) => {
 									let t = e.min, n = e.max, r = Number(e.value), i = "0%", a = "0%", o = e.colorPositive;
 									if (t < 0 && n > 0) {
 										let s = n - t, c = Math.abs(t) / s * 100;
@@ -12164,22 +12164,22 @@ function lo({ charId: e, targetChar: t, localCharacters: n, setLocalCharacters: 
 			};
 		}));
 	}, p = (i, a, o) => {
-		let s = n.find((e) => (e.name || "").trim().toLowerCase() === i.trim().toLowerCase()), l = t.name || "New Character";
+		let s = n.find((e) => (e.name || "").trim().toLowerCase() === i.trim().toLowerCase()), l = (t.name || "New Character").trim();
 		r(n.map((t) => {
 			if (s && t.id === s.id) {
-				let e = { ...t.relations || {} }, n = e[l] ? JSON.parse(JSON.stringify(e[l])) : {
+				let e = { ...t.relations || {} }, n = Object.keys(e).find((e) => e.trim().toLowerCase() === l.toLowerCase()) || l, r = e[n] ? JSON.parse(JSON.stringify(e[n])) : {
 					text: "",
 					isLocked: !1,
 					isInject: !0,
 					values: {}
 				};
-				if (a === "updateField") n.text = o.value;
+				if (a === "updateField") r.text = o.value;
 				else if (a === "updateMetricValue") {
-					let e = n.values[o.field];
-					typeof e == "object" && e ? n.values[o.field] = {
+					let e = r.values[o.field];
+					typeof e == "object" && e ? r.values[o.field] = {
 						...e,
 						value: o.value
-					} : n.values[o.field] = {
+					} : r.values[o.field] = {
 						value: o.value,
 						min: -100,
 						max: 100,
@@ -12187,25 +12187,25 @@ function lo({ charId: e, targetChar: t, localCharacters: n, setLocalCharacters: 
 						colorPositive: "#2ecc71"
 					};
 				} else if (a === "updateMetricConfig") {
-					let e = n.values[o.metric], t = typeof e == "object" && e ? e : {
+					let e = r.values[o.metric], t = typeof e == "object" && e ? e : {
 						value: e || 0,
 						min: -100,
 						max: 100,
 						colorNegative: "#e74c3c",
 						colorPositive: "#2ecc71"
 					};
-					n.values[o.metric] = {
+					r.values[o.metric] = {
 						...t,
 						...o.config
 					};
 				} else if (a === "renameMetric") {
-					let e = { ...n.values };
-					e[o.newKey] = e[o.oldKey], delete e[o.oldKey], n.values = e;
+					let e = { ...r.values };
+					e[o.newKey] = e[o.oldKey], delete e[o.oldKey], r.values = e;
 				} else if (a === "removeMetric") {
-					let e = { ...n.values };
-					delete e[o.metric], n.values = e;
-				} else a === "addMetric" && (n.values = {
-					...n.values || {},
+					let e = { ...r.values };
+					delete e[o.metric], r.values = e;
+				} else a === "addMetric" && (r.values = {
+					...r.values || {},
 					[o.metric]: {
 						value: 0,
 						min: c,
@@ -12214,7 +12214,7 @@ function lo({ charId: e, targetChar: t, localCharacters: n, setLocalCharacters: 
 						colorPositive: "#2ecc71"
 					}
 				});
-				return e[l] = n, {
+				return e[n] = r, {
 					...t,
 					relations: e
 				};
@@ -12366,10 +12366,10 @@ function lo({ charId: e, targetChar: t, localCharacters: n, setLocalCharacters: 
 			className: L.emptySectionText,
 			children: "No relations recorded."
 		}) : h.map(([o, s], c) => {
-			let l = !!i[`relation_${o}`], u = n.map((e) => e.name?.trim().toLowerCase()).includes(o?.trim().toLowerCase()), d = "", h = {};
+			let l = !!i[`relation_${o}`], u = n.map((e) => e.name?.trim().toLowerCase()).filter(Boolean).includes(o?.trim().toLowerCase()), d = "", h = {};
 			if (u) {
-				let e = n.find((e) => e.name?.trim().toLowerCase() === o.trim().toLowerCase())?.relations?.[t.name || "New Character"] || {};
-				d = e.text || "", h = e.values || {};
+				let e = n.find((e) => e.name?.trim().toLowerCase() === o.trim().toLowerCase()), r = (t.name || "New Character").trim().toLowerCase(), i = Object.keys(e?.relations || {}).find((e) => e.trim().toLowerCase() === r), a = i ? e.relations[i] : {};
+				d = a.text || "", h = a.values || {};
 			} else d = s.targetText || "", h = s.targetValues || {};
 			return /* @__PURE__ */ (0, z.jsxs)("div", {
 				className: L.relationCard,

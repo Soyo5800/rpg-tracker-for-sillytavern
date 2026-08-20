@@ -185,7 +185,9 @@ export function buildDynamicValuesPrompt(trackerData) {
     activeData["World"] = worldFields;
   }
 
-  const existingCharNames = characters.map(c => c.name?.trim());
+  const existingCharNames = characters
+    .map(c => c.name?.trim().toLowerCase())
+    .filter(Boolean);
 
   characters.forEach((char) => {
     if (char.isActive !== false && char.activeInjection !== false) {
@@ -269,7 +271,8 @@ export function buildDynamicValuesPrompt(trackerData) {
                 : `<new_value (type: text. Emotions/impressions toward ${targetName})>`
             };
 
-            if (!existingCharNames.includes(targetName?.trim())) {
+            const isIndependentChar = existingCharNames.includes(targetName?.trim().toLowerCase());
+            if (!isIndependentChar) {
               relationsObj[targetName].targetDescription = (rData.targetText && rData.targetText.trim() !== '')
                 ? rData.targetText
                 : `<new_value (type: text. How ${targetName} feels about this character)>`;
@@ -447,6 +450,10 @@ export function buildCleanStatusPrompt(trackerData) {
     }
   }
 
+  const existingCharNames = characters
+    .map(c => c.name?.trim().toLowerCase())
+    .filter(Boolean);
+
   characters.forEach(char => {
     if (char.isActive !== false && char.activeInjection !== false) {
       const charInfo = {};
@@ -493,6 +500,25 @@ export function buildCleanStatusPrompt(trackerData) {
             if (Object.keys(metrics).length > 0) relEntry.metrics = metrics;
             if (rData.text && rData.text.trim() !== '') relEntry.description = rData.text.trim();
 
+            const isIndependentChar = existingCharNames.includes(targetName?.trim().toLowerCase());
+            if (!isIndependentChar) {
+              if (rData.targetText && rData.targetText.trim() !== '') {
+                relEntry.targetDescription = rData.targetText.trim();
+              }
+              if (rData.targetValues) {
+                const targetMetrics = {};
+                Object.entries(rData.targetValues).forEach(([tmName, tmVal]) => {
+                  const val = typeof tmVal === 'object' && tmVal !== null ? tmVal.value : tmVal;
+                  if (val !== undefined && val !== null && String(val).trim() !== '') {
+                    targetMetrics[tmName] = val;
+                  }
+                });
+                if (Object.keys(targetMetrics).length > 0) {
+                  relEntry.targetMetrics = targetMetrics;
+                }
+              }
+            }
+
             if (Object.keys(relEntry).length > 0) {
               relationsObj[targetName] = relEntry;
             }
@@ -509,8 +535,18 @@ export function buildCleanStatusPrompt(trackerData) {
             const equipObj = {};
             Object.entries(inv.equipment).forEach(([slot, item]) => {
               if (item && item.name && String(item.name).trim() !== '') {
-                const qty = item.quantity && item.quantity > 1 ? ` (x${item.quantity})` : '';
-                equipObj[slot] = `${item.name}${qty}`;
+                const itemType = item.type || 'general';
+                if (itemType === 'currency') {
+                  const qty = item.quantity !== undefined ? item.quantity : 0;
+                  equipObj[slot] = `${item.name} (${qty})`;
+                } else if (itemType === 'asset') {
+                  const amt = item.assetValue?.amount !== undefined ? item.assetValue.amount : 0;
+                  const unit = item.assetValue?.currencyName || 'Gold';
+                  equipObj[slot] = `${item.name} [Value: ${amt} ${unit}]`;
+                } else {
+                  const qty = item.quantity && item.quantity > 1 ? ` (x${item.quantity})` : '';
+                  equipObj[slot] = `${item.name}${qty}`;
+                }
               }
             });
             if (Object.keys(equipObj).length > 0) invObj.equipment = equipObj;
@@ -520,8 +556,18 @@ export function buildCleanStatusPrompt(trackerData) {
             Object.entries(inv.storage).forEach(([box, items]) => {
               if (Array.isArray(items) && items.length > 0) {
                 const validItems = items.filter(i => i && i.name && String(i.name).trim() !== '').map(i => {
-                  const qty = i.quantity && i.quantity > 1 ? ` (x${i.quantity})` : '';
-                  return `${i.name}${qty}`;
+                  const itemType = i.type || 'general';
+                  if (itemType === 'currency') {
+                    const qty = i.quantity !== undefined ? i.quantity : 0;
+                    return `${i.name} (${qty})`;
+                  } else if (itemType === 'asset') {
+                    const amt = i.assetValue?.amount !== undefined ? i.assetValue.amount : 0;
+                    const unit = i.assetValue?.currencyName || 'Gold';
+                    return `${i.name} [Value: ${amt} ${unit}]`;
+                  } else {
+                    const qty = i.quantity && i.quantity > 1 ? ` (x${i.quantity})` : '';
+                    return `${i.name}${qty}`;
+                  }
                 });
                 if (validItems.length > 0) storageObj[box] = validItems;
               }

@@ -5,7 +5,7 @@
     "optional": [],
     "js": "index.js",
     "author": "Soyo",
-    "version": "1.2.6",
+    "version": "1.2.7",
     "description": "Extension that tracks, stores, and updates RPG status for the user and active characters using state persistence.",
     "generate_interceptor": "RPGTracker_interceptGeneration"
 }

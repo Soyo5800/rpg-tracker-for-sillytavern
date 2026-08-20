@@ -1,5 +1,3 @@
-// src/messagetracker/SnapshotRenderer.js
-
 export const snapshotStyles = `
 <style id="rpg-snapshot-styles">
 .rpg-snapshot-container {
@@ -164,7 +162,7 @@ export function buildSnapshotHtml(payload) {
 
     let contentHtml = '';
 
-    // 1. World State 렌더링
+    // 1. Render World State
     if (payload.world) {
         const w = payload.world;
         let wItems = [];
@@ -200,12 +198,12 @@ export function buildSnapshotHtml(payload) {
         }
     }
 
-    // 2. Characters 상세 렌더링
+    // 2. Render Characters
     if (payload.chars) {
         Object.entries(payload.chars).forEach(([charName, data]) => {
             let charSectionsHtml = '';
 
-            // A. Status (능력치)
+            // A. Status
             if (data.status && Object.keys(data.status).length > 0) {
                 let statusItems = [];
                 Object.entries(data.status).forEach(([k, v]) => {
@@ -220,7 +218,7 @@ export function buildSnapshotHtml(payload) {
                 `;
             }
 
-            // B. Profile (프로필 정보)
+            // B. Profile
             if (data.profile && Object.keys(data.profile).length > 0) {
                 let profileItems = [];
                 Object.entries(data.profile).forEach(([k, v]) => {
@@ -238,19 +236,21 @@ export function buildSnapshotHtml(payload) {
                 }
             }
 
-            // C. Relations (관계 정보)
+            // C. Relations (Forward and target perspective)
             if (data.relations && Object.keys(data.relations).length > 0) {
                 let relationItems = [];
                 Object.entries(data.relations).forEach(([targetName, rData]) => {
                     if (rData && typeof rData === 'object') {
-                        const metrics = rData.values || {};
+                        // Current Character -> Target
+                        const metrics = rData.values || rData.metrics || {};
                         const metricsStr = Object.entries(metrics).map(([mName, mVal]) => {
                             const val = typeof mVal === 'object' && mVal !== null ? mVal.value : mVal;
                             return `${mName}: ${val}`;
                         }).join(', ');
                         
                         const metricsPart = metricsStr ? `[${metricsStr}]` : '';
-                        const descPart = (rData.text && rData.text.trim() !== '') ? ` ${rData.text.trim()}` : '';
+                        const desc = rData.text || rData.description || '';
+                        const descPart = (desc && desc.trim() !== '') ? ` ${desc.trim()}` : '';
                         
                         if (metricsPart || descPart) {
                             relationItems.push(`
@@ -259,6 +259,29 @@ export function buildSnapshotHtml(payload) {
                                     <span class="rpg-snapshot-val">
                                         ${metricsPart ? `<strong style="font-size: 0.9em; opacity: 0.95;">${metricsPart}</strong>` : ''} 
                                         ${descPart}
+                                    </span>
+                                </li>
+                            `);
+                        }
+
+                        // Target -> Current Character (For minor NPCs without a separate card)
+                        const targetMetrics = rData.targetValues || rData.targetMetrics || {};
+                        const targetMetricsStr = Object.entries(targetMetrics).map(([tmName, tmVal]) => {
+                            const val = typeof tmVal === 'object' && tmVal !== null ? tmVal.value : tmVal;
+                            return `${tmName}: ${val}`;
+                        }).join(', ');
+
+                        const targetMetricsPart = targetMetricsStr ? `[${targetMetricsStr}]` : '';
+                        const targetDesc = rData.targetText || rData.targetDescription || '';
+                        const targetDescPart = (targetDesc && targetDesc.trim() !== '') ? ` ${targetDesc.trim()}` : '';
+
+                        if (targetMetricsPart || targetDescPart) {
+                            relationItems.push(`
+                                <li>
+                                    <span class="rpg-snapshot-key" style="opacity: 0.7;">↳ From ${targetName}</span> 
+                                    <span class="rpg-snapshot-val" style="opacity: 0.9;">
+                                        ${targetMetricsPart ? `<strong style="font-size: 0.9em;">${targetMetricsPart}</strong>` : ''} 
+                                        ${targetDescPart}
                                     </span>
                                 </li>
                             `);
@@ -276,11 +299,10 @@ export function buildSnapshotHtml(payload) {
                 }
             }
 
-            // D. Inventory (장비 및 소지품)
+            // D. Inventory
             if (data.inventory) {
                 let invDetails = [];
                 
-                // 장착 장비 렌더링
                 if (data.inventory.equipment && Object.keys(data.inventory.equipment).length > 0) {
                     Object.entries(data.inventory.equipment).forEach(([slot, item]) => {
                         if (item) {
@@ -290,7 +312,6 @@ export function buildSnapshotHtml(payload) {
                     });
                 }
                 
-                // 보관함 아이템 렌더링
                 if (data.inventory.storage && Object.keys(data.inventory.storage).length > 0) {
                     Object.entries(data.inventory.storage).forEach(([container, items]) => {
                         if (Array.isArray(items) && items.length > 0) {
@@ -310,7 +331,7 @@ export function buildSnapshotHtml(payload) {
                 }
             }
 
-            // E. Quests (진행 중인 퀘스트)
+            // E. Quests
             if (data.quests) {
                 let questItems = [];
                 if (data.quests.main && data.quests.main.name) {
@@ -347,7 +368,7 @@ export function buildSnapshotHtml(payload) {
         });
     }
 
-    // 3. Custom Note 렌더링
+    // 3. Custom Note
     if (payload.note) {
         contentHtml += `<div class="rpg-snapshot-note">Note: ${payload.note}</div>`;
     }
