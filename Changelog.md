@@ -4,6 +4,13 @@ All notable changes and updates to the RPG Tracker extension are documented in t
 
 ---
 
+## v1.2.7 Update
+
+* Fixed an issue in separated mode where un-synced NPCs sent relationship values for one side only; both sides are now properly sent when transmitting the relationship matrix.
+* Fixed the relationship value issue in Snapshot as well.
+
+---
+
 ## v1.2.6 Update
 
 * Fixed an issue in separated mode where the context limit sent 1 less than configured during update requests. sys outputs are now automatically excluded.
