@@ -1,7 +1,8 @@
 # RPG Tracker for SillyTavern
 
 **Notice:** This extension was created with heavy assistance from AI. It is in an experimental stage, so feedback, bug reports, and suggestions are welcome!
-You can check the changelog [here](https://github.com/Soyo5800/rpg-tracker-for-sillytavern/blob/Guide-Images/Changelog.md)
+
+You can check the changelog [here](https://github.com/Soyo5800/rpg-tracker-for-sillytavern/blob/Guide-Images/Changelog.md).
 
 ---
 
