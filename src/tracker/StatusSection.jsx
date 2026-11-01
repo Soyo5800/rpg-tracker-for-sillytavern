@@ -1,74 +1,36 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useRPG } from '../core/RPGControl';
 import styles from './StatusSection.module.css';
 import StatusComponent from './StatusComponent';
 import PlayerComponent from './PlayerComponent';
 import CharListEditor from '../editor/CharListEditor';
-import { getDefaultCharacters } from '../core/PromptSchema';
-import { LockIcon, GearIcon, ProfileTabIcon, RelationsTabIcon, InventoryTabIcon, QuestsTabIcon } from '../Icons';
-import { AutoGrowingTextArea, resolveSillyTavernAvatarUrl, ToggleSwitch, AccordionArrow } from '../utils';
+import { getDefaultCharacters, createDefaultCharacter } from '../core/PromptSchema';
+import {
+  LockIcon,
+  GearIcon,
+  ProfileTabIcon,
+  RelationsTabIcon,
+  InventoryTabIcon,
+  QuestsTabIcon,
+  CameraIcon
+} from '../Icons';
+import { AutoGrowingTextArea, ToggleSwitch, AccordionArrow } from '../utils';
+import { getNextCharacterId } from '../core/JSONTracker';
+import { resolveEffectiveCharacterVisual } from '../core/AvatarResolver';
 
-// Helper for dynamic loading of Cropper.js
-async function ensureCropperLoaded() {
-  if (window.Cropper) return true;
-
-  const origin = window.location.origin;
-  const paths = [
-    { js: `${origin}/libs/cropperjs/cropper.min.js`, css: `${origin}/libs/cropperjs/cropper.min.css` },
-    { js: `${origin}/libs/cropper/cropper.min.js`, css: `${origin}/libs/cropper/cropper.min.css` },
-    { js: './libs/cropperjs/cropper.min.js', css: './libs/cropperjs/cropper.min.css' },
-    { js: './libs/cropper/cropper.min.js', css: './libs/cropper/cropper.min.css' }
-  ];
-
-  for (const path of paths) {
-    try {
-      if (!document.querySelector('link[href*="cropper"]')) {
-        const link = document.createElement('link');
-        link.rel = 'stylesheet';
-        link.href = path.css;
-        document.head.appendChild(link);
-      }
-      await new Promise((resolve, reject) => {
-        const script = document.createElement('script');
-        script.src = path.js;
-        script.onload = resolve;
-        script.onerror = reject;
-        document.head.appendChild(script);
-      });
-      if (window.Cropper) {
-        return true;
-      }
-    } catch (e) {
-      // Fall through to next path
-    }
-  }
-  return false;
-}
-
-const CameraIcon = () => (
-  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.6 }}>
-    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-    <circle cx="12" cy="13" r="4" />
-  </svg>
-);
-
-export default function StatusSection({ onOpenEditor }) {
-  const { trackerData, updateTrackerData, settings, updateSettings, patchCharacterField, uiState, updateUiState } = useRPG();
-
-  const fileInputRef = useRef(null);
-  const cropperImgRef = useRef(null);
-  const cropperInstanceRef = useRef(null);
-
-  const activeUploadIdRef = useRef(null);
+export default function StatusSection({ onOpenEditor, onOpenAssetManager }) {
+  const {
+    trackerData,
+    updateTrackerData,
+    patchCharacterField,
+    uiState,
+    updateUiState,
+    activeVisualCharId,
+    toggleVisualStage,
+    customAvatars
+  } = useRPG();
 
   const [showCharList, setShowCharList] = useState(false);
-  const [isCropperLibraryReady, setIsCropperLibraryReady] = useState(!!window.Cropper);
-
-  const [cropModal, setCropModal] = useState({
-    isOpen: false,
-    imageSrc: '',
-    charId: null
-  });
 
   const characters = (trackerData.characters && trackerData.characters.length > 0)
     ? trackerData.characters
@@ -76,52 +38,6 @@ export default function StatusSection({ onOpenEditor }) {
 
   const collapsedChars = uiState.collapsedChars || {};
   const activeInlineTabs = uiState.activeInlineTabs || {};
-
-  useEffect(() => {
-    if (cropModal.isOpen) {
-      if (window.Cropper) {
-        setIsCropperLibraryReady(true);
-      } else {
-        ensureCropperLoaded().then((success) => {
-          setIsCropperLibraryReady(success);
-        });
-      }
-    }
-  }, [cropModal.isOpen]);
-
-  useEffect(() => {
-    return () => {
-      if (cropperInstanceRef.current) {
-        cropperInstanceRef.current.destroy();
-        cropperInstanceRef.current = null;
-      }
-    };
-  }, [cropModal.isOpen]);
-
-  useEffect(() => {
-    if (cropModal.isOpen && isCropperLibraryReady) {
-      const timer = setTimeout(() => {
-        initCropperInstance();
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [cropModal.isOpen, isCropperLibraryReady]);
-
-  const initCropperInstance = () => {
-    if (cropperImgRef.current && window.Cropper && isCropperLibraryReady) {
-      if (cropperInstanceRef.current) {
-        cropperInstanceRef.current.destroy();
-      }
-      cropperInstanceRef.current = new window.Cropper(cropperImgRef.current, {
-        aspectRatio: 1,
-        viewMode: 1,
-        autoCropArea: 1,
-        responsive: true,
-        restore: false,
-        checkCrossOrigin: false
-      });
-    }
-  };
 
   const handleUpdateCharacters = (nextChars) => {
     if (updateTrackerData) {
@@ -136,9 +52,13 @@ export default function StatusSection({ onOpenEditor }) {
     const schemaItem = (char.statusSchema || []).find(s => s.id === statId);
     let finalVal = newVal;
     if (schemaItem && schemaItem.type !== 'text') {
-      const minLimit = schemaItem.min !== undefined && schemaItem.min !== null ? schemaItem.min : 0;
-      const maxLimit = schemaItem.max || 100;
-      finalVal = Math.min(maxLimit, Math.max(minLimit, newVal));
+      if (newVal === '' || newVal === null || isNaN(newVal)) {
+        patchCharacterField(charId, ['status', statId], '');
+        return;
+      }
+      const minLimit = (schemaItem.min !== undefined && schemaItem.min !== null) ? Number(schemaItem.min) : 0;
+      const maxLimit = (schemaItem.max !== undefined && schemaItem.max !== null) ? Number(schemaItem.max) : 100;
+      finalVal = Math.min(maxLimit, Math.max(minLimit, Number(newVal)));
     }
     patchCharacterField(charId, ['status', statId], finalVal);
   };
@@ -162,135 +82,11 @@ export default function StatusSection({ onOpenEditor }) {
     });
   };
 
-  const handleAvatarClick = (charId, avatarUrl) => {
-    const char = characters.find(c => c.id === charId);
-    if (!char) return;
-
-    if (char.syncedCardType === 'Persona') {
-      return;
-    }
-
-    if (char.syncedCardType === 'Card' && char.syncedCardAvatar) {
-      const cropSource = resolveSillyTavernAvatarUrl(char.syncedCardAvatar, 'Card');
-      if (cropSource) {
-        setCropModal({
-          isOpen: true,
-          imageSrc: cropSource,
-          charId: charId
-        });
-      }
-      return;
-    }
-
-    activeUploadIdRef.current = charId;
-    if (fileInputRef.current) {
-      fileInputRef.current.click();
+  const handleCameraClick = (charId) => {
+    if (typeof onOpenAssetManager === 'function') {
+      onOpenAssetManager(charId);
     }
   };
-
-  const handleFileChange = (e) => {
-    const file = e.target.files?.[0];
-    const targetCharId = activeUploadIdRef.current;
-    if (!file || !targetCharId) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      setCropModal({
-        isOpen: true,
-        imageSrc: event.target.result,
-        charId: targetCharId
-      });
-    };
-    reader.readAsDataURL(file);
-
-    e.target.value = '';
-    activeUploadIdRef.current = null;
-  };
-
-  const handleCropperImageLoad = () => {
-    initCropperInstance();
-  };
-
-  const handleSaveCrop = () => {
-    if (cropperInstanceRef.current && window.Cropper) {
-      const canvas = cropperInstanceRef.current.getCroppedCanvas({
-        width: 128,
-        height: 128,
-        imageSmoothingEnabled: true,
-        imageSmoothingQuality: 'high'
-      });
-
-      if (canvas) {
-        const croppedBase64 = canvas.toDataURL('image/webp', 0.85);
-
-        const currentCropped = settings.croppedAvatars || {};
-        updateSettings({
-          croppedAvatars: {
-            ...currentCropped,
-            [cropModal.charId]: croppedBase64
-          }
-        });
-
-        patchCharacterField(cropModal.charId, ['avatarUrl'], croppedBase64);
-      }
-    } else {
-      const img = cropperImgRef.current;
-      if (img) {
-        const canvas = document.createElement('canvas');
-        canvas.width = 128;
-        canvas.height = 128;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          const size = Math.min(img.naturalWidth, img.naturalHeight);
-          const sx = (img.naturalWidth - size) / 2;
-          const sy = (img.naturalHeight - size) / 2;
-          ctx.drawImage(img, sx, sy, size, size, 0, 0, 128, 128);
-          const croppedBase64 = canvas.toDataURL('image/webp', 0.85);
-
-          const currentCropped = settings.croppedAvatars || {};
-          updateSettings({
-            croppedAvatars: {
-              ...currentCropped,
-              [cropModal.charId]: croppedBase64
-            }
-          });
-
-          patchCharacterField(cropModal.charId, ['avatarUrl'], croppedBase64);
-        }
-      }
-    }
-    setCropModal({ isOpen: false, imageSrc: '', charId: null });
-  };
-
-  const handleResetToOriginalImage = () => {
-    const charId = cropModal.charId;
-    const char = characters.find(c => c.id === charId);
-    if (!char) return;
-
-    const nextCropped = { ...(settings.croppedAvatars || {}) };
-    delete nextCropped[charId];
-    updateSettings({ croppedAvatars: nextCropped });
-
-    const context = window.SillyTavern?.getContext?.();
-    let originalUrl = null;
-
-    if (char.syncedCardType === 'Persona') {
-      const userAvatarFile = char.syncedCardAvatar || context?.user_avatar || window.user_avatar;
-      originalUrl = resolveSillyTavernAvatarUrl(userAvatarFile, 'Persona');
-    } else if (char.syncedCardType === 'Card' && char.syncedCardAvatar) {
-      originalUrl = resolveSillyTavernAvatarUrl(char.syncedCardAvatar, 'Card');
-    }
-
-    patchCharacterField(charId, ['avatarUrl'], originalUrl);
-    if (originalUrl) {
-      alert("Profile photo has been reset to the original card image.");
-    } else {
-      alert("Profile photo reset to default icon.");
-    }
-    setCropModal({ isOpen: false, imageSrc: '', charId: null });
-  };
-
-  const targetCharCard = characters.find(c => c.id === cropModal.charId);
 
   return (
     <div className={styles.container}>
@@ -300,11 +96,7 @@ export default function StatusSection({ onOpenEditor }) {
           className="rpg-btn"
           style={{ flex: 1 }}
           onClick={() => {
-            const newChar = JSON.parse(JSON.stringify(getDefaultCharacters()[0]));
-            newChar.id = `char_${Date.now()}`;
-            newChar.name = "New Character";
-            newChar.activePlayer = false;
-            newChar.activeInjection = true;
+            const newChar = createDefaultCharacter({ id: getNextCharacterId(characters), name: "New Character", activePlayer: false });
 
             let nextChars = (characters.length === 1 && characters[0].id === 'char_user' && characters[0].name === 'New')
               ? [newChar]
@@ -318,14 +110,6 @@ export default function StatusSection({ onOpenEditor }) {
           Character List
         </button>
       </div>
-
-      <input
-        type="file"
-        ref={fileInputRef}
-        accept="image/*"
-        style={{ display: 'none' }}
-        onChange={handleFileChange}
-      />
 
       {characters.map((char) => {
         const schema = (char.statusSchema || []).filter(s => s.type !== 'relation_schema');
@@ -342,61 +126,25 @@ export default function StatusSection({ onOpenEditor }) {
 
         const hasActiveTab = Object.values(charTabs).some(v => v === true);
 
-        let liveName = char.name;
-        let liveAvatarUrl = char.avatarUrl;
+        const {
+          displayName: liveName,
+          avatarUrl: liveAvatarUrl,
+          fallbackAvatarUrl,
+          cropOffset
+        } = resolveEffectiveCharacterVisual(char, customAvatars);
 
-        const globalCrop = settings.croppedAvatars?.[char.id];
-        if (globalCrop) {
-          liveAvatarUrl = globalCrop;
-        }
-
-        const isCropped = liveAvatarUrl && liveAvatarUrl.startsWith('data:');
-
-        const context = window.SillyTavern?.getContext?.();
-        if (context) {
-          if (char.syncedCardType === 'Card' && char.syncedCardAvatar) {
-            const matched = context.characters?.find(stChar => stChar.avatar === char.syncedCardAvatar);
-            if (matched) {
-              liveName = matched.name;
-              if (!isCropped) {
-                liveAvatarUrl = resolveSillyTavernAvatarUrl(matched.avatar, 'Card');
-              }
-            } else {
-              if (!isCropped) {
-                liveAvatarUrl = null;
-              }
-            }
-          } else if (char.syncedCardType === 'Persona') {
-            liveName = context.name1 || window.name1 || char.name;
-            if (!isCropped) {
-              const userAvatarFile = context.user_avatar || window.user_avatar;
-              liveAvatarUrl = resolveSillyTavernAvatarUrl(userAvatarFile, 'Persona');
-            }
-          } else {
-            if (!isCropped) {
-              liveAvatarUrl = null;
-            }
-          }
-        } else {
-          if (!isCropped && !char.syncedCardType) {
-            liveAvatarUrl = null;
-          }
-        }
-
-        const hasValidAvatar = liveAvatarUrl &&
-          typeof liveAvatarUrl === 'string' &&
-          liveAvatarUrl.trim() !== '' &&
-          liveAvatarUrl !== 'null' &&
-          liveAvatarUrl !== 'undefined';
-
-        const isPersona = char.syncedCardType === 'Persona';
+        const hasValidAvatar = Boolean(liveAvatarUrl);
+        const isVisualActive = activeVisualCharId === char.id;
 
         return (
           <div key={char.id} className={styles.charBlock}>
 
             <header className={styles.blockHeader}>
               <div className={styles.headerLeft} onClick={() => toggleCollapse(char.id)}>
-                <AccordionArrow isExpanded={!isCollapsed} />
+                <AccordionArrow
+                  isExpanded={!isCollapsed}
+                  onClick={() => toggleCollapse(char.id)}
+                />
                 <span className={styles.charName}>{liveName}</span>
               </div>
 
@@ -473,25 +221,52 @@ export default function StatusSection({ onOpenEditor }) {
                     </>
                   )}
 
-                  <div
-                    className={`${styles.avatarContainer} ${isPersona ? styles.readOnlyAvatar : ''}`}
-                    onClick={() => handleAvatarClick(char.id, liveAvatarUrl)}
-                    title={isPersona ? "" : "Change Photo / Crop"}
-                  >
-                    {hasValidAvatar ? (
-                      <img
-                        src={liveAvatarUrl}
-                        alt={liveName}
-                        className={styles.avatarImg}
-                        onError={(e) => {
-                          e.target.style.display = 'none';
-                        }}
-                      />
-                    ) : (
-                      <div className={styles.avatarFallback}>
-                        <CameraIcon />
-                      </div>
-                    )}
+                  <div className={styles.avatarControlWrapper}>
+                    <button
+                      type="button"
+                      className={styles.cameraBtn}
+                      onClick={() => handleCameraClick(char.id)}
+                      title="Manage Character Assets & Expressions"
+                    >
+                      <CameraIcon />
+                    </button>
+
+                    <div
+                      className={`${styles.avatarContainer} ${isVisualActive ? styles.avatarActive : ''}`}
+                      onClick={() => toggleVisualStage && toggleVisualStage(char.id)}
+                      title="Click to toggle Visual Stage illustration"
+                    >
+                      {hasValidAvatar ? (
+                        <>
+                          <img
+                            src={liveAvatarUrl}
+                            alt={liveName}
+                            className={styles.avatarImg}
+                            style={{
+                              objectPosition: `${cropOffset.x}% ${cropOffset.y}%`,
+                              transformOrigin: `${cropOffset.x}% ${cropOffset.y}%`,
+                              transform: `scale(${cropOffset.zoom})`
+                            }}
+                            onError={(e) => {
+                              if (fallbackAvatarUrl && e.target.src !== fallbackAvatarUrl) {
+                                e.target.src = fallbackAvatarUrl;
+                                return;
+                              }
+                              e.target.style.display = 'none';
+                              const fallbackEl = e.target.parentElement?.querySelector('[class*="avatarFallback"]');
+                              if (fallbackEl) fallbackEl.style.display = 'flex';
+                            }}
+                          />
+                          <div className={styles.avatarFallback} style={{ display: 'none' }}>
+                            <CameraIcon />
+                          </div>
+                        </>
+                      ) : (
+                        <div className={styles.avatarFallback}>
+                          <CameraIcon />
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -546,8 +321,18 @@ export default function StatusSection({ onOpenEditor }) {
                               <input
                                 type="number"
                                 className={styles.smallNumberInput}
-                                value={currentValue}
-                                onChange={(e) => handleValueChange(char.id, item.id, Number(e.target.value))}
+                                value={currentValue !== undefined ? currentValue : ''}
+                                onFocus={(e) => e.target.select()}
+                                onBlur={(e) => {
+                                  if (e.target.value === '' || isNaN(Number(e.target.value))) {
+                                    const minLimit = (item.min !== undefined && item.min !== null) ? Number(item.min) : 0;
+                                    handleValueChange(char.id, item.id, minLimit);
+                                  }
+                                }}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  handleValueChange(char.id, item.id, val === '' ? '' : Number(val));
+                                }}
                               />
                               <span className={`${styles.gaugeMax} ${styles.gaugeMaxText}`}>/{item.max || 100}</span>
                             </div>
@@ -599,8 +384,18 @@ export default function StatusSection({ onOpenEditor }) {
                             <input
                               type="number"
                               className={styles.smallNumberInput}
-                              value={currentValue}
-                              onChange={(e) => handleValueChange(char.id, item.id, Number(e.target.value))}
+                              value={currentValue !== undefined ? currentValue : ''}
+                              onFocus={(e) => e.target.select()}
+                              onBlur={(e) => {
+                                if (e.target.value === '' || isNaN(Number(e.target.value))) {
+                                  const minLimit = (item.min !== undefined && item.min !== null) ? Number(item.min) : 0;
+                                  handleValueChange(char.id, item.id, minLimit);
+                                }
+                              }}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                handleValueChange(char.id, item.id, val === '' ? '' : Number(val));
+                              }}
                             />
                             <button
                               type="button"
@@ -655,69 +450,6 @@ export default function StatusSection({ onOpenEditor }) {
           </div>
         );
       })}
-
-      {cropModal.isOpen && (
-        <div className="rpg-modal-overlay high-priority">
-          <div
-            className="rpg-modal-container"
-            style={{ width: '500px', height: 'auto', maxHeight: '90vh' }}
-            onClick={e => e.stopPropagation()}
-          >
-            <header className="rpg-modal-header">
-              <h4>Set the crop position of the avatar image</h4>
-              <button
-                type="button"
-                className="rpg-modal-close-btn"
-                onClick={() => setCropModal({ isOpen: false, imageSrc: '', charId: null })}
-              >
-                ×
-              </button>
-            </header>
-
-            <div className="rpg-modal-body" style={{ background: '#0c0d12', padding: '16px' }}>
-              <div className={styles.cropperCanvasWrapper}>
-                <img
-                  ref={cropperImgRef}
-                  src={cropModal.imageSrc}
-                  onLoad={handleCropperImageLoad}
-                  alt="Source"
-                  style={{ maxWidth: '100%', maxHeight: '420px', display: 'block' }}
-                />
-              </div>
-            </div>
-
-            <footer className="rpg-modal-footer">
-              <div className="rpg-modal-footer-left">
-                {(targetCharCard?.syncedCardAvatar || targetCharCard?.id === 'char_user' || targetCharCard?.activePlayer) && (
-                  <button
-                    type="button"
-                    className="rpg-modal-btn reset"
-                    onClick={handleResetToOriginalImage}
-                  >
-                    Reset to Original Card
-                  </button>
-                )}
-              </div>
-              <div className="rpg-modal-footer-right">
-                <button
-                  type="button"
-                  className="rpg-modal-btn"
-                  onClick={() => setCropModal({ isOpen: false, imageSrc: '', charId: null })}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  className="rpg-modal-btn save"
-                  onClick={handleSaveCrop}
-                >
-                  Save Crop
-                </button>
-              </div>
-            </footer>
-          </div>
-        </div>
-      )}
 
       {showCharList && (
         <CharListEditor

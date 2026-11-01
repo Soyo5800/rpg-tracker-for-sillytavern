@@ -1,0 +1,108 @@
+.stageContainer {
+  position: fixed !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  height: 100vh !important;
+  height: 100dvh !important;
+  max-height: 100vh !important;
+  max-height: 100dvh !important;
+  z-index: 1005 !important;
+  pointer-events: none !important;
+  user-select: none !important;
+  display: flex !important;
+  align-items: flex-end !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+  transition: opacity 0.2s ease;
+}
+
+/* Desktop: Docked opposite to tracker panel (Right side) */
+.dockRight {
+  right: 0 !important;
+  left: auto !important;
+  width: calc(50vw - var(--sheldWidth, 800px) / 2) !important;
+  min-width: 280px !important;
+  justify-content: flex-end !important;
+  padding-right: 12px !important;
+}
+
+/* Desktop: Docked opposite to tracker panel (Left side) */
+.dockLeft {
+  left: 0 !important;
+  right: auto !important;
+  width: calc(50vw - var(--sheldWidth, 800px) / 2) !important;
+  min-width: 280px !important;
+  justify-content: flex-start !important;
+  padding-left: 12px !important;
+}
+
+.stageImage {
+  display: block;
+  width: auto;
+  height: auto;
+  min-height: 0 !important;
+  max-width: calc(100% * var(--rpg-viewport-scale, 1));
+  max-height: calc(85vh * var(--rpg-viewport-scale, 1));
+  object-fit: contain;
+  object-position: bottom center;
+  pointer-events: none !important;
+  user-select: none !important;
+  filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.65));
+  animation: fadeInStage 0.2s ease-out;
+}
+
+@keyframes fadeInStage {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Narrow screens / Mobile (<= 1000px): Overlap on top of tracker, strictly limited to bottom 50% max height */
+@media (max-width: 1000px) {
+  .stageContainer {
+    top: 0 !important;
+    bottom: 0 !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    max-height: 100vh !important;
+    max-height: 100dvh !important;
+    overflow: hidden !important;
+    pointer-events: none !important;
+    z-index: 1005 !important;
+    align-items: flex-end !important;
+  }
+
+  /* Overlay directly over left tracker panel */
+  .dockRight {
+    left: 0 !important;
+    right: auto !important;
+    width: 85vw !important;
+    max-width: 100vw !important;
+    justify-content: center !important;
+    padding-right: 0 !important;
+  }
+
+  /* Overlay directly over right tracker panel */
+  .dockLeft {
+    right: 0 !important;
+    left: auto !important;
+    width: 85vw !important;
+    max-width: 100vw !important;
+    justify-content: center !important;
+    padding-left: 0 !important;
+  }
+
+  /* The standee image is strictly clamped to a maximum of 50% tracker panel height */
+  .stageImage {
+    min-height: 0 !important;
+    max-height: calc(50vh * var(--rpg-viewport-scale, 1)) !important;
+    max-height: calc(50dvh * var(--rpg-viewport-scale, 1)) !important;
+    max-width: 95% !important;
+    object-position: bottom center !important;
+  }
+}

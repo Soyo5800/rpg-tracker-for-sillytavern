@@ -1,11 +1,74 @@
 import {
   DEFAULT_CYOA_PROMPT,
   DEFAULT_WEATHER_PROMPT,
-  DEFAULT_WORLD_EVENTS_PROMPT
+  DEFAULT_WORLD_EVENTS_PROMPT,
+  DEFAULT_PROMPT_HEADER_MERGED,
+  DEFAULT_PROMPT_FOOTER_MERGED,
+  DEFAULT_READONLY_CONTEXT_HEADER,
+  DEFAULT_OUTPUT_ENFORCER,
+  DEFAULT_OUTPUT_ENFORCER_SEP
 } from './PromptSchema.js';
 
+const CORE_EMOTION_PRIORITIES = [
+  'neutral', 'normal', 'default', 'calm',
+  'joy', 'happy', 'smile', 'smiling', 'cheerful',
+  'sadness', 'sad', 'crying', 'cry',
+  'anger', 'angry', 'rage', 'annoyed',
+  'surprise', 'surprised', 'shocked',
+  'fear', 'scared', 'terrified',
+  'embarrassment', 'embarrassed', 'blush', 'blushing',
+  'love', 'fond', 'affection',
+  'disgust', 'disgusted',
+  'confusion', 'confused', 'curiosity', 'curious'
+];
+
+const MAX_EXPRESSION_CANDIDATES = 35;
+
+/**
+ * Resolves active prompt configurations prioritizing metadata settings over legacy tracker data.
+ */
+function resolvePromptConfig(promptSettings, trackerData) {
+  if (promptSettings && typeof promptSettings === 'object' && Object.keys(promptSettings).length > 0) {
+    return promptSettings;
+  }
+  if (typeof window !== 'undefined' && window.RPGBridge?.currentPromptSettings) {
+    return window.RPGBridge.currentPromptSettings;
+  }
+  return trackerData || {};
+}
+
+/**
+ * Verifies if expression tracking is active for a character.
+ * Falls back to chatMetadata configurations if properties are missing on the snapshot character.
+ */
+export function isCharacterExpressionActive(char) {
+  if (!char || typeof char !== 'object') return false;
+  if (char.activeInjection === false) return false;
+
+  const ctx = (typeof window !== 'undefined' && window.SillyTavern?.getContext)
+    ? window.SillyTavern.getContext()
+    : null;
+  const customMeta = ctx?.chatMetadata?.rpgCustomAvatars?.[char.id] || {};
+
+  const isFolder = char.isFolder !== undefined ? Boolean(char.isFolder) : (customMeta.isFolder !== false);
+  if (!isFolder) return false;
+
+  const enableExpression = char.enableExpression !== undefined ? Boolean(char.enableExpression) : (customMeta.enableExpression === true);
+  if (!enableExpression) return false;
+
+  const available = (Array.isArray(char.availableSprites) && char.availableSprites.length > 0)
+    ? char.availableSprites
+    : (Array.isArray(customMeta.availableSprites) ? customMeta.availableSprites : []);
+
+  if (available.length === 0) return false;
+  return true;
+}
+
+/**
+ * Builds static field definitions and guidelines prompt for active characters.
+ */
 export function buildStaticDefinitionsPrompt(trackerData) {
-  const globalDefs = trackerData.globalDefinitions || {};
+  const globalDefs = trackerData?.globalDefinitions || {};
   const lines = [];
 
   Object.entries(globalDefs).forEach(([key, guide]) => {
@@ -36,6 +99,60 @@ export function buildStaticDefinitionsPrompt(trackerData) {
     `${lines.join('\n')}\n`;
 }
 
+/**
+ * Builds expression candidate rules prompt for active characters with expression tracking enabled.
+ * Formats allowed emotion candidate tokens cleaned from available sprite filenames with token-budget capping.
+ */
+export function buildExpressionRulesPrompt(trackerData) {
+  const characters = trackerData?.characters || [];
+  const lines = [];
+
+  const ctx = (typeof window !== 'undefined' && window.SillyTavern?.getContext)
+    ? window.SillyTavern.getContext()
+    : null;
+  const customAvatars = ctx?.chatMetadata?.rpgCustomAvatars || {};
+
+  characters.forEach(char => {
+    if (!isCharacterExpressionActive(char)) return;
+
+    const customMeta = customAvatars[char.id] || {};
+    const available = (Array.isArray(char.availableSprites) && char.availableSprites.length > 0)
+      ? char.availableSprites
+      : (Array.isArray(customMeta.availableSprites) ? customMeta.availableSprites : []);
+
+    const cleanLabels = available.map(s => {
+      const raw = typeof s === 'string' ? s : (s.cleanLabel || s.label || s.fileName || s.name || '');
+      return raw.replace(/\.[a-zA-Z0-9]{2,5}$/, '').replace(/[-_]\d+$/, '').trim().toLowerCase();
+    }).filter(Boolean);
+
+    if (cleanLabels.length > 0) {
+      const uniqueLabels = Array.from(new Set(cleanLabels));
+
+      uniqueLabels.sort((a, b) => {
+        const aIndex = CORE_EMOTION_PRIORITIES.indexOf(a);
+        const bIndex = CORE_EMOTION_PRIORITIES.indexOf(b);
+
+        if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
+        if (aIndex !== -1) return -1;
+        if (bIndex !== -1) return 1;
+        return a.localeCompare(b);
+      });
+
+      const cappedLabels = uniqueLabels.slice(0, MAX_EXPRESSION_CANDIDATES);
+      lines.push(`- ${char.name}: MUST be one of [${cappedLabels.map(l => `"${l}"`).join(', ')}]`);
+    }
+  });
+
+  if (lines.length === 0) return '';
+
+  return `\n### CHARACTER EXPRESSION CONSTRAINTS\n` +
+    `Characters with expression tracking update their facial sprite dynamically. When a character's emotion or mood changes, output an "expression" field matching one of their allowed values exactly:\n` +
+    `${lines.join('\n')}\n`;
+}
+
+/**
+ * Resolves master category switches from guidePrompts array.
+ */
 export function getMasterSwitches(guidePrompts = []) {
   const isEnabled = (id, def = true) => {
     const found = guidePrompts.find(g => g.id === id);
@@ -56,14 +173,21 @@ export function getMasterSwitches(guidePrompts = []) {
   };
 }
 
-export function getDynamicSchemaExample(trackerData, forcePlayer = null) {
-  const guidePrompts = trackerData.guidePrompts || [];
-  const characters = trackerData.characters || [];
+/**
+ * Generates dynamic JSON delta schema example block for prompting.
+ */
+export function getDynamicSchemaExample(trackerData, forcePlayer = null, promptSettings = null) {
+  const promptConfig = resolvePromptConfig(promptSettings, trackerData);
+  const guidePrompts = promptConfig.guidePrompts || trackerData?.guidePrompts || [];
+  const characters = trackerData?.characters || [];
   const ms = getMasterSwitches(guidePrompts);
 
   const hasActivePlayer = forcePlayer !== null
     ? forcePlayer
-    : characters.some(char => char.isActive !== false && char.activeInjection !== false && char.activePlayer === true);
+    : characters.some(char => char.activeInjection !== false && char.activePlayer === true);
+
+  const activeChar = characters.find(c => c.activeInjection !== false);
+  const exampleCharName = activeChar?.name?.trim() || "Character Name";
 
   const charSchema = {};
 
@@ -71,41 +195,48 @@ export function getDynamicSchemaExample(trackerData, forcePlayer = null) {
     charSchema.activePlayer = forcePlayer;
   }
 
+  if (activeChar && isCharacterExpressionActive(activeChar)) {
+    const ctx = (typeof window !== 'undefined' && window.SillyTavern?.getContext)
+      ? window.SillyTavern.getContext()
+      : null;
+    const customMeta = ctx?.chatMetadata?.rpgCustomAvatars?.[activeChar.id] || {};
+    const available = (Array.isArray(activeChar.availableSprites) && activeChar.availableSprites.length > 0)
+      ? activeChar.availableSprites
+      : (Array.isArray(customMeta.availableSprites) ? customMeta.availableSprites : []);
+
+    const firstSprite = available[0];
+    const rawLabel = typeof firstSprite === 'string' ? firstSprite : (firstSprite?.cleanLabel || firstSprite?.label || firstSprite?.fileName || 'joy');
+    const sampleLabel = rawLabel.replace(/\.[a-zA-Z0-9]{2,5}$/, '').replace(/[-_]\d+$/, '').trim().toLowerCase() || 'joy';
+    charSchema.expression = sampleLabel;
+  }
+
   if (ms.status) {
     charSchema.status = {
-      "Status_Name_1": "new_value (type: consumable, min: 0, max: 100. e.g. HP - reduce on damage, increase on rest)",
-      "Status_Name_2": "new_value (type: stacking, min: 0, max: 100. e.g. Fatigue - increase on strenuous actions)",
-      "Status_Name_3": "new_value (type: integer, min: 0, max: 100. e.g. Strength, Agility, Intelligence)",
-      "Status_Name_4": "new_value (type: text. extremely short current condition)"
+      "HP": 85,
+      "Fatigue": 15
     };
   }
 
   if (ms.profile) {
-    charSchema.profile = { "Profile_Key": "new_value (type: text. strictly for non-numerical descriptions e.g. Race, Appearance, Personality. NEVER put numerical status parameters here)" };
+    charSchema.profile = {
+      "Appearance": "Slightly disheveled after the encounter"
+    };
   }
 
   if (ms.relations) {
     charSchema.relations = {
       "Target Name": {
-        "description": "Brief summary of emotions/impressions toward Target Name",
-        "metrics": { "Metric_Name": "new_value (type: integer. adjust dynamically by -15 to +15 based on interaction)" },
-        "targetDescription": "Brief summary of how Target Name feels about this character (use ONLY for minor/one-time NPCs with no separate card)",
-        "targetMetrics": { "Metric_Name": "new_value (type: integer. adjust dynamically by -15 to +15)" }
+        "description": "Growing trust after fighting together",
+        "metrics": { "Affection": 15 }
       }
     };
   }
 
   if (ms.inventory && hasActivePlayer) {
     charSchema.inventory = {
-      "equipment": {
-        "Slot": { "id": "item_id", "type": "general", "name": "Item Name", "desc": "Description" },
-        "Back": { "id": "container_backpack", "type": "general", "name": "Leather Backpack", "isContainer": true, "storageKey": "Backpack" }
-      },
       "storage": {
-        "Container": [
-          { "id": "item_id", "type": "general", "name": "Health Potion", "quantity": 5, "desc": "Restores 50 HP" },
-          { "id": "item_id", "type": "currency", "name": "Gold", "quantity": 150 },
-          { "id": "item_id", "type": "asset", "name": "Small Cabin", "assetValue": { "amount": 1200, "currencyName": "Gold" }, "desc": "A quiet wooden house" }
+        "Backpack": [
+          { "name": "Health Potion", "quantity": 2 }
         ]
       }
     };
@@ -113,25 +244,18 @@ export function getDynamicSchemaExample(trackerData, forcePlayer = null) {
 
   if (ms.quests && hasActivePlayer) {
     charSchema.quests = {
-      "main": { "name": "Quest Name", "description": "Details", "status": "ACTIVE (or COMPLETED)" },
-      "sideQuests": [{ "name": "Side Quest", "description": "Details", "status": "ACTIVE (or COMPLETED)" }]
+      "main": { "status": "COMPLETED" }
     };
   }
-
-  const exampleCharName = "Character Name";
 
   const fullSchema = {
     [exampleCharName]: charSchema
   };
 
   const worldFields = {};
-  const wSchema = trackerData.worldSchema || {};
-
-  if (ms.world_date) worldFields["date"] = wSchema.dateCustom || "yyyy-mm-dd";
-  if (ms.world_time) worldFields["time"] = wSchema.timeCustom || "14:30";
-  if (ms.world_weather) worldFields["weather"] = wSchema.weatherCustom || "Clear/Cloudy...";
-  if (ms.world_location) worldFields["location"] = wSchema.locationCustom || "Current Location";
-  if (ms.world_events) worldFields["events"] = [{ "name": "Event Name", "desc": "Details" }];
+  if (ms.world_location) worldFields["location"] = "Tavern";
+  if (ms.world_weather) worldFields["weather"] = "Rainy";
+  if (ms.world_events) worldFields["events"] = [{ "name": "Festival Approaching", "desc": "Town prepares for celebrations." }];
 
   if (Object.keys(worldFields).length > 0) {
     fullSchema["World"] = worldFields;
@@ -140,183 +264,215 @@ export function getDynamicSchemaExample(trackerData, forcePlayer = null) {
   return `\n<!--RPG_TRACKER\n\`\`\`json\n${JSON.stringify(fullSchema, null, 2)}\n\`\`\`\n-->\n`;
 }
 
-export function buildDynamicValuesPrompt(trackerData) {
-  const characters = trackerData.characters || [];
-  const ms = getMasterSwitches(trackerData.guidePrompts || []);
-  const activeData = {};
+/**
+ * Serializes active tracker state into structured JSON for LLM prompts.
+ */
+function serializeStatusState(trackerData, options = {}) {
+  const { includePlaceholders = false, includeLockedFields = false, promptSettings = null } = options;
+  const promptConfig = resolvePromptConfig(promptSettings, trackerData);
+  const characters = trackerData?.characters || [];
+  const guidePrompts = promptConfig.guidePrompts || trackerData?.guidePrompts || [];
+  const ms = getMasterSwitches(guidePrompts);
+  const result = {};
 
-  const worldFields = {};
-  if (trackerData.worldState) {
+  if (trackerData?.worldState) {
     const ws = trackerData.worldState;
-    const wSchema = trackerData.worldSchema || {};
+    const wSchema = promptConfig.worldSchema || trackerData.worldSchema || {};
+    const worldFields = {};
+
+    const hasValue = (val) => val !== undefined && val !== null && String(val).trim() !== '';
+
     if (ms.world_date) {
-      worldFields["date"] = (ws.date && String(ws.date).trim() !== '')
-        ? ws.date
-        : `<new_value (type: text. format: ${wSchema.dateCustom || 'yyyy-mm-dd'})>`;
+      if (hasValue(ws.date)) worldFields.date = ws.date;
+      else if (includePlaceholders) worldFields.date = `<new_value (format: ${wSchema.dateCustom || 'yyyy-mm-dd'})>`;
     }
     if (ms.world_time) {
-      worldFields["time"] = (ws.time && String(ws.time).trim() !== '')
-        ? ws.time
-        : `<new_value (type: text. format: ${wSchema.timeCustom || '14:30'})>`;
+      if (hasValue(ws.time)) worldFields.time = ws.time;
+      else if (includePlaceholders) worldFields.time = `<new_value (format: ${wSchema.timeCustom || '14:30'})>`;
     }
     if (ms.world_weather) {
-      worldFields["weather"] = (ws.weather && String(ws.weather).trim() !== '')
-        ? ws.weather
-        : `<new_value (type: text. format: ${wSchema.weatherCustom || 'Clear/Cloudy...'})>`;
+      if (hasValue(ws.weather)) worldFields.weather = ws.weather;
+      else if (includePlaceholders) worldFields.weather = `<new_value (format: ${wSchema.weatherCustom || 'Clear/Cloudy...'})>`;
     }
     if (ms.world_location) {
-      worldFields["location"] = (ws.location && String(ws.location).trim() !== '')
-        ? ws.location
-        : `<new_value (type: text. format: ${wSchema.locationCustom || 'Current Location'})>`;
+      if (hasValue(ws.location)) worldFields.location = ws.location;
+      else if (includePlaceholders) worldFields.location = `<new_value (format: ${wSchema.locationCustom || 'Current Location'})>`;
     }
     if (ms.world_events) {
       const eventsList = Array.isArray(ws.events) ? ws.events : [];
       if (eventsList.length > 0) {
-        worldFields["events"] = eventsList.map(e => typeof e === 'string' ? { name: '', desc: e } : { name: e.name || '', desc: e.desc || '' });
-      } else {
-        worldFields["events"] = [
-          { name: "<new_value (type: text. Event name)>", desc: "<new_value (type: text. Event description)>" }
-        ];
+        const validEvents = eventsList
+          .map(e => typeof e === 'string' ? { desc: e } : { name: e.name || '', desc: e.desc || '' })
+          .filter(e => (e.name && e.name.trim() !== '') || (e.desc && e.desc.trim() !== ''));
+
+        if (validEvents.length > 0) worldFields.events = validEvents;
+      } else if (includePlaceholders) {
+        worldFields.events = [{ name: "<new_value (Event name)>", desc: "<new_value (Event description)>" }];
       }
     }
-  }
 
-  if (Object.keys(worldFields).length > 0) {
-    activeData["World"] = worldFields;
+    if (Object.keys(worldFields).length > 0) {
+      result["World"] = worldFields;
+    }
   }
 
   const existingCharNames = characters
     .map(c => c.name?.trim().toLowerCase())
     .filter(Boolean);
 
-  characters.forEach((char) => {
-    if (char.isActive !== false && char.activeInjection !== false) {
-      const charInfo = {};
-      const lockedFields = [];
+  characters.forEach(char => {
+    if (char.activeInjection === false) return;
 
-      if (ms.status) {
-        const schemas = char.statusSchema || [];
-        const statusMap = char.status || {};
-        const statusObj = {};
+    const charInfo = {};
+    const lockedFields = [];
 
-        schemas.forEach((schema) => {
-          if (schema.isInject !== false) {
-            const value = statusMap[schema.id];
-            const key = schema.name || schema.id;
-
-            if (value !== undefined && value !== null && String(value).trim() !== '') {
-              statusObj[key] = value;
-            } else {
-              const minLimit = schema.min !== undefined ? schema.min : 0;
-              const maxLimit = schema.max !== undefined ? schema.max : 100;
-              statusObj[key] = `<new_value (type: ${schema.type || 'integer'}, min: ${minLimit}, max: ${maxLimit})>`;
-            }
-
-            if (schema.isLocked) lockedFields.push(`status.${key}`);
-          }
-        });
-        if (Object.keys(statusObj).length > 0) {
-          charInfo.status = statusObj;
-        }
+    if (isCharacterExpressionActive(char)) {
+      let currentExp = char.selectedSprite || '';
+      if (typeof currentExp === 'string') {
+        currentExp = currentExp.replace(/\.[a-zA-Z0-9]{2,5}$/, '').replace(/[-_]\d+$/, '').trim().toLowerCase();
       }
 
-      if (ms.profile) {
-        const profile = char.profile || {};
-        const profileInjects = char.profileInjects || {};
-        const profileLocks = char.profileLocks || {};
-        const profileObj = {};
-
-        Object.keys(profile).forEach(key => {
-          if (profileInjects[key] !== false) {
-            const value = profile[key];
-            if (value !== undefined && value !== null && String(value).trim() !== '') {
-              profileObj[key] = value;
-            } else {
-              profileObj[key] = `<new_value (type: text. Describe ${key})>`;
-            }
-            if (profileLocks[key]) lockedFields.push(`profile.${key}`);
-          }
-        });
-        if (Object.keys(profileObj).length > 0) {
-          charInfo.profile = profileObj;
-        }
+      if (currentExp && currentExp !== 'default') {
+        charInfo.expression = currentExp;
+      } else if (includePlaceholders) {
+        charInfo.expression = "<new_value (one of allowed expressions)>";
       }
+    }
 
-      if (ms.relations) {
-        const relations = char.relations || {};
-        const relationsObj = {};
+    if (ms.status && Array.isArray(char.statusSchema)) {
+      const statusMap = char.status || {};
+      const statusObj = {};
 
-        Object.entries(relations).forEach(([targetName, rData]) => {
-          if (rData.isInject !== false) {
-            const metrics = {};
-            if (rData.values) {
-              Object.entries(rData.values).forEach(([mName, mVal]) => {
-                const isObj = typeof mVal === 'object' && mVal !== null;
-                const val = isObj ? mVal.value : mVal;
-                const minLimit = isObj && mVal.min !== undefined ? mVal.min : -100;
-                const maxLimit = isObj && mVal.max !== undefined ? mVal.max : 100;
+      char.statusSchema.forEach(schema => {
+        if (schema.isInject === false) return;
+        const val = statusMap[schema.id];
+        const key = schema.name || schema.id;
+        const hasVal = val !== undefined && val !== null && String(val).trim() !== '';
 
-                if (val !== undefined && val !== null && String(val).trim() !== '') {
-                  metrics[mName] = val;
-                } else {
-                  metrics[mName] = `<new_value (type: integer, min: ${minLimit}, max: ${maxLimit})>`;
-                }
-              });
+        if (hasVal) {
+          statusObj[key] = val;
+        } else if (includePlaceholders) {
+          const minLimit = schema.min !== undefined ? schema.min : 0;
+          const maxLimit = schema.max !== undefined ? schema.max : 100;
+          statusObj[key] = `<new_value (type: ${schema.type || 'integer'}, min: ${minLimit}, max: ${maxLimit})>`;
+        }
+
+        if (includeLockedFields && schema.isLocked) {
+          lockedFields.push(`status.${key}`);
+        }
+      });
+
+      if (Object.keys(statusObj).length > 0) charInfo.status = statusObj;
+    }
+
+    if (ms.profile && char.profile) {
+      const profileInjects = char.profileInjects || {};
+      const profileLocks = char.profileLocks || {};
+      const profileObj = {};
+
+      Object.entries(char.profile).forEach(([k, v]) => {
+        if (profileInjects[k] === false) return;
+        const hasVal = v !== undefined && v !== null && String(v).trim() !== '';
+
+        if (hasVal) {
+          profileObj[k] = v;
+        } else if (includePlaceholders) {
+          profileObj[k] = `<new_value (Describe ${k})>`;
+        }
+
+        if (includeLockedFields && profileLocks[k]) {
+          lockedFields.push(`profile.${k}`);
+        }
+      });
+
+      if (Object.keys(profileObj).length > 0) charInfo.profile = profileObj;
+    }
+
+    if (ms.relations && char.relations) {
+      const relationsObj = {};
+
+      Object.entries(char.relations).forEach(([targetName, rData]) => {
+        if (rData.isInject === false) return;
+
+        const metrics = {};
+        if (rData.values) {
+          Object.entries(rData.values).forEach(([mName, mVal]) => {
+            const isObj = typeof mVal === 'object' && mVal !== null;
+            const val = isObj ? mVal.value : mVal;
+            const hasVal = val !== undefined && val !== null && String(val).trim() !== '';
+
+            if (hasVal) {
+              metrics[mName] = val;
+            } else if (includePlaceholders) {
+              const minLimit = isObj && mVal.min !== undefined ? mVal.min : -100;
+              const maxLimit = isObj && mVal.max !== undefined ? mVal.max : 100;
+              metrics[mName] = `<new_value (min: ${minLimit}, max: ${maxLimit})>`;
             }
+          });
+        }
 
-            relationsObj[targetName] = {
-              metrics,
-              description: (rData.text && rData.text.trim() !== '')
-                ? rData.text
-                : `<new_value (type: text. Emotions/impressions toward ${targetName})>`
-            };
+        const relEntry = {};
+        if (Object.keys(metrics).length > 0) relEntry.metrics = metrics;
 
-            const isIndependentChar = existingCharNames.includes(targetName?.trim().toLowerCase());
-            if (!isIndependentChar) {
-              relationsObj[targetName].targetDescription = (rData.targetText && rData.targetText.trim() !== '')
-                ? rData.targetText
-                : `<new_value (type: text. How ${targetName} feels about this character)>`;
+        if (rData.text && rData.text.trim() !== '') {
+          relEntry.description = rData.text.trim();
+        } else if (includePlaceholders) {
+          relEntry.description = `<new_value (Emotions/impressions toward ${targetName})>`;
+        }
 
-              if (rData.targetValues) {
-                const targetMetrics = {};
-                Object.entries(rData.targetValues).forEach(([tmName, tmVal]) => {
-                  const isObj = typeof tmVal === 'object' && tmVal !== null;
-                  const val = isObj ? tmVal.value : tmVal;
-                  const minLimit = isObj && tmVal.min !== undefined ? tmVal.min : -100;
-                  const maxLimit = isObj && tmVal.max !== undefined ? tmVal.max : 100;
+        const isIndependentChar = existingCharNames.includes(targetName?.trim().toLowerCase());
+        if (!isIndependentChar) {
+          if (rData.targetText && rData.targetText.trim() !== '') {
+            relEntry.targetDescription = rData.targetText.trim();
+          } else if (includePlaceholders) {
+            relEntry.targetDescription = `<new_value (How ${targetName} feels about this character)>`;
+          }
 
-                  if (val !== undefined && val !== null && String(val).trim() !== '') {
-                    targetMetrics[tmName] = val;
-                  } else {
-                    targetMetrics[tmName] = `<new_value (type: integer, min: ${minLimit}, max: ${maxLimit})>`;
-                  }
-                });
-                if (Object.keys(targetMetrics).length > 0) {
-                  relationsObj[targetName].targetMetrics = targetMetrics;
-                }
+          if (rData.targetValues) {
+            const targetMetrics = {};
+            Object.entries(rData.targetValues).forEach(([tmName, tmVal]) => {
+              const isObj = typeof tmVal === 'object' && tmVal !== null;
+              const val = isObj ? tmVal.value : tmVal;
+              const hasVal = val !== undefined && val !== null && String(val).trim() !== '';
+
+              if (hasVal) {
+                targetMetrics[tmName] = val;
+              } else if (includePlaceholders) {
+                const minLimit = isObj && tmVal.min !== undefined ? tmVal.min : -100;
+                const maxLimit = isObj && tmVal.max !== undefined ? tmVal.max : 100;
+                targetMetrics[tmName] = `<new_value (min: ${minLimit}, max: ${maxLimit})>`;
               }
+            });
+            if (Object.keys(targetMetrics).length > 0) {
+              relEntry.targetMetrics = targetMetrics;
             }
-
-            if (rData.isLocked) lockedFields.push(`relations.${targetName}`);
           }
-        });
-        if (Object.keys(relationsObj).length > 0) {
-          charInfo.relations = relationsObj;
         }
-      }
 
-      if (char.activePlayer === true) {
-        if (ms.inventory && char.inventory) {
-          const inv = char.inventory;
-          const invObj = {};
+        if (includeLockedFields && rData.isLocked) {
+          lockedFields.push(`relations.${targetName}`);
+        }
 
-          if (inv.equipIsInject !== false) {
-            const equipObj = {};
-            Object.entries(inv.equipment || {}).forEach(([slot, item]) => {
-              if (item && item.name && String(item.name).trim() !== '') {
+        if (Object.keys(relEntry).length > 0) {
+          relationsObj[targetName] = relEntry;
+        }
+      });
+
+      if (Object.keys(relationsObj).length > 0) charInfo.relations = relationsObj;
+    }
+
+    if (char.activePlayer === true) {
+      if (ms.inventory && char.inventory) {
+        const inv = char.inventory;
+        const invObj = {};
+
+        if (inv.equipIsInject !== false && inv.equipment) {
+          const equipObj = {};
+          Object.entries(inv.equipment).forEach(([slot, item]) => {
+            if (item && item.name && String(item.name).trim() !== '') {
+              if (includePlaceholders) {
                 const itemType = item.type || 'general';
                 const base = { id: item.id, type: itemType, name: item.name };
-
                 if (itemType === 'currency') {
                   base.quantity = item.quantity !== undefined ? item.quantity : 0;
                 } else if (itemType === 'asset') {
@@ -326,219 +482,15 @@ export function buildDynamicValuesPrompt(trackerData) {
                   base.quantity = item.quantity !== undefined ? item.quantity : 1;
                   base.desc = item.desc || '';
                 }
-
                 if (item.isContainer) {
                   base.isContainer = true;
                   base.storageKey = item.storageKey;
                 }
                 equipObj[slot] = base;
               } else {
-                equipObj[slot] = "Empty";
-              }
-              if (inv.equipmentLocks?.[slot] === true) {
-                lockedFields.push(`inventory.equipment.${slot}`);
-              }
-            });
-            invObj.equipment = equipObj;
-            if (inv.equipIsLocked) lockedFields.push(`inventory.equipment`);
-          }
-
-          if (inv.storageIsInject !== false) {
-            const storageObj = {};
-            Object.entries(inv.storage || {}).forEach(([container, items]) => {
-              const itemList = Array.isArray(items) ? items : [];
-              if (itemList.length > 0) {
-                storageObj[container] = itemList.map(i => {
-                  const itemType = i.type || 'general';
-                  const base = { id: i.id, type: i.type || 'general', name: i.name };
-
-                  if (itemType === 'currency') {
-                    base.quantity = i.quantity || 0;
-                  } else if (itemType === 'asset') {
-                    base.assetValue = i.assetValue || { amount: 0, currencyName: "Gold" };
-                    base.desc = i.desc || '';
-                  } else {
-                    base.quantity = i.quantity || 1;
-                    base.desc = i.desc || '';
-                  }
-                  return base;
-                });
-              } else {
-                storageObj[container] = [];
-              }
-
-              if (inv.storageLocks?.[container] === true) {
-                lockedFields.push(`inventory.storage.${container}`);
-              }
-            });
-            invObj.storage = storageObj;
-            if (inv.storageIsLocked) lockedFields.push(`inventory.storage`);
-          }
-
-          if (Object.keys(invObj).length > 0) {
-            charInfo.inventory = invObj;
-          }
-        }
-
-        if (ms.quests && char.quests) {
-          const q = char.quests;
-          const qObj = {};
-
-          const mainName = q.main?.name?.trim();
-          qObj.main = {
-            name: mainName ? mainName : `<new_value (type: text. Active main quest name)>`,
-            description: q.main?.desc?.trim() ? q.main.desc : `<new_value (type: text. Quest details)>`,
-            status: mainName ? (q.main?.isCompleted ? 'COMPLETED' : 'ACTIVE') : `<new_value (type: text. "ACTIVE" or "COMPLETED")>`
-          };
-          if (q.main?.isLocked) lockedFields.push('quests.main');
-
-          const sideQuestsList = Array.isArray(q.sides) ? q.sides : [];
-          qObj.sideQuests = sideQuestsList.length > 0 ? sideQuestsList.map((sq, qIdx) => {
-            if (sq.isLocked) lockedFields.push(`quests.sideQuests.${qIdx}`);
-            return {
-              name: sq.name,
-              description: sq.desc || '',
-              status: sq.isCompleted ? 'COMPLETED' : 'ACTIVE'
-            };
-          }) : [
-            {
-              name: `<new_value (type: text. Side quest name)>`,
-              description: `<new_value (type: text. Side quest details)>`,
-              status: `<new_value (type: text. "ACTIVE" or "COMPLETED")>`
-            }
-          ];
-
-          charInfo.quests = qObj;
-        }
-      }
-
-      if (lockedFields.length > 0) {
-        charInfo._lockedFields = lockedFields;
-      }
-
-      if (Object.keys(charInfo).length > 0) {
-        activeData[char.name] = charInfo;
-      }
-    }
-  });
-
-  if (Object.keys(activeData).length === 0) return '';
-
-  return `\n[CURRENT RPG STATUS REFERENCE]\n\`\`\`json\n${JSON.stringify(activeData, null, 2)}\n\`\`\`\n`;
-}
-
-export function buildCleanStatusPrompt(trackerData) {
-  const characters = trackerData.characters || [];
-  const ms = getMasterSwitches(trackerData.guidePrompts || []);
-  const cleanData = {};
-
-  if (trackerData.worldState) {
-    const ws = trackerData.worldState;
-    const worldFields = {};
-    if (ms.world_date && ws.date && String(ws.date).trim() !== '') worldFields.date = ws.date;
-    if (ms.world_time && ws.time && String(ws.time).trim() !== '') worldFields.time = ws.time;
-    if (ms.world_weather && ws.weather && String(ws.weather).trim() !== '') worldFields.weather = ws.weather;
-    if (ms.world_location && ws.location && String(ws.location).trim() !== '') worldFields.location = ws.location;
-    if (ms.world_events && Array.isArray(ws.events) && ws.events.length > 0) {
-      const validEvents = ws.events
-        .map(e => typeof e === 'string' ? { desc: e } : { name: e.name || '', desc: e.desc || '' })
-        .filter(e => (e.name && e.name.trim() !== '') || (e.desc && e.desc.trim() !== ''));
-      if (validEvents.length > 0) worldFields.events = validEvents;
-    }
-    if (Object.keys(worldFields).length > 0) {
-      cleanData["World"] = worldFields;
-    }
-  }
-
-  const existingCharNames = characters
-    .map(c => c.name?.trim().toLowerCase())
-    .filter(Boolean);
-
-  characters.forEach(char => {
-    if (char.isActive !== false && char.activeInjection !== false) {
-      const charInfo = {};
-
-      if (ms.status && Array.isArray(char.statusSchema)) {
-        const statusMap = char.status || {};
-        const statusObj = {};
-        char.statusSchema.forEach(schema => {
-          if (schema.isInject !== false) {
-            const val = statusMap[schema.id];
-            if (val !== undefined && val !== null && String(val).trim() !== '') {
-              statusObj[schema.name || schema.id] = val;
-            }
-          }
-        });
-        if (Object.keys(statusObj).length > 0) charInfo.status = statusObj;
-      }
-
-      if (ms.profile && char.profile) {
-        const profileInjects = char.profileInjects || {};
-        const profileObj = {};
-        Object.entries(char.profile).forEach(([k, v]) => {
-          if (profileInjects[k] !== false && v !== undefined && v !== null && String(v).trim() !== '') {
-            profileObj[k] = v;
-          }
-        });
-        if (Object.keys(profileObj).length > 0) charInfo.profile = profileObj;
-      }
-
-      if (ms.relations && char.relations) {
-        const relationsObj = {};
-        Object.entries(char.relations).forEach(([targetName, rData]) => {
-          if (rData.isInject !== false) {
-            const metrics = {};
-            if (rData.values) {
-              Object.entries(rData.values).forEach(([mName, mVal]) => {
-                const val = typeof mVal === 'object' && mVal !== null ? mVal.value : mVal;
-                if (val !== undefined && val !== null && String(val).trim() !== '') {
-                  metrics[mName] = val;
-                }
-              });
-            }
-            const relEntry = {};
-            if (Object.keys(metrics).length > 0) relEntry.metrics = metrics;
-            if (rData.text && rData.text.trim() !== '') relEntry.description = rData.text.trim();
-
-            const isIndependentChar = existingCharNames.includes(targetName?.trim().toLowerCase());
-            if (!isIndependentChar) {
-              if (rData.targetText && rData.targetText.trim() !== '') {
-                relEntry.targetDescription = rData.targetText.trim();
-              }
-              if (rData.targetValues) {
-                const targetMetrics = {};
-                Object.entries(rData.targetValues).forEach(([tmName, tmVal]) => {
-                  const val = typeof tmVal === 'object' && tmVal !== null ? tmVal.value : tmVal;
-                  if (val !== undefined && val !== null && String(val).trim() !== '') {
-                    targetMetrics[tmName] = val;
-                  }
-                });
-                if (Object.keys(targetMetrics).length > 0) {
-                  relEntry.targetMetrics = targetMetrics;
-                }
-              }
-            }
-
-            if (Object.keys(relEntry).length > 0) {
-              relationsObj[targetName] = relEntry;
-            }
-          }
-        });
-        if (Object.keys(relationsObj).length > 0) charInfo.relations = relationsObj;
-      }
-
-      if (char.activePlayer === true) {
-        if (ms.inventory && char.inventory) {
-          const inv = char.inventory;
-          const invObj = {};
-          if (inv.equipIsInject !== false && inv.equipment) {
-            const equipObj = {};
-            Object.entries(inv.equipment).forEach(([slot, item]) => {
-              if (item && item.name && String(item.name).trim() !== '') {
                 const itemType = item.type || 'general';
                 if (itemType === 'currency') {
-                  const qty = item.quantity !== undefined ? item.quantity : 0;
-                  equipObj[slot] = `${item.name} (${qty})`;
+                  equipObj[slot] = `${item.name} (${item.quantity !== undefined ? item.quantity : 0})`;
                 } else if (itemType === 'asset') {
                   const amt = item.assetValue?.amount !== undefined ? item.assetValue.amount : 0;
                   const unit = item.assetValue?.currencyName || 'Gold';
@@ -548,18 +500,46 @@ export function buildCleanStatusPrompt(trackerData) {
                   equipObj[slot] = `${item.name}${qty}`;
                 }
               }
-            });
-            if (Object.keys(equipObj).length > 0) invObj.equipment = equipObj;
-          }
-          if (inv.storageIsInject !== false && inv.storage) {
-            const storageObj = {};
-            Object.entries(inv.storage).forEach(([box, items]) => {
-              if (Array.isArray(items) && items.length > 0) {
-                const validItems = items.filter(i => i && i.name && String(i.name).trim() !== '').map(i => {
+            } else if (includePlaceholders) {
+              equipObj[slot] = "Empty";
+            }
+
+            if (includeLockedFields && inv.equipmentLocks?.[slot] === true) {
+              lockedFields.push(`inventory.equipment.${slot}`);
+            }
+          });
+
+          if (Object.keys(equipObj).length > 0) invObj.equipment = equipObj;
+          if (includeLockedFields && inv.equipIsLocked) lockedFields.push(`inventory.equipment`);
+        }
+
+        if (inv.storageIsInject !== false && inv.storage) {
+          const storageObj = {};
+          Object.entries(inv.storage).forEach(([container, items]) => {
+            const itemList = Array.isArray(items) ? items : [];
+
+            if (includePlaceholders) {
+              storageObj[container] = itemList.map(i => {
+                const itemType = i.type || 'general';
+                const base = { id: i.id, type: itemType, name: i.name };
+                if (itemType === 'currency') {
+                  base.quantity = i.quantity || 0;
+                } else if (itemType === 'asset') {
+                  base.assetValue = i.assetValue || { amount: 0, currencyName: "Gold" };
+                  base.desc = i.desc || '';
+                } else {
+                  base.quantity = i.quantity || 1;
+                  base.desc = i.desc || '';
+                }
+                return base;
+              });
+            } else if (itemList.length > 0) {
+              const validItems = itemList
+                .filter(i => i && i.name && String(i.name).trim() !== '')
+                .map(i => {
                   const itemType = i.type || 'general';
                   if (itemType === 'currency') {
-                    const qty = i.quantity !== undefined ? i.quantity : 0;
-                    return `${i.name} (${qty})`;
+                    return `${i.name} (${i.quantity !== undefined ? i.quantity : 0})`;
                   } else if (itemType === 'asset') {
                     const amt = i.assetValue?.amount !== undefined ? i.assetValue.amount : 0;
                     const unit = i.assetValue?.currencyName || 'Gold';
@@ -569,52 +549,121 @@ export function buildCleanStatusPrompt(trackerData) {
                     return `${i.name}${qty}`;
                   }
                 });
-                if (validItems.length > 0) storageObj[box] = validItems;
-              }
-            });
-            if (Object.keys(storageObj).length > 0) invObj.storage = storageObj;
-          }
-          if (Object.keys(invObj).length > 0) charInfo.inventory = invObj;
+              if (validItems.length > 0) storageObj[container] = validItems;
+            }
+
+            if (includeLockedFields && inv.storageLocks?.[container] === true) {
+              lockedFields.push(`inventory.storage.${container}`);
+            }
+          });
+
+          if (Object.keys(storageObj).length > 0) invObj.storage = storageObj;
+          if (includeLockedFields && inv.storageIsLocked) lockedFields.push(`inventory.storage`);
         }
 
-        if (ms.quests && char.quests) {
-          const q = char.quests;
-          const qObj = {};
+        if (Object.keys(invObj).length > 0) charInfo.inventory = invObj;
+      }
+
+      if (ms.quests && char.quests) {
+        const q = char.quests;
+        const qObj = {};
+
+        if (includePlaceholders) {
+          const mainName = q.main?.name?.trim();
+          qObj.main = {
+            name: mainName ? mainName : `<new_value (Active main quest name)>`,
+            description: q.main?.desc?.trim() ? q.main.desc : `<new_value (Quest objective details)>`,
+            status: mainName ? (q.main?.isCompleted ? 'COMPLETED' : 'ACTIVE') : `<new_value ("ACTIVE" or "COMPLETED")>`
+          };
+          if (includeLockedFields && q.main?.isLocked) lockedFields.push('quests.main');
+
+          const sideQuestsList = (Array.isArray(q.sides) ? q.sides : []).filter(
+            sq => sq && ((sq.name && sq.name.trim() !== '') || (sq.desc && sq.desc.trim() !== ''))
+          );
+          qObj.sideQuests = sideQuestsList.length > 0 ? sideQuestsList.map((sq, qIdx) => {
+            if (includeLockedFields && sq.isLocked) lockedFields.push(`quests.sideQuests.${qIdx}`);
+            return {
+              name: sq.name,
+              description: sq.desc || '',
+              status: sq.isCompleted ? 'COMPLETED' : 'ACTIVE'
+            };
+          }) : [
+            {
+              name: `<new_value (Side quest name)>`,
+              description: `<new_value (Side quest details)>`,
+              status: `<new_value ("ACTIVE" or "COMPLETED")>`
+            }
+          ];
+        } else {
           if (q.main && q.main.name && q.main.name.trim() !== '') {
             qObj.main = `${q.main.name} (${q.main.isCompleted ? 'COMPLETED' : 'ACTIVE'})`;
           }
           if (Array.isArray(q.sides) && q.sides.length > 0) {
-            const validSides = q.sides.filter(s => s && s.name && s.name.trim() !== '').map(s => `${s.name} (${s.isCompleted ? 'COMPLETED' : 'ACTIVE'})`);
+            const validSides = q.sides
+              .filter(s => s && s.name && s.name.trim() !== '')
+              .map(s => `${s.name} (${s.isCompleted ? 'COMPLETED' : 'ACTIVE'})`);
             if (validSides.length > 0) qObj.sideQuests = validSides;
           }
-          if (Object.keys(qObj).length > 0) charInfo.quests = qObj;
         }
-      }
 
-      if (Object.keys(charInfo).length > 0) {
-        cleanData[char.name] = charInfo;
+        if (Object.keys(qObj).length > 0) charInfo.quests = qObj;
       }
+    }
+
+    if (includeLockedFields && lockedFields.length > 0) {
+      charInfo._lockedFields = lockedFields;
+    }
+
+    if (Object.keys(charInfo).length > 0) {
+      result[char.name] = charInfo;
     }
   });
 
-  if (Object.keys(cleanData).length === 0) return '';
-  return `\n[CURRENT RPG STATUS]\n\`\`\`json\n${JSON.stringify(cleanData, null, 2)}\n\`\`\`\n`;
+  return result;
 }
 
-export function buildAddonSection(trackerData) {
+/**
+ * Builds baseline status reference JSON string with delta placeholders.
+ */
+export function buildDynamicValuesPrompt(trackerData, options = {}) {
+  const activeData = serializeStatusState(trackerData, { ...options, includePlaceholders: true, includeLockedFields: true });
+  if (Object.keys(activeData).length === 0) return '';
+  return `\n[BASELINE RPG STATUS REFERENCE (COMPARE AGAINST RECENT CHAT)]\n\`\`\`json\n${JSON.stringify(activeData, null, 2)}\n\`\`\`\n`;
+}
+
+/**
+ * Builds clean status JSON string without delta placeholders or locked fields.
+ */
+export function buildCleanStatusPrompt(trackerData, options = {}) {
+  const cleanData = serializeStatusState(trackerData, { ...options, includePlaceholders: false, includeLockedFields: false });
+  if (Object.keys(cleanData).length === 0) return '';
+  return `\n[CURRENT RPG STATUS CONTEXT]\n\`\`\`json\n${JSON.stringify(cleanData, null, 2)}\n\`\`\`\n`;
+}
+
+/**
+ * Builds active add-on guidelines section.
+ */
+export function buildAddonSection(trackerData, promptSettings = null) {
+  const promptConfig = resolvePromptConfig(promptSettings, trackerData);
   const activeAddons = [];
-  const addons = trackerData.addons || {};
+  const addons = promptConfig.addons || trackerData?.addons || {};
 
   if (addons.worldEvents) {
-    const worldEventsText = trackerData.worldEventsPrompt !== undefined ? trackerData.worldEventsPrompt : DEFAULT_WORLD_EVENTS_PROMPT;
+    const worldEventsText = promptConfig.worldEventsPrompt !== undefined
+      ? promptConfig.worldEventsPrompt
+      : DEFAULT_WORLD_EVENTS_PROMPT;
     if (worldEventsText && worldEventsText.trim() !== '') activeAddons.push(`- ${worldEventsText.trim()}`);
   }
   if (addons.weather) {
-    const weatherText = trackerData.weatherPrompt !== undefined ? trackerData.weatherPrompt : DEFAULT_WEATHER_PROMPT;
+    const weatherText = promptConfig.weatherPrompt !== undefined
+      ? promptConfig.weatherPrompt
+      : DEFAULT_WEATHER_PROMPT;
     if (weatherText && weatherText.trim() !== '') activeAddons.push(`- ${weatherText.trim()}`);
   }
   if (addons.cyoa) {
-    const cyoaText = trackerData.cyoaPrompt !== undefined ? trackerData.cyoaPrompt : DEFAULT_CYOA_PROMPT;
+    const cyoaText = promptConfig.cyoaPrompt !== undefined
+      ? promptConfig.cyoaPrompt
+      : DEFAULT_CYOA_PROMPT;
     if (cyoaText && cyoaText.trim() !== '') activeAddons.push(`- ${cyoaText.trim()}`);
   }
 
@@ -623,8 +672,12 @@ export function buildAddonSection(trackerData) {
     : '';
 }
 
-export function buildGuidePromptsSection(trackerData) {
-  const guidePromptsData = trackerData.guidePrompts || [];
+/**
+ * Builds update instructions section based on active master switches.
+ */
+export function buildGuidePromptsSection(trackerData, promptSettings = null) {
+  const promptConfig = resolvePromptConfig(promptSettings, trackerData);
+  const guidePromptsData = promptConfig.guidePrompts || trackerData?.guidePrompts || [];
   const activeGuides = guidePromptsData
     .filter(g => g.enabled && g.prompt && g.prompt.trim() !== '')
     .map(g => `- ${g.prompt.trim()}`);
@@ -634,44 +687,121 @@ export function buildGuidePromptsSection(trackerData) {
     : '';
 }
 
-export function buildDefinitionPromptWrapper(trackerData, headerPrompt = '', footerPrompt = '', forcePlayer = null) {
-  const staticDefs = buildStaticDefinitionsPrompt(trackerData) || '';
-  const schemaExample = getDynamicSchemaExample(trackerData, forcePlayer) || '';
-  const statusReference = buildDynamicValuesPrompt(trackerData) || '';
-  const guideSection = buildGuidePromptsSection(trackerData);
-  const addonSection = buildAddonSection(trackerData);
+/**
+ * Module 1: Builds System Rules, Schema Example, Guide Prompts, Expression Rules, and Definitions.
+ */
+export function buildRulesDefsModule(trackerData, updateMode = 'merged', forcePlayer = null, promptSettings = null) {
+  if (updateMode === 'isolated') {
+    return '';
+  }
 
-  const finalPrompt = [
+  const promptConfig = resolvePromptConfig(promptSettings, trackerData);
+
+  if (updateMode === 'separated') {
+    const readOnlyHeader = promptConfig.systemPrompt_readonly !== undefined
+      ? promptConfig.systemPrompt_readonly
+      : DEFAULT_READONLY_CONTEXT_HEADER;
+    const staticDefs = buildStaticDefinitionsPrompt(trackerData);
+
+    return [readOnlyHeader, staticDefs]
+      .filter(part => part && part.trim() !== '')
+      .join('\n\n');
+  }
+
+  const header = promptConfig.systemPromptHeader_merged !== undefined
+    ? promptConfig.systemPromptHeader_merged
+    : DEFAULT_PROMPT_HEADER_MERGED;
+  const schemaExample = getDynamicSchemaExample(trackerData, forcePlayer, promptConfig);
+  const guideSection = buildGuidePromptsSection(trackerData, promptConfig);
+  const expressionRules = buildExpressionRulesPrompt(trackerData);
+  const footer = promptConfig.systemPromptFooter_merged !== undefined
+    ? promptConfig.systemPromptFooter_merged
+    : DEFAULT_PROMPT_FOOTER_MERGED;
+  const staticDefs = buildStaticDefinitionsPrompt(trackerData);
+
+  return [header, schemaExample, guideSection, expressionRules, footer, staticDefs]
+    .filter(part => part && part.trim() !== '')
+    .join('\n\n');
+}
+
+/**
+ * Module 2: Builds Status Reference JSON block.
+ */
+export function buildStatusModule(trackerData, updateMode = 'merged', promptSettings = null) {
+  if (updateMode === 'isolated') {
+    return '';
+  }
+
+  const promptConfig = resolvePromptConfig(promptSettings, trackerData);
+
+  if (updateMode === 'separated') {
+    return buildCleanStatusPrompt(trackerData, { promptSettings: promptConfig });
+  }
+
+  return buildDynamicValuesPrompt(trackerData, { promptSettings: promptConfig });
+}
+
+/**
+ * Module 3: Builds Add-ons and Output Format Enforcer.
+ */
+export function buildAddonsEnforcerModule(trackerData, updateMode = 'merged', promptSettings = null) {
+  const promptConfig = resolvePromptConfig(promptSettings, trackerData);
+  const addonSection = buildAddonSection(trackerData, promptConfig);
+
+  if (updateMode === 'separated' || updateMode === 'isolated') {
+    return addonSection.trim();
+  }
+
+  const enforcer = promptConfig.outputEnforcerPrompt !== undefined
+    ? promptConfig.outputEnforcerPrompt
+    : DEFAULT_OUTPUT_ENFORCER;
+
+  return [addonSection, enforcer]
+    .filter(part => part && part.trim() !== '')
+    .join('\n\n');
+}
+
+/**
+ * Modular orchestrator returning all 3 decoupled prompt sections as a keyed object.
+ */
+export function buildModularPrompts(trackerData, updateMode = 'merged', options = {}) {
+  const { forcePlayer = null, promptSettings = null } = options;
+  const promptConfig = resolvePromptConfig(promptSettings, trackerData);
+
+  return {
+    rules_defs: buildRulesDefsModule(trackerData, updateMode, forcePlayer, promptConfig),
+    status: buildStatusModule(trackerData, updateMode, promptConfig),
+    addons_enforcer: buildAddonsEnforcerModule(trackerData, updateMode, promptConfig)
+  };
+}
+
+/**
+ * Builds standalone update prompt specifically for quiet prompt manual updates and character generation.
+ */
+export function buildUpdatePromptWrapper(trackerData, headerPrompt = '', footerPrompt = '', forcePlayer = null, promptSettings = null) {
+  const promptConfig = resolvePromptConfig(promptSettings, trackerData);
+  const staticDefs = buildStaticDefinitionsPrompt(trackerData) || '';
+  const expressionRules = buildExpressionRulesPrompt(trackerData) || '';
+  const schemaExample = getDynamicSchemaExample(trackerData, forcePlayer, promptConfig) || '';
+  const statusReference = buildDynamicValuesPrompt(trackerData, { promptSettings: promptConfig }) || '';
+  const guideSection = buildGuidePromptsSection(trackerData, promptConfig);
+  const customEnforcer = promptConfig.outputEnforcerPrompt;
+  const enforcer = (
+    typeof customEnforcer === 'string' &&
+    customEnforcer.trim() !== '' &&
+    customEnforcer.trim() !== DEFAULT_OUTPUT_ENFORCER.trim()
+  )
+    ? customEnforcer
+    : DEFAULT_OUTPUT_ENFORCER_SEP;
+
+  return [
     headerPrompt,
     schemaExample,
     statusReference,
     guideSection,
+    expressionRules,
     footerPrompt,
-    addonSection,
-    staticDefs
-  ].filter(part => part && part.trim() !== '').join('\n');
-
-  return finalPrompt;
-}
-
-export function buildUpdatePromptWrapper(trackerData, headerPrompt = '', footerPrompt = '', forcePlayer = null) {
-  const staticDefs = buildStaticDefinitionsPrompt(trackerData) || '';
-  const schemaExample = getDynamicSchemaExample(trackerData, forcePlayer) || '';
-  const statusReference = buildDynamicValuesPrompt(trackerData) || '';
-  const guideSection = buildGuidePromptsSection(trackerData);
-
-  const finalPrompt = [
-    headerPrompt,
-    schemaExample,
-    statusReference,
-    guideSection,
-    footerPrompt,
-    staticDefs
-  ].filter(part => part && part.trim() !== '').join('\n');
-
-  return finalPrompt;
-}
-
-export function buildStatusPromptWrapper(trackerData) {
-  return buildDynamicValuesPrompt(trackerData);
+    staticDefs,
+    enforcer
+  ].filter(part => part && part.trim() !== '').join('\n\n');
 }

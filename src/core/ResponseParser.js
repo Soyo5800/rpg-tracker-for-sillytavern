@@ -1,26 +1,82 @@
-// src/core/ResponseParser.js
-
 /**
- * HTML 특수 엔티티 문자를 안전하게 원본 기호로 디코딩
+ * Decodes HTML special entities back to their original characters.
  */
 function decodeHtmlEntities(str) {
   if (!str) return '';
   return str
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&apos;/g, "'")
     .replace(/&#39;/g, "'")
     .replace(/&#x27;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
     .replace(/&amp;/g, '&');
 }
 
 /**
- * 미완성되거나 중간에 끊긴 JSON 문자열을 보정하여 최대한 파싱 가능한 구조로.
- * 열린 따옴표, 중괄호, 대괄호를 역순으로 매칭하여 안전하게 닫아줌.
+ * Safely strips single-line (//) and multi-line (/* ... *\/) comments from a JSON-like string
+ * while preserving comments and slashes within quoted string literals.
+ */
+export function stripJsonComments(str) {
+  if (!str || typeof str !== 'string') return '';
+
+  let inString = false;
+  let escaped = false;
+  let result = '';
+
+  for (let i = 0; i < str.length; i++) {
+    const char = str[i];
+
+    if (escaped) {
+      result += char;
+      escaped = false;
+      continue;
+    }
+
+    if (char === '\\') {
+      result += char;
+      escaped = true;
+      continue;
+    }
+
+    if (char === '"') {
+      inString = !inString;
+      result += char;
+      continue;
+    }
+
+    if (!inString) {
+      if (char === '/' && str[i + 1] === '/') {
+        i += 2;
+        while (i < str.length && str[i] !== '\n' && str[i] !== '\r') {
+          i++;
+        }
+        result += '\n';
+        continue;
+      }
+      if (char === '/' && str[i + 1] === '*') {
+        i += 2;
+        while (i < str.length - 1 && !(str[i] === '*' && str[i + 1] === '/')) {
+          i++;
+        }
+        i++;
+        continue;
+      }
+    }
+
+    result += char;
+  }
+
+  return result;
+}
+
+/**
+ * Repairs incomplete, unclosed, or control-character-corrupted JSON strings into a valid JSON structure.
+ * Strips comments, escapes raw newlines and tabs inside strings, and balances unclosed brackets.
  */
 export function repairJson(jsonStr) {
-  let cleaned = jsonStr.trim();
+  const decommented = stripJsonComments(jsonStr);
+  let cleaned = decommented.trim();
   if (!cleaned) return "{}";
 
   let inString = false;
@@ -49,6 +105,24 @@ export function repairJson(jsonStr) {
       continue;
     }
 
+    if (inString) {
+      if (char === '\n') {
+        repaired += '\\n';
+        continue;
+      }
+      if (char === '\r') {
+        continue;
+      }
+      if (char === '\t') {
+        repaired += '\\t';
+        continue;
+      }
+      const charCode = char.charCodeAt(0);
+      if (charCode < 0x20) {
+        continue;
+      }
+    }
+
     repaired += char;
 
     if (!inString) {
@@ -62,18 +136,15 @@ export function repairJson(jsonStr) {
     }
   }
 
-  // 따옴표 내부에서 문자열이 잘렸을 때 따옴표 강제 종결
   if (inString) {
     repaired += '"';
   }
 
-  // 닫는 중괄호/대괄호 직전 구조적 유효성을 저해하는 뒤처진 문자(쉼표, 콜론 등) 정리
   repaired = repaired.trim();
   while (repaired.length > 0 && /[,:\s]$/.test(repaired)) {
     repaired = repaired.slice(0, -1);
   }
 
-  // 누적된 열린 괄호들을 역순으로 안전하게 폐합
   while (stack.length > 0) {
     repaired += stack.pop();
   }
@@ -82,56 +153,225 @@ export function repairJson(jsonStr) {
 }
 
 /**
- * Extracts the JSON patch from the LLM response text and returns the cleaned text and the patch object.
- * @param {string} text - The raw response text from the LLM.
- * @returns {{ cleanedText: string, patch: object|null }}
+ * Validates whether an extracted JSON object is a legitimate RPG Tracker patch.
+ * Recognizes entity-level subkeys including dynamic expressions, emotions, and character names.
+ */
+export function isValidTrackerPatch(patch) {
+  if (!patch || typeof patch !== 'object' || Array.isArray(patch)) return false;
+
+  const topKeys = Object.keys(patch);
+  if (topKeys.length === 0) return false;
+
+  const lowerTopKeys = topKeys.map(k => k.toLowerCase());
+
+  if (
+    lowerTopKeys.includes('world') ||
+    lowerTopKeys.includes('worldstate') ||
+    lowerTopKeys.includes('characters')
+  ) {
+    return true;
+  }
+
+  const knownCharNames = new Set(
+    (window.RPGBridge?.currentTrackerData?.characters || [])
+      .map(c => (c.name || '').trim().toLowerCase())
+      .filter(Boolean)
+  );
+
+  const trackerSubKeys = new Set([
+    'status', 'stats', 'statusschema', 'profile', 'profilelocks', 'profileinjects',
+    'relations', 'inventory', 'quests', 'activeplayer', 'activeinjection',
+    'expression', 'emotion', 'mood'
+  ]);
+
+  for (const key of topKeys) {
+    const val = patch[key];
+    if (!val || typeof val !== 'object' || Array.isArray(val)) continue;
+
+    const subKeys = Object.keys(val).map(k => k.toLowerCase());
+    if (subKeys.some(k => trackerSubKeys.has(k))) {
+      return true;
+    }
+
+    if (knownCharNames.has(key.trim().toLowerCase())) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Scans string from a starting offset and extracts a balanced JSON object by counting brace depth.
+ * Accurately handles string literals, escape sequences, JS comments, and token truncation.
+ */
+export function extractBalancedJson(text, startIndex = 0) {
+  if (!text || typeof text !== 'string') return null;
+
+  let firstBrace = -1;
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  let endIndex = -1;
+
+  for (let i = startIndex; i < text.length; i++) {
+    const char = text[i];
+
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+
+    if (char === '\\') {
+      escaped = true;
+      continue;
+    }
+
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+
+    if (!inString) {
+      if (char === '/' && text[i + 1] === '/') {
+        i += 2;
+        while (i < text.length && text[i] !== '\n' && text[i] !== '\r') {
+          i++;
+        }
+        continue;
+      }
+
+      if (char === '/' && text[i + 1] === '*') {
+        i += 2;
+        while (i < text.length - 1 && !(text[i] === '*' && text[i + 1] === '/')) {
+          i++;
+        }
+        i++;
+        continue;
+      }
+
+      if (char === '{') {
+        if (depth === 0) {
+          firstBrace = i;
+        }
+        depth++;
+      } else if (char === '}') {
+        if (depth > 0) {
+          depth--;
+          if (depth === 0) {
+            endIndex = i;
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  if (firstBrace !== -1 && endIndex !== -1) {
+    return {
+      rawJson: text.slice(firstBrace, endIndex + 1),
+      startIndex: firstBrace,
+      endIndex: endIndex,
+      isTruncated: false
+    };
+  }
+
+  if (firstBrace !== -1 && depth > 0) {
+    return {
+      rawJson: text.slice(firstBrace),
+      startIndex: firstBrace,
+      endIndex: text.length - 1,
+      isTruncated: true
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Extracts JSON patch from LLM response text and returns cleaned narrative text with the patch object.
+ * Preserves the original narrative text formatting while parsing and repairing the isolated JSON payload.
  */
 export function parseResponse(text) {
-  if (!text) return { cleanedText: '', patch: null };
+  if (!text || typeof text !== 'string') return { cleanedText: '', patch: null };
 
-  const decodedText = decodeHtmlEntities(text);
+  const trackerCommentRegex = /(?:<!--|&lt;!--)\s*RPG_TRACKER:?[\s\S]*?(?:-->|--&gt;|$)/i;
+  const trackerCommentMatch = text.match(trackerCommentRegex);
 
-  // 1순위: 마크다운 코드 블록 내의 모든 JSON 구조 유연하게 추출
-  const jsonBlockRegex = /(?:\s*<!--(?:RPG_TRACKER)?\s*)?```(?:json|markdown)?\s*\n?(\{[\s\S]*?\})\s*\n?```(?:\s*-->)?/i;
-  const match = decodedText.match(jsonBlockRegex);
+  if (trackerCommentMatch) {
+    const commentStartIndex = trackerCommentMatch.index;
+    const commentFullText = trackerCommentMatch[0];
+    const commentEndIndex = commentStartIndex + commentFullText.length;
 
-  if (match && match[1]) {
-    try {
-      const repairedString = repairJson(match[1]);
-      const patch = JSON.parse(repairedString);
-      const cleanedText = decodedText.replace(match[0], '').trim();
-      return { cleanedText, patch };
-    } catch (e) {
-      console.error("[RPG Tracker] Failed to parse JSON patch from block:", e);
+    const decodedComment = decodeHtmlEntities(commentFullText);
+    const extracted = extractBalancedJson(decodedComment, 0);
+
+    if (extracted) {
+      try {
+        const repairedString = repairJson(extracted.rawJson);
+        const patch = JSON.parse(repairedString);
+
+        const cleanedText = (text.slice(0, commentStartIndex) + text.slice(commentEndIndex)).trim();
+        return { cleanedText, patch };
+      } catch (e) {
+        console.error("[RPG Tracker] Failed to parse JSON patch from tracker comment:", e);
+      }
     }
   }
 
-  // 2순위: 마크다운 없이 <!--RPG_TRACKER...--> HTML 주석으로만 감싸진 객체 (어디서든 추출)
-  const commentRegex = /<!--(?:RPG_TRACKER)?\s*(\{[\s\S]*?\})\s*-->/i;
-  const commentMatch = decodedText.match(commentRegex);
+  const codeBlockHeaderRegex = /```(?:json|markdown)?/gi;
+  let codeBlockMatch;
 
-  if (commentMatch && commentMatch[1]) {
-    try {
-      const repairedString = repairJson(commentMatch[1]);
-      const patch = JSON.parse(repairedString);
-      const cleanedText = decodedText.replace(commentMatch[0], '').trim();
-      return { cleanedText, patch };
-    } catch (e) {
-      console.error("[RPG Tracker] Failed to parse JSON patch from comment:", e);
+  while ((codeBlockMatch = codeBlockHeaderRegex.exec(text)) !== null) {
+    const blockStartIndex = codeBlockMatch.index;
+    const extracted = extractBalancedJson(text, blockStartIndex);
+
+    if (extracted && extracted.startIndex > blockStartIndex) {
+      try {
+        const decodedJson = decodeHtmlEntities(extracted.rawJson);
+        const repairedString = repairJson(decodedJson);
+        const patch = JSON.parse(repairedString);
+
+        if (isValidTrackerPatch(patch)) {
+          const textAfterJson = text.slice(extracted.endIndex + 1);
+          const closingBackticksMatch = textAfterJson.match(/^\s*```/);
+          const blockEndIndex = extracted.endIndex + 1 + (closingBackticksMatch ? closingBackticksMatch[0].length : 0);
+
+          const cleanedText = (text.slice(0, blockStartIndex) + text.slice(blockEndIndex)).trim();
+          return { cleanedText, patch };
+        }
+      } catch (e) {
+        // Continue scanning subsequent code blocks
+      }
+
+      codeBlockHeaderRegex.lastIndex = Math.max(codeBlockHeaderRegex.lastIndex, extracted.endIndex + 1);
     }
   }
 
-  // 3순위: 마크다운도 주석도 없는 순수 객체 (매우 보수적으로 문장 맨 앞에 있을 때만 캐치)
-  const rawJsonRegex = /^\s*(\{[\s\S]*?\})\s*(?=\n|$)/;
-  const rawMatch = decodedText.match(rawJsonRegex);
+  let searchIndex = 0;
+  while (searchIndex < text.length) {
+    const braceIndex = text.indexOf('{', searchIndex);
+    if (braceIndex === -1) break;
 
-  if (rawMatch && rawMatch[1]) {
-    try {
-      const repairedString = repairJson(rawMatch[1]);
-      const patch = JSON.parse(repairedString);
-      const cleanedText = decodedText.replace(rawMatch[0], '').trim();
-      return { cleanedText, patch };
-    } catch (e) { }
+    const extracted = extractBalancedJson(text, braceIndex);
+    if (extracted) {
+      try {
+        const decodedJson = decodeHtmlEntities(extracted.rawJson);
+        const repairedString = repairJson(decodedJson);
+        const patch = JSON.parse(repairedString);
+
+        if (isValidTrackerPatch(patch)) {
+          const cleanedText = (text.slice(0, extracted.startIndex) + text.slice(extracted.endIndex + 1)).trim();
+          return { cleanedText, patch };
+        }
+      } catch (e) {
+        // Continue scanning
+      }
+
+      searchIndex = extracted.endIndex + 1;
+    } else {
+      searchIndex = braceIndex + 1;
+    }
   }
 
   return { cleanedText: text, patch: null };

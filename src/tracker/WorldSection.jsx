@@ -2,15 +2,16 @@ import React from 'react';
 import { useRPG } from '../core/RPGControl';
 import styles from './WorldSection.module.css';
 import { AutoGrowingTextArea } from '../utils';
+import { LockIcon } from '../Icons';
 
 export default function WorldSection() {
-  const { trackerData, updateTrackerData, patchWorldField } = useRPG();
-  
+  const { trackerData, updateTrackerData, patchWorldField, promptSettings } = useRPG();
+
   const worldState = trackerData.worldState || { date: '', time: '', location: '', weather: '', events: [] };
   const worldStateLocks = trackerData.worldStateLocks || { date: false, time: false, location: false, weather: false };
   const events = Array.isArray(worldState.events) ? worldState.events : [];
 
-  const guidePrompts = trackerData.guidePrompts || [];
+  const guidePrompts = promptSettings?.guidePrompts || trackerData?.guidePrompts || [];
   const isEnabled = (id) => {
     const guide = guidePrompts.find(g => g.id === id);
     return guide ? guide.enabled : true;
@@ -52,23 +53,34 @@ export default function WorldSection() {
 
   const handleAddEvent = () => {
     const newEvent = { id: `event_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`, name: '', desc: '' };
-    handleUpdate({ events: [...events, newEvent] });
+    if (patchWorldField) {
+      patchWorldField(['events'], [...events, newEvent]);
+    } else {
+      handleUpdate({ events: [...events, newEvent] });
+    }
   };
 
   const handleEventChange = (index, key, value) => {
-    const newEvents = [...events];
-    newEvents[index] = { ...newEvents[index], [key]: value };
-    handleUpdate({ events: newEvents });
+    if (patchWorldField) {
+      patchWorldField(['events', index, key], value);
+    } else {
+      const newEvents = [...events];
+      newEvents[index] = { ...newEvents[index], [key]: value };
+      handleUpdate({ events: newEvents });
+    }
   };
 
   const handleDeleteEvent = (index) => {
     const newEvents = events.filter((_, i) => i !== index);
-    handleUpdate({ events: newEvents });
+    if (patchWorldField) {
+      patchWorldField(['events'], newEvents);
+    } else {
+      handleUpdate({ events: newEvents });
+    }
   };
 
   return (
     <div className={styles.container}>
-
       {/* World State Section */}
       <div>
         <div className={styles.sectionHeader}>
@@ -78,14 +90,10 @@ export default function WorldSection() {
         <div className={styles.stateGrid}>
           {isEnabled('world_date') && (
             <div className={styles.rowField}>
-              <button
-                type="button"
-                className={styles.lockBtn}
+              <LockIcon
+                isLocked={worldStateLocks.date}
                 onClick={() => handleToggleLock('date')}
-                title={worldStateLocks.date ? 'Unlock Date' : 'Lock Date'}
-              >
-                <i className={`fa-solid ${worldStateLocks.date ? 'fa-lock' : 'fa-lock-open'}`} />
-              </button>
+              />
               <span className={styles.fieldLabel}>Date</span>
               <AutoGrowingTextArea
                 value={safeStr(worldState.date)}
@@ -99,14 +107,10 @@ export default function WorldSection() {
 
           {isEnabled('world_time') && (
             <div className={styles.rowField}>
-              <button
-                type="button"
-                className={styles.lockBtn}
+              <LockIcon
+                isLocked={worldStateLocks.time}
                 onClick={() => handleToggleLock('time')}
-                title={worldStateLocks.time ? 'Unlock Time' : 'Lock Time'}
-              >
-                <i className={`fa-solid ${worldStateLocks.time ? 'fa-lock' : 'fa-lock-open'}`} />
-              </button>
+              />
               <span className={styles.fieldLabel}>Time</span>
               <AutoGrowingTextArea
                 value={safeStr(worldState.time)}
@@ -120,14 +124,10 @@ export default function WorldSection() {
 
           {isEnabled('world_weather') && (
             <div className={styles.rowField}>
-              <button
-                type="button"
-                className={styles.lockBtn}
+              <LockIcon
+                isLocked={worldStateLocks.weather}
                 onClick={() => handleToggleLock('weather')}
-                title={worldStateLocks.weather ? 'Unlock Weather' : 'Lock Weather'}
-              >
-                <i className={`fa-solid ${worldStateLocks.weather ? 'fa-lock' : 'fa-lock-open'}`} />
-              </button>
+              />
               <span className={styles.fieldLabel}>Weather</span>
               <AutoGrowingTextArea
                 value={safeStr(worldState.weather)}
@@ -141,14 +141,10 @@ export default function WorldSection() {
 
           {isEnabled('world_location') && (
             <div className={styles.rowField}>
-              <button
-                type="button"
-                className={styles.lockBtn}
+              <LockIcon
+                isLocked={worldStateLocks.location}
                 onClick={() => handleToggleLock('location')}
-                title={worldStateLocks.location ? 'Unlock Location' : 'Lock Location'}
-              >
-                <i className={`fa-solid ${worldStateLocks.location ? 'fa-lock' : 'fa-lock-open'}`} />
-              </button>
+              />
               <span className={styles.fieldLabel}>Location</span>
               <AutoGrowingTextArea
                 value={safeStr(worldState.location)}
@@ -174,7 +170,7 @@ export default function WorldSection() {
 
           <div className={styles.eventsList}>
             {events.length === 0 ? (
-              <p className={styles.emptyPlaceholder}>No recorded events.</p>
+              <p className="rpg-empty-text">No recorded events.</p>
             ) : (
               events.map((evtObj, idx) => {
                 return (
@@ -212,7 +208,6 @@ export default function WorldSection() {
           </div>
         </div>
       )}
-
     </div>
   );
 }

@@ -1,6 +1,4 @@
-/* --------------------------------------------------------------------------
-   [1] 기본 및 소형 액션 버튼 (Action Buttons)
-   -------------------------------------------------------------------------- */
+/* [1] Action & Small Buttons */
 .rpg-btn {
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--rpg-border);
@@ -116,9 +114,7 @@
   color: var(--rpg-highlight) !important;
 }
 
-/* --------------------------------------------------------------------------
-   [2] 삭제 및 위험 버튼 (Danger / Remove Buttons)
-   -------------------------------------------------------------------------- */
+/* [2] Danger & Remove Buttons */
 .rpg-btn-del {
   background: rgba(231, 76, 60, 0.12);
   border: 1px solid rgba(231, 76, 60, 0.3);
@@ -159,9 +155,7 @@
   color: #e74c3c;
 }
 
-/* --------------------------------------------------------------------------
-   [3] 정렬 및 아코디언 버튼 (Sort & Accordion Buttons)
-   -------------------------------------------------------------------------- */
+/* [3] Sort & Accordion Buttons */
 .rpg-btn-sort {
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--rpg-border);
@@ -205,9 +199,7 @@
   transform: rotate(90deg);
 }
 
-/* --------------------------------------------------------------------------
-   [4] 탭 네비게이션 (Tab Navigation System)
-   -------------------------------------------------------------------------- */
+/* [4] Tab Navigation System */
 .rpg-tab-nav {
   display: flex;
   background: rgba(0, 0, 0, 0.15);
@@ -223,7 +215,7 @@
   border-bottom: 2px solid transparent;
   color: var(--rpg-text);
   opacity: 0.6;
-  padding: 10px 0;
+  padding: 9px 0;
   font-size: 11.5px;
   font-weight: bold;
   cursor: pointer;
@@ -244,9 +236,7 @@
   background: rgba(255, 255, 255, 0.04);
 }
 
-/* --------------------------------------------------------------------------
-   [5] 토글 스위치 (Switch Toggle System)
-   -------------------------------------------------------------------------- */
+/* [5] Switch Toggle System */
 .rpg-switch-row {
   display: inline-flex;
   align-items: center;
@@ -312,9 +302,7 @@
   cursor: not-allowed;
 }
 
-/* --------------------------------------------------------------------------
-   [6] 전역 인풋 및 셀렉트 설정 (Input & Select System)
-   -------------------------------------------------------------------------- */
+/* [6] Global Input & Select System */
 input[type=number]::-webkit-outer-spin-button,
 input[type=number]::-webkit-inner-spin-button {
   -webkit-appearance: none;
@@ -323,6 +311,46 @@ input[type=number]::-webkit-inner-spin-button {
 
 input[type=number] {
   -moz-appearance: textfield;
+}
+
+.rpg-input {
+  flex: 1;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--rpg-border);
+  color: var(--rpg-text);
+  border-radius: 4px;
+  padding: 5px 8px;
+  font-size: 11.5px;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease;
+}
+
+.rpg-input:focus {
+  border-color: var(--rpg-highlight) !important;
+}
+
+.rpg-input-number {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--rpg-border);
+  color: var(--rpg-text);
+  border-radius: 4px;
+  padding: 4px 6px;
+  font-size: 11px;
+  font-weight: bold;
+  text-align: center;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease;
+}
+
+.rpg-input-number:focus {
+  border-color: var(--rpg-highlight) !important;
+}
+
+.rpg-input-number:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
 }
 
 .rpg-select-custom {
@@ -346,4 +374,69 @@ input[type=number] {
 
 .rpg-select-custom:focus {
   border-color: var(--rpg-highlight);
+}
+
+/* [7] Status & Entity Badges */
+.rpg-sync-badge {
+  font-size: 10px;
+  background: rgba(52, 152, 219, 0.1);
+  color: #3498db;
+  padding: 2px 6px;
+  border-radius: 3px;
+  border: 1px solid rgba(52, 152, 219, 0.3);
+  display: inline-block;
+  line-height: 1.2;
+  flex-shrink: 0;
+}
+
+/* [8] Icons & Utility Indicators */
+.rpg-lock-icon {
+  cursor: pointer;
+  opacity: 0.4;
+  flex-shrink: 0;
+  transition: opacity 0.15s ease, color 0.15s ease;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.rpg-lock-icon:hover {
+  opacity: 0.75;
+}
+
+.rpg-lock-icon.active,
+.rpg-lock-icon-active {
+  opacity: 1 !important;
+  color: var(--rpg-highlight);
+}
+
+.rpg-empty-text {
+  font-size: 11.5px;
+  opacity: 0.35;
+  text-align: center;
+  padding: 12px 0;
+  margin: 0;
+  user-select: none;
+  font-style: italic;
+}
+
+/* [9] Unified Dark Scrollbar */
+#my-rpg-react-root ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+#my-rpg-react-root ::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.15);
+  border: none !important;
+}
+
+#my-rpg-react-root ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  border: none !important;
+  background-clip: border-box !important;
+}
+
+#my-rpg-react-root ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.35);
 }

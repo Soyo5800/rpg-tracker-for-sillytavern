@@ -42,13 +42,6 @@
   opacity: 0.8;
 }
 
-.emptySectionText {
-  font-size: 11px;
-  opacity: 0.35;
-  text-align: center;
-  margin: 8px 0;
-}
-
 .schemaItem {
   border: 1px solid var(--rpg-border);
   background: rgba(255, 255, 255, 0.01);
@@ -275,13 +268,6 @@
   margin-bottom: 6px;
 }
 
-.emptyText {
-  font-size: 11px;
-  opacity: 0.3;
-  text-align: center;
-  padding: 10px 0;
-}
-
 .invStorageBox {
   background: rgba(0, 0, 0, 0.15);
   border: 1px solid rgba(255, 255, 255, 0.03);
@@ -467,15 +453,6 @@
   background: transparent;
   cursor: pointer;
   padding: 0;
-}
-
-.syncBadge {
-  font-size: 10px;
-  background: rgba(52, 152, 219, 0.1);
-  color: #3498db;
-  padding: 2px 6px;
-  border-radius: 3px;
-  border: 1px solid rgba(52, 152, 219, 0.3);
 }
 
 .metricLimitWrapper {

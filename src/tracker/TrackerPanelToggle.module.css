@@ -5,21 +5,21 @@
   margin: 0 !important;
   padding: 0 !important;
   
-  /* 화면 좌측 상단 여유공간 - 1000px 미만 기본값 */
+  /* Default top-left padding for screens under 1000px */
   left: 8px;
   top: 8px;
 }
 
-/* 유저가 수동으로 위치를 드래그한 경우, 미디어 쿼리의 위치 덮어쓰기를 차단 */
+/* Prevent media query overrides when custom user position is active */
 .toggleWrapper:not(.userPositioned) {
   @media (min-width: 1001px) {
-    /* 1000px 이상 데스크탑 환경: 자물쇠 아이콘 피하기 위해 오른쪽으로 버튼 하나만큼 이동 (8px + 38px + 8px = 54px) */
+    /* Desktop (>1000px): Offset to the right to avoid SillyTavern lock button */
     left: 40px;
     top: 6px;
   }
 
   @media (max-width: 1000px) {
-    /* 모바일에서는 상단 ST 기본 헤더에 가려지지 않게 최소한의 위치 확보 */
+    /* Mobile: Ensure offset below the top SillyTavern header bar */
     left: 10px !important;
     top: 45px !important; 
   }

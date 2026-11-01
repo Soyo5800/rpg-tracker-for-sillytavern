@@ -1,12 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { resolveSillyTavernAvatarUrl } from '../utils';
+import { resolveSillyTavernAvatarUrl } from '../core/AvatarResolver';
 
-// 캐릭터 카드 메타데이터에 프리셋 데이터를 저장하는 공식 API 및 폴백 함수
 export async function savePresetToSillyTavernCard(avatarFile, presetData) {
   if (!avatarFile) return false;
 
   const context = window.SillyTavern?.getContext?.() || {};
-  // 그룹 채팅 스코프 배열이 아닌 글로벌 캐릭터 전체 배열을 최우선 참조
   const globalCharacters = Array.isArray(window.characters)
     ? window.characters
     : (Array.isArray(context.characters) ? context.characters : []);
@@ -19,7 +17,6 @@ export async function savePresetToSillyTavernCard(avatarFile, presetData) {
   const char = globalCharacters[charIndex];
 
   try {
-    // 1순위: SillyTavern 공식 writeExtensionField API 사용 (절대 인덱스 전달)
     if (window.RPGBridge && typeof window.RPGBridge.writeExtensionFieldNatively === 'function') {
       const success = await window.RPGBridge.writeExtensionFieldNatively(charIndex, 'rpg_tracker', presetData);
       if (success) {
@@ -41,7 +38,6 @@ export async function savePresetToSillyTavernCard(avatarFile, presetData) {
       }
     }
 
-    // 2순위 (폴백): REST API를 이용한 기존 업데이트 방식
     const currentExtensions = JSON.parse(JSON.stringify(char.data?.extensions || char.extensions || {}));
     if (presetData === null) {
       delete currentExtensions.rpg_tracker;
@@ -135,13 +131,17 @@ export default function CardSyncComponent({ onSync, isSynced }) {
 
     const currentName1 = context.name1 || window.name1;
     if (currentName1) {
-      const userAvatarFile = context.user_avatar || window.user_avatar || 'default.png';
+      const rawUserAvatar = context.user_avatar || window.user_avatar || null;
+      const cleanAvatarFile = (rawUserAvatar && typeof rawUserAvatar === 'string' && !['default.png', 'ghost.png', 'user.png', 'none', ''].includes(rawUserAvatar.trim().toLowerCase()))
+        ? rawUserAvatar.trim()
+        : null;
+
       list.push({
         id: "persona_user",
         name: currentName1,
         type: "Persona",
-        avatarFile: userAvatarFile,
-        avatarUrl: resolveSillyTavernAvatarUrl(userAvatarFile, 'Persona'),
+        avatarFile: cleanAvatarFile,
+        avatarUrl: resolveSillyTavernAvatarUrl(cleanAvatarFile, 'Persona'),
         preset: null
       });
     }
@@ -185,7 +185,7 @@ export default function CardSyncComponent({ onSync, isSynced }) {
             type: "Card",
             avatarFile: char.avatar || null,
             avatarUrl: resolveSillyTavernAvatarUrl(char.avatar, 'Card'),
-            preset: char.data?.extensions?.rpg_tracker || null
+            preset: char.data?.extensions?.rpg_tracker || char.extensions?.rpg_tracker || null
           });
         }
       });

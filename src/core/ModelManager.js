@@ -1,55 +1,93 @@
 import { getContext, extension_settings } from "../../../../../extensions.js";
-import { generateQuietPrompt, setExtensionPrompt, extension_prompt_types, extension_prompt_roles } from "../../../../../../script.js";
-import { buildDefinitionPromptWrapper, buildCleanStatusPrompt, buildStaticDefinitionsPrompt, buildAddonSection } from "./ActivePrompt.js";
-import { DEFAULT_PROMPT_HEADER_MERGED, DEFAULT_PROMPT_FOOTER_MERGED, DEFAULT_READONLY_CONTEXT_HEADER } from "./PromptSchema.js";
+import { generateQuietPrompt } from "../../../../../../script.js";
+import { applyModularExtensionPrompts, clearAllExtensionPrompts } from "./ExtensionLifecycle.js";
+import { rehydrateFromHistory } from "./JSONTracker.js";
+import { getAvailableOpenRouterProviders, fetchProvidersForOpenRouterModel } from "./OpenRouterHelper.js";
+
+export { getAvailableOpenRouterProviders, fetchProvidersForOpenRouterModel };
 
 /**
- * Restores extension prompt configuration based on active update mode.
+ * Validates whether an intercepted HTTP request targets text completion generation.
+ * Prevents interference with TTS, translation, vector embeddings, and other auxiliary services.
  */
-export function restoreExtensionPromptForCurrentMode(extensionName) {
-    if (typeof setExtensionPrompt !== 'function' || typeof extension_prompt_types === 'undefined') return;
-
-    const currentSettings = extension_settings[extensionName] || {};
-    const mode = currentSettings.updateMode || 'merged';
-    const trackerData = window.RPGBridge?.currentTrackerData;
-
-    if (!currentSettings.enabled || !trackerData) {
-        setExtensionPrompt(`${extensionName}_def`, '', extension_prompt_types.IN_PROMPT, 0, false);
-        return;
+function isTargetGenerationRequest(url, bodyObj) {
+    if (!bodyObj || typeof bodyObj !== 'object' || Array.isArray(bodyObj)) {
+        return false;
     }
 
-    if (mode === 'isolated') {
-        const addonSection = buildAddonSection(trackerData);
-        if (addonSection && addonSection.trim() !== '') {
-            setExtensionPrompt(`${extensionName}_def`, addonSection.trim(), extension_prompt_types.IN_CHAT, 0, false, extension_prompt_roles.SYSTEM || 0);
-        } else {
-            setExtensionPrompt(`${extensionName}_def`, '', extension_prompt_types.IN_PROMPT, 0, false);
+    const normalizedUrl = String(url || '').toLowerCase();
+
+    const excludedEndpoints = [
+        '/audio', '/tts', 'speech', 'voice',
+        '/translate', 'translation',
+        '/embedding', 'vector', 'tokenize',
+        '/sprites', '/thumbnails', '/tags', '/worldinfo'
+    ];
+    if (excludedEndpoints.some(token => normalizedUrl.includes(token))) {
+        return false;
+    }
+
+    const hasModelField = 'model' in bodyObj;
+    const hasPayloadField = Array.isArray(bodyObj.messages) || typeof bodyObj.prompt === 'string';
+
+    const isKnownGenerationUrl =
+        normalizedUrl.includes('/generate') ||
+        normalizedUrl.includes('/completions') ||
+        normalizedUrl.includes('chat/completions');
+
+    return isKnownGenerationUrl && (hasModelField || hasPayloadField);
+}
+
+/**
+ * Applies model override and OpenRouter provider routing configurations to the request payload.
+ */
+function applyModelOverride(bodyObj, targetModelName, settings) {
+    bodyObj.model = targetModelName;
+
+    const isOpenRouter = (bodyObj.chat_completion_source === 'openrouter') ||
+                         (typeof targetModelName === 'string' && targetModelName.includes('/'));
+
+    if (isOpenRouter) {
+        const validProviders = Array.isArray(settings.customProviders)
+            ? settings.customProviders.filter(p => typeof p === 'string' && p.trim() !== '')
+            : [];
+
+        const allowFallbacks = settings.customAllowFallbacks !== false;
+
+        if (validProviders.length > 0) {
+            bodyObj.provider = {
+                order: validProviders,
+                allow_fallbacks: allowFallbacks
+            };
+            bodyObj.openrouter_providers = validProviders;
         }
-        return;
-    }
 
-    if (mode === 'separated') {
-        const cleanStatusPrompt = buildCleanStatusPrompt(trackerData);
-        const staticDefs = buildStaticDefinitionsPrompt(trackerData) || '';
-        const readOnlyHeader = trackerData.systemPrompt_readonly !== undefined ? trackerData.systemPrompt_readonly : DEFAULT_READONLY_CONTEXT_HEADER;
-        const addonSection = buildAddonSection(trackerData);
-        
-        const readOnlyPrompt = [readOnlyHeader, cleanStatusPrompt, staticDefs, addonSection]
-            .filter(part => part && part.trim() !== '')
-            .join('\n\n');
-
-        setExtensionPrompt(`${extensionName}_def`, readOnlyPrompt, extension_prompt_types.IN_CHAT, 0, false, extension_prompt_roles.SYSTEM || 0);
-    } else if (mode === 'merged') {
-        const header = trackerData.systemPromptHeader_merged !== undefined ? trackerData.systemPromptHeader_merged : DEFAULT_PROMPT_HEADER_MERGED;
-        const footer = trackerData.systemPromptFooter_merged !== undefined ? trackerData.systemPromptFooter_merged : DEFAULT_PROMPT_FOOTER_MERGED;
-        const finalPrompt = buildDefinitionPromptWrapper(trackerData, header, footer);
-
-        setExtensionPrompt(`${extensionName}_def`, finalPrompt, extension_prompt_types.IN_PROMPT, 0, false, extension_prompt_roles.SYSTEM || 0);
+        bodyObj.allow_fallbacks = allowFallbacks;
+        bodyObj.openrouter_allow_fallbacks = allowFallbacks;
     }
 }
 
 /**
- * Executes background quiet prompt with optional API model override.
+ * Restores extension prompt configuration based on active injection settings and update mode.
+ */
+export function restoreExtensionPromptForCurrentMode(extensionName) {
+    const currentSettings = window.RPGBridge?.latestSettings || extension_settings[extensionName] || {};
+    const context = typeof getContext === 'function' ? getContext() : (window.SillyTavern?.getContext?.() || {});
+    const trackerData = window.RPGBridge?.currentTrackerData || (context?.chatId ? rehydrateFromHistory(context.chat) : null);
+
+    if (!currentSettings.enabled || !trackerData || !Array.isArray(trackerData.characters)) {
+        clearAllExtensionPrompts(extensionName);
+        return;
+    }
+
+    const mode = currentSettings.updateMode || 'merged';
+    const promptConfig = window.RPGBridge?.currentPromptSettings || window.RPGBridge?.getChatPromptSettings?.() || null;
+    applyModularExtensionPrompts(extensionName, trackerData, mode, promptConfig);
+}
+
+/**
+ * Executes quiet prompt with target model override and OpenRouter provider routing.
+ * Intercepts text generation network calls strictly within the execution lifetime.
  */
 export async function executeQuietPromptWithModelOverride(extensionName, prompt, customModel, sendChat = false, clearExtensionPrompt = true) {
     globalThis.rpgTracker_isQuietUpdating = true;
@@ -63,40 +101,51 @@ export async function executeQuietPromptWithModelOverride(extensionName, prompt,
         ? customModel.trim()
         : (settings.useCustomModel && settings.customModel ? settings.customModel.trim() : null);
 
-    const shouldUseCustom = settings.useCustomModel && !!targetModelName;
+    const shouldUseCustom = settings.useCustomModel && Boolean(targetModelName);
 
     if (clearExtensionPrompt) {
-        if (extension_settings.extension_prompts) {
-            delete extension_settings.extension_prompts[`${extensionName}_def`];
-            delete extension_settings.extension_prompts[`${extensionName}_status`];
-        }
-        if (typeof setExtensionPrompt === 'function' && typeof extension_prompt_types !== 'undefined') {
-            try {
-                setExtensionPrompt(`${extensionName}_def`, '', extension_prompt_types.IN_PROMPT, 0, false);
-            } catch (e) {
-                console.warn("[RPG Tracker] Clearing active extension prompt failed:", e);
-            }
-        }
+        clearAllExtensionPrompts(extensionName);
     }
 
     const originalFetch = window.fetch;
-    const originalAjax = (typeof $ !== 'undefined' && $.ajax) ? $.ajax : null;
 
     if (shouldUseCustom && targetModelName) {
         window.fetch = async function (...args) {
             try {
                 let [resource, config] = args;
+
+                const url = typeof resource === 'string'
+                    ? resource
+                    : (resource && typeof resource === 'object' && resource.url ? resource.url : (resource ? resource.toString() : ''));
+
+                // Case 1: Standard fetch(url, options) with JSON string body
                 if (config && config.body && typeof config.body === 'string') {
                     try {
                         const bodyObj = JSON.parse(config.body);
-                        if (bodyObj && typeof bodyObj === 'object') {
-                            if ('model' in bodyObj || resource.toString().includes('completions') || resource.toString().includes('generate')) {
-                                bodyObj.model = targetModelName;
-                                config.body = JSON.stringify(bodyObj);
+                        if (isTargetGenerationRequest(url, bodyObj)) {
+                            applyModelOverride(bodyObj, targetModelName, settings);
+                            config.body = JSON.stringify(bodyObj);
+                        }
+                    } catch {
+                        // Ignore non-JSON request body
+                    }
+                }
+                // Case 2: fetch(Request) where body is encapsulated in Request instance
+                else if (typeof Request !== 'undefined' && resource instanceof Request && (!config || !config.body)) {
+                    try {
+                        const clonedReq = resource.clone();
+                        const reqText = await clonedReq.text();
+                        if (reqText && typeof reqText === 'string') {
+                            const bodyObj = JSON.parse(reqText);
+                            if (isTargetGenerationRequest(url, bodyObj)) {
+                                applyModelOverride(bodyObj, targetModelName, settings);
+                                args[0] = new Request(resource, {
+                                    body: JSON.stringify(bodyObj)
+                                });
                             }
                         }
-                    } catch (parseErr) {
-                        // Non-JSON payload, preserve original body
+                    } catch {
+                        // Ignore uncloneable or non-JSON request instance
                     }
                 }
             } catch (e) {
@@ -104,32 +153,16 @@ export async function executeQuietPromptWithModelOverride(extensionName, prompt,
             }
             return originalFetch.apply(this, args);
         };
-
-        if (originalAjax) {
-            $.ajax = function (options) {
-                if (options && options.data && typeof options.data === 'string') {
-                    try {
-                        const bodyObj = JSON.parse(options.data);
-                        if (bodyObj && typeof bodyObj === 'object') {
-                            if ('model' in bodyObj || (options.url && options.url.includes('generate'))) {
-                                bodyObj.model = targetModelName;
-                                options.data = JSON.stringify(bodyObj);
-                            }
-                        }
-                    } catch (e) { }
-                }
-                return originalAjax.apply(this, arguments);
-            };
-        }
     }
 
     try {
-        return await generateQuietPrompt(prompt, sendChat, false, 'quiet');
+        return await generateQuietPrompt({
+            quietPrompt: prompt,
+            quietToLoud: sendChat,
+            skipWIAN: false
+        });
     } finally {
         window.fetch = originalFetch;
-        if (originalAjax) {
-            $.ajax = originalAjax;
-        }
 
         globalThis.rpgTracker_isQuietUpdating = false;
         if (window.RPGBridge) {
@@ -144,7 +177,12 @@ export async function executeQuietPromptWithModelOverride(extensionName, prompt,
  */
 export function getAvailableModels() {
     try {
-        const context = getContext();
+        const $ = window.jQuery || window.$;
+        if (!$) {
+            return { api: 'default', currentModel: '', models: [] };
+        }
+
+        const context = typeof getContext === 'function' ? getContext() : (window.SillyTavern?.getContext?.() || {});
         const mainApi = ($('#main_api').val() || window.main_api || context?.main_api || '').toLowerCase();
 
         let activeSource = '';

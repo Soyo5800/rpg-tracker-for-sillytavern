@@ -4,6 +4,8 @@ import TrackerPanelToggle from './tracker/TrackerPanelToggle';
 import TrackerPanel from './tracker/TrackerPanel';
 import { ErrorBoundary } from './core/ErrorBoundary';
 import SnapshotModal from './messagetracker/SnapshotModal';
+import HistoryModal from './messagetracker/HistoryModal';
+import VisualStage from './tracker/VisualStage';
 
 function RPGTrackerContainer() {
   const { isEnabled, settings } = useRPG();
@@ -33,7 +35,7 @@ function RPGTrackerContainer() {
     return null;
   }
 
-  // Detect if custom theme mode is active
+  // Detect custom theme mode
   const isCustomTheme = settings.theme === 'custom';
 
   // Apply visual theme variables
@@ -61,24 +63,38 @@ function RPGTrackerContainer() {
 
   return (
     <div style={{ ...globalThemeStyles, pointerEvents: 'none', width: '100%', height: '100%' }}>
-      {/* Isolate floating toggle button */}
+      {/* Floating toggle launcher */}
       <div style={{ pointerEvents: 'auto' }}>
         <ErrorBoundary>
           <TrackerPanelToggle />
         </ErrorBoundary>
       </div>
 
-      {/* Isolate main sidebar panel */}
+        {/* Main sidebar tracker panel */}
       <div style={{ pointerEvents: 'auto' }}>
         <ErrorBoundary>
           <TrackerPanel />
         </ErrorBoundary>
       </div>
 
-      {/* 모달 렌더링 추가 */}
+      {/* Visual stage standee viewport (Full click-through) */}
+      <div style={{ pointerEvents: 'none' }}>
+        <ErrorBoundary>
+          <VisualStage />
+        </ErrorBoundary>
+      </div>
+
+      {/* Single message snapshot modal */}
       <div style={{ pointerEvents: 'auto' }}>
         <ErrorBoundary>
           <SnapshotModal />
+        </ErrorBoundary>
+      </div>
+
+      {/* Chat turn history and snapshot manager modal */}
+      <div style={{ pointerEvents: 'auto' }}>
+        <ErrorBoundary>
+          <HistoryModal />
         </ErrorBoundary>
       </div>
     </div>

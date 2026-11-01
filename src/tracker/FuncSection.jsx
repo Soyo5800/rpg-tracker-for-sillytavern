@@ -3,62 +3,93 @@ import { useRPG } from '../core/RPGControl';
 import styles from './FuncSection.module.css';
 import { DEFAULT_ADD_CHAR_PROMPT, DEFAULT_ADD_PLAYER_CHAR_PROMPT } from '../core/PromptSchema.js';
 import { ToggleSwitch } from '../utils';
+import { PenIcon, GearIcon } from '../Icons';
 
-export default function FuncSection() {
-  const { trackerData, updateTrackerData, settings, updateSettings, isChatConnected } = useRPG();
+export default function FuncSection({ onOpenPromptSettings, onOpenSettings }) {
+  const {
+    trackerData,
+    updateTrackerData,
+    promptSettings,
+    updatePromptSettings,
+    settings,
+    updateSettings,
+    isChatConnected
+  } = useRPG();
+
   const [targetNameInput, setTargetNameInput] = useState('');
-  const [limitInput, setLimitInput] = useState(() => String(settings.contextMessageLimit ?? 4));
+  const [maxBackupInput, setMaxBackupInput] = useState(() => String(settings.maxBackupCount ?? 20));
 
-  const [modelInfo, setModelInfo] = useState({ api: '', currentModel: '', models: [] });
-  const [isManualInputMode, setIsManualInputMode] = useState(false);
+  useEffect(() => {
+    setMaxBackupInput(String(settings.maxBackupCount ?? 20));
+  }, [settings.maxBackupCount]);
 
-  const refreshModels = () => {
-    if (window.RPGBridge && typeof window.RPGBridge.getAvailableModels === 'function') {
-      const info = window.RPGBridge.getAvailableModels();
-      setModelInfo(info);
+  const effectivePrompts = promptSettings || trackerData || {};
+  const addons = effectivePrompts.addons || { weather: false, worldEvents: false, cyoa: false };
+  const isUnlimited = settings.keepAllBackups === true;
 
-      if (settings.customModel && info.models.length > 0 && !info.models.some(m => m.value === settings.customModel)) {
-        setIsManualInputMode(true);
+  const handleMaxBackupChange = (e) => {
+    const rawVal = e.target.value;
+    setMaxBackupInput(rawVal);
+
+    const parsed = parseInt(rawVal, 10);
+    if (!isNaN(parsed) && parsed >= 0) {
+      updateSettings({ maxBackupCount: Math.min(100, parsed) });
+    }
+  };
+
+  const handleMaxBackupBlur = () => {
+    const parsed = parseInt(maxBackupInput, 10);
+    if (isNaN(parsed) || parsed < 0) {
+      setMaxBackupInput('20');
+      updateSettings({ maxBackupCount: 20 });
+    } else if (parsed > 100) {
+      setMaxBackupInput('100');
+      updateSettings({ maxBackupCount: 100 });
+    }
+  };
+
+  const handleCleanOldBackups = async () => {
+    if (!window.RPGBridge || typeof window.RPGBridge.runManualPrune !== 'function') {
+      alert("Manual cleanup API is not available.");
+      return;
+    }
+
+    if (window.confirm("Clean up old snapshots exceeding the retention limit? Pinned turns will remain protected.")) {
+      try {
+        const result = await window.RPGBridge.runManualPrune();
+        const pruned = result?.prunedCount ?? 0;
+        const pinned = result?.pinnedCount ?? 0;
+        alert(`Cleanup complete: Removed ${pruned} old snapshot(s).\n(${pinned} pinned turn(s) safely preserved)`);
+      } catch (err) {
+        console.error("[RPG Tracker] Manual prune error:", err);
+        alert("An error occurred during snapshot cleanup.");
       }
     }
   };
 
-  useEffect(() => {
-    refreshModels();
-  }, []);
-
-  useEffect(() => {
-    setLimitInput(String(settings.contextMessageLimit ?? 4));
-  }, [settings.contextMessageLimit]);
-
-  const addons = trackerData.addons || { weather: false, worldEvents: false, cyoa: false };
-
-  const handleLimitInputChange = (e) => {
-    const rawVal = e.target.value;
-    setLimitInput(rawVal);
-
-    const parsed = parseInt(rawVal, 10);
-    if (!isNaN(parsed) && parsed >= 1) {
-      updateSettings({ contextMessageLimit: parsed });
-    }
-  };
-
-  const handleLimitInputBlur = () => {
-    const parsed = parseInt(limitInput, 10);
-    if (isNaN(parsed) || parsed < 1) {
-      setLimitInput('4');
-      updateSettings({ contextMessageLimit: 4 });
+  const handleOpenTurnHistory = () => {
+    if (window.RPGBridge && typeof window.RPGBridge.openHistoryModal === 'function') {
+      window.RPGBridge.openHistoryModal();
     }
   };
 
   const handleAddonToggle = (key, checked) => {
-    updateTrackerData({
-      ...trackerData,
-      addons: {
-        ...addons,
-        [key]: checked
-      }
-    });
+    const nextAddons = {
+      ...addons,
+      [key]: checked
+    };
+
+    if (typeof updatePromptSettings === 'function') {
+      updatePromptSettings({
+        ...effectivePrompts,
+        addons: nextAddons
+      });
+    } else if (typeof updateTrackerData === 'function') {
+      updateTrackerData({
+        ...trackerData,
+        addons: nextAddons
+      });
+    }
   };
 
   const handleSendGenerationRequest = async (type) => {
@@ -70,8 +101,8 @@ export default function FuncSection() {
     const isPlayer = type === 'player';
     const name = targetNameInput.trim();
     const basePrompt = isPlayer
-      ? (trackerData.addPlayerCharPrompt || DEFAULT_ADD_PLAYER_CHAR_PROMPT)
-      : (trackerData.addCharPrompt || DEFAULT_ADD_CHAR_PROMPT);
+      ? (effectivePrompts.addPlayerCharPrompt || DEFAULT_ADD_PLAYER_CHAR_PROMPT)
+      : (effectivePrompts.addCharPrompt || DEFAULT_ADD_CHAR_PROMPT);
 
     let cardDescription = "";
     try {
@@ -112,95 +143,83 @@ export default function FuncSection() {
   return (
     <div className={styles.container}>
 
-      {/* 1. Tracker API Model */}
-      <div className={styles.sectionBlock}>
-        <div className={styles.sectionHeader}>
-          <span className={styles.sectionTitle}>Tracker API Model</span>
-          <button
-            type="button"
-            className={styles.refreshBtn}
-            onClick={refreshModels}
-            title="Scan connected API models"
-          >
-            ↻
-          </button>
-        </div>
-
-        <div className={styles.toggleRow}>
-          <div className={styles.labelGroup}>
-            <span className={styles.itemLabel}>Use Separate Model</span>
-            <span className={styles.itemSubText}>
-              Use a fast/lite model for status extraction & background updates.
-            </span>
-          </div>
-          <ToggleSwitch
-            checked={settings.useCustomModel || false}
-            onChange={(checked) => updateSettings({ useCustomModel: checked })}
-          />
-        </div>
-
-        {settings.useCustomModel && (
-          <div className={styles.inputGroup} style={{ marginTop: '6px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-              <span className={styles.fieldLabel}>
-                {isManualInputMode ? 'Custom Model ID' : 'Select Model'}
-              </span>
-              <button
-                type="button"
-                className="rpg-btn-sm"
-                onClick={() => setIsManualInputMode(!isManualInputMode)}
-              >
-                {isManualInputMode ? 'Select from List' : 'Custom Model'}
-              </button>
-            </div>
-
-            {isManualInputMode ? (
-              <input
-                type="text"
-                className={styles.textInput}
-                value={settings.customModel || ''}
-                onChange={(e) => updateSettings({ customModel: e.target.value })}
-                placeholder="e.g. gemini-1.5-flash, gpt-4o-mini"
-              />
-            ) : (
-              <select
-                className={`${styles.selectInput} rpg-select-custom`}
-                value={settings.customModel || ''}
-                onChange={(e) => updateSettings({ customModel: e.target.value })}
-              >
-                <option value="">Current Model</option>
-                {modelInfo.models.map((m) => (
-                  <option key={m.value} value={m.value}>
-                    {m.label}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
-        )}
+      {/* 1. Quick Settings Launchers */}
+      <div className={styles.launcherGrid}>
+        <button
+          type="button"
+          className={styles.launcherBtn}
+          onClick={onOpenPromptSettings}
+        >
+          <PenIcon size={14} className={styles.launcherIcon} />
+          <span>Prompt Settings</span>
+        </button>
+        <button
+          type="button"
+          className={styles.launcherBtn}
+          onClick={onOpenSettings}
+        >
+          <GearIcon size={14} className={styles.launcherIcon} />
+          <span>Tracker Settings</span>
+        </button>
       </div>
 
-      {/* 2. Context Limit */}
+      {/* 2. Snapshot Retention & History */}
       <div className={styles.sectionBlock}>
         <div className={styles.sectionHeader}>
-          <span className={styles.sectionTitle}>Context Limit Setting</span>
+          <span className={styles.sectionTitle}>Snapshot Retention & History</span>
         </div>
+
         <div className={styles.rowItem}>
           <div className={styles.labelGroup}>
-            <span className={styles.itemLabel}>Max Recent Messages</span>
+            <span className={styles.itemLabel}>Max Stored Snapshots</span>
             <span className={styles.itemSubText}>
-              Number of recent chat history turns sent to AI during manual status updates or queries.
+              Number of past turns that preserve tracker data before automatic cleanup.
             </span>
           </div>
           <input
             type="number"
-            min="1"
+            min="0"
             max="100"
+            disabled={isUnlimited}
             className={styles.numberInput}
-            value={limitInput}
-            onChange={handleLimitInputChange}
-            onBlur={handleLimitInputBlur}
+            value={maxBackupInput}
+            onChange={handleMaxBackupChange}
+            onBlur={handleMaxBackupBlur}
           />
+        </div>
+
+        <div className={styles.toggleRow}>
+          <div className={styles.labelGroup}>
+            <span className={styles.itemLabel}>Unlimited Storage</span>
+            <span className={styles.itemSubText}>
+              Keep all historical snapshots indefinitely without auto-pruning.
+            </span>
+          </div>
+          <ToggleSwitch
+            checked={isUnlimited}
+            onChange={(checked) => updateSettings({ keepAllBackups: checked })}
+          />
+        </div>
+
+        <div className={styles.buttonGroup}>
+          <button
+            type="button"
+            className="rpg-btn"
+            style={{ flex: 1, padding: '7px 8px' }}
+            onClick={handleOpenTurnHistory}
+            title="Open Tracker History Manager"
+          >
+            Tracker History
+          </button>
+          <button
+            type="button"
+            className={`rpg-btn ${styles.dangerBtn}`}
+            style={{ flex: 1, padding: '7px 8px' }}
+            onClick={handleCleanOldBackups}
+            title="Clean up old unpinned backups exceeding the retention limit"
+          >
+            Clean Old Backups
+          </button>
         </div>
       </div>
 

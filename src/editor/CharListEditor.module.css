@@ -1,3 +1,4 @@
+/* Preset Management Toolbar */
 .presetBar {
   display: flex;
   align-items: center;
@@ -7,8 +8,9 @@
   border-bottom: 1px solid var(--rpg-border);
 }
 
-.presetInputContainer {
+.presetDropdownContainer {
   flex: 1;
+  position: relative;
 }
 
 .presetInputWrapper {
@@ -100,6 +102,13 @@
   opacity: 0.5;
 }
 
+/* Character List Tab Items */
+.charListContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .charItem {
   display: flex;
   align-items: center;
@@ -146,4 +155,50 @@
   min-width: 36px;
   display: inline-block;
   margin-left: 6px;
+}
+
+/* Field Definitions Tab Layout (used by FieldDefinitionsTab.jsx) */
+.definitionsContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.defTopBar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 4px;
+}
+
+.defSectionTitle {
+  font-size: 13.5px;
+  font-weight: bold;
+  color: var(--rpg-highlight);
+}
+
+.defInfoNotice {
+  font-size: 11px;
+  opacity: 0.7;
+  margin: 0;
+  color: var(--rpg-text);
+  line-height: 1.4;
+}
+
+.defGroup {
+  background: rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--rpg-border);
+  border-radius: 6px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.defGroupTitle {
+  margin: 0;
+  font-size: 12px;
+  color: var(--rpg-highlight);
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.1);
+  padding-bottom: 4px;
 }

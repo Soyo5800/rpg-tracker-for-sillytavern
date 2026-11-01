@@ -1,0 +1,466 @@
+.configViewContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+/* Block 1: Input and Stacked Buttons */
+.inputSectionBox {
+  background: var(--rpg-accent);
+  border: 1px solid var(--rpg-border);
+  border-radius: 6px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.sectionLabel {
+  font-size: 11.5px;
+  font-weight: bold;
+  color: var(--rpg-highlight);
+}
+
+.assetConfigRow {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.assetInputsCol {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.assetInput {
+  width: 100%;
+  height: 28px;
+  background: var(--rpg-bg);
+  border: 1px solid var(--rpg-border);
+  border-radius: 4px;
+  color: var(--rpg-text);
+  font-size: 11.5px;
+  padding: 4px 8px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.assetInput:focus {
+  border-color: var(--rpg-highlight);
+}
+
+.typeSelect {
+  width: 100%;
+  height: 28px;
+}
+
+.assetButtonsCol {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 90px;
+  flex-shrink: 0;
+}
+
+.stackedActionBtn {
+  width: 100% !important;
+  height: 28px !important;
+  font-size: 11px !important;
+  padding: 0 6px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 5px !important;
+  box-sizing: border-box !important;
+}
+
+.statusNoticeText {
+  font-size: 10.5px;
+  color: var(--rpg-text);
+  opacity: 0.75;
+  margin-top: 2px;
+}
+
+/* Block 2: Unified Configuration Card (Tracking + Active + List) */
+.unifiedConfigCard {
+  background: var(--rpg-accent);
+  border: 1px solid var(--rpg-border);
+  border-radius: 6px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.toggleRowItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.labelGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.highlightTitle {
+  font-size: 12.5px;
+  font-weight: bold;
+  color: var(--rpg-highlight);
+}
+
+.subText {
+  font-size: 10.5px;
+  color: var(--rpg-text);
+  opacity: 0.6;
+}
+
+.innerDivider {
+  height: 1px;
+  background: var(--rpg-border);
+  opacity: 0.4;
+  width: 100%;
+  margin: 1px 0;
+}
+
+.activeSpriteIndicatorRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Identical color and weight as Sprite List Title */
+.indicatorLabel {
+  font-size: 11.5px;
+  font-weight: bold;
+  color: var(--rpg-text);
+}
+
+.activeSpriteBadge {
+  background: var(--rpg-bg);
+  border: 1px solid var(--rpg-highlight);
+  color: var(--rpg-highlight);
+  font-size: 11px;
+  font-weight: bold;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+/* Sprite List Headers (Fixed Position inside Card) */
+.gridHeaderRow {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.gridHeaderTopBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.gridListTitle {
+  font-size: 11.5px;
+  font-weight: bold;
+  color: var(--rpg-text);
+}
+
+.bulkCheckButtons {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.gridHelperNotice {
+  font-size: 10px;
+  color: var(--rpg-text);
+  opacity: 0.55;
+  line-height: 1.3;
+}
+
+/* Scrollable Container just for the Sprite Grid */
+.spriteScrollArea {
+  max-height: 260px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
+  margin-top: 4px;
+  border-radius: 4px;
+}
+
+.emptyGridNotice {
+  font-size: 11px;
+  color: var(--rpg-text);
+  opacity: 0.45;
+  text-align: center;
+  padding: 24px 0;
+}
+
+/* 4-Column Grid */
+.spriteGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 600px) {
+  .spriteGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.spriteTile {
+  background: var(--rpg-bg);
+  border: 1px solid var(--rpg-border);
+  border-radius: 6px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  user-select: none;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.spriteTile:hover {
+  border-color: var(--rpg-highlight);
+}
+
+.spriteTile.currentActiveTile {
+  border-color: var(--rpg-highlight);
+  box-shadow: 0 0 6px var(--rpg-highlight);
+}
+
+/* Top Header of Tile */
+.tileHeader {
+  height: 24px;
+  padding: 0 6px;
+  background: var(--rpg-accent);
+  border-bottom: 1px solid var(--rpg-border);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.tileCheckbox {
+  cursor: pointer;
+  margin: 0;
+  flex-shrink: 0;
+}
+
+.spriteLabelText {
+  font-size: 10.5px;
+  font-weight: bold;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--rpg-text);
+  flex: 1;
+}
+
+/* Bottom Thumbnail: Mathematically guaranteed 1:1 square */
+.thumbnailWrapper {
+  width: 100%;
+  padding-top: 100%;
+  position: relative;
+  background: rgba(0, 0, 0, 0.25);
+  display: block;
+  overflow: hidden;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.spriteThumbnail {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  object-position: top center;
+  pointer-events: none;
+  transition: transform 0.2s ease;
+}
+
+.spriteTile:hover .spriteThumbnail {
+  transform: scale(1.06);
+}
+
+/* Selected Badge */
+.selectedBadge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: var(--rpg-highlight);
+  color: var(--rpg-bg);
+  font-size: 8.5px;
+  font-weight: bold;
+  padding: 2px 4px;
+  line-height: 1;
+  border-radius: 3px;
+  z-index: 2;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+}
+
+/* Block 3: Visual Stage Standee */
+.standeeSectionBox {
+  background: var(--rpg-accent);
+  border: 1px solid var(--rpg-border);
+  border-radius: 6px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.standeeControlsContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.standeeSliderRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.standeeControlLabel {
+  font-size: 11px;
+  width: 55px;
+  color: var(--rpg-text);
+  opacity: 0.7;
+}
+
+.sliderInput {
+  flex: 1;
+}
+
+.standeeValueBadge {
+  font-size: 11px;
+  width: 38px;
+  text-align: right;
+  font-family: monospace;
+  color: var(--rpg-text);
+  opacity: 0.85;
+}
+
+/* Crop View Mode */
+.cropperViewContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 0;
+}
+
+.cropInstruction {
+  font-size: 11.5px;
+  color: var(--rpg-text);
+  opacity: 0.75;
+  text-align: center;
+}
+
+.cropViewportFrame {
+  width: 260px;
+  height: 260px;
+  border: 2px dashed var(--rpg-highlight);
+  border-radius: 10px;
+  position: relative;
+  overflow: hidden;
+  cursor: grab;
+  background: rgba(0, 0, 0, 0.4);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  user-select: none;
+}
+
+.cropViewportFrame:active {
+  cursor: grabbing;
+}
+
+.cropTargetImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+.cropCenterGuideCircle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 180px;
+  height: 180px;
+  transform: translate(-50%, -50%);
+  border: 1px dashed var(--rpg-border);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.cropControlsBar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 320px;
+}
+
+.zoomControlRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.controlLabel {
+  font-size: 11px;
+  color: var(--rpg-text);
+  opacity: 0.7;
+}
+
+.zoomSlider {
+  flex: 1;
+}
+
+.zoomValueLabel {
+  font-size: 11px;
+  font-family: monospace;
+  width: 38px;
+  text-align: right;
+  color: var(--rpg-text);
+}
+
+.cropPresetButtons {
+  display: flex;
+  gap: 8px;
+}
+
+.footerHelpText {
+  font-size: 10.5px;
+  color: var(--rpg-text);
+  opacity: 0.5;
+}

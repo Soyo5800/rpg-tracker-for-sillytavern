@@ -4,7 +4,8 @@
   gap: 8px;
   height: 100%;
   overflow-y: auto;
-  padding-right: 6px;
+  padding: 0 0 10px 0;
+  box-sizing: border-box;
 }
 
 .topActionBar {
@@ -89,6 +90,38 @@
   width: 100%;
 }
 
+.avatarControlWrapper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.cameraBtn {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--rpg-border);
+  color: var(--rpg-text);
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  flex-shrink: 0;
+  opacity: 0.7;
+  transition: all 0.15s ease;
+}
+
+.cameraBtn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--rpg-highlight);
+  color: var(--rpg-highlight);
+  opacity: 1;
+}
+
 .avatarContainer {
   width: 28px;
   height: 28px;
@@ -100,7 +133,6 @@
   flex-shrink: 0;
   cursor: pointer;
   transition: all 0.2s ease;
-  margin-left: auto;
 }
 
 .avatarContainer:hover {
@@ -108,36 +140,16 @@
   box-shadow: 0 0 6px rgba(74, 158, 255, 0.35);
 }
 
-.avatarContainer:hover::after {
-  content: '✂';
-  position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0, 0, 0, 0.65);
-  color: var(--rpg-highlight);
-  font-size: 13px;
-  font-weight: bold;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.readOnlyAvatar {
-  cursor: default !important;
-}
-
-.readOnlyAvatar:hover {
-  border-color: var(--rpg-border) !important;
-  box-shadow: none !important;
-}
-
-.readOnlyAvatar:hover::after {
-  display: none !important;
+.avatarContainer.avatarActive {
+  border-color: var(--rpg-highlight);
+  box-shadow: 0 0 8px var(--rpg-highlight);
 }
 
 .avatarImg {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transition: transform 0.2s ease;
 }
 
 .avatarFallback {
@@ -147,7 +159,7 @@
   align-items: center;
   justify-content: center;
   color: var(--rpg-text);
-  opacity: 0.8;
+  opacity: 0.6;
 }
 
 .statusComponentContainer {
@@ -160,6 +172,7 @@
   margin-bottom: 2px;
 }
 
+/* Consumable & Stacking Gauge Grid */
 .gaugeGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -199,31 +212,28 @@
 }
 
 .lockIcon {
-  cursor: pointer;
-  opacity: 0.4;
   margin-right: 4px;
-  flex-shrink: 0;
-  transition: opacity 0.15s;
 }
 
 .lockIconActive {
-  opacity: 1;
+  color: var(--rpg-highlight);
 }
 
 .smallNumberInput {
   width: 32px;
+  min-height: 18px;
+  height: 18px;
+  line-height: 16px;
   text-align: center;
   padding: 0;
   margin: 0;
   font-size: 11px;
-  min-height: 18px;
-  height: 18px;
-  line-height: 16px;
   background: rgba(0, 0, 0, 0.2);
   border: 1px solid var(--rpg-border);
   border-radius: 4px;
   color: var(--rpg-text);
   outline: none;
+  box-sizing: border-box;
 }
 
 .smallNumberInput:focus {
@@ -260,6 +270,7 @@
   transition: width 0.3s ease-out;
 }
 
+/* Integer Block Cards */
 .integerRowGrid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -332,6 +343,7 @@
   border-radius: 3px;
 }
 
+/* Text Fields Stack */
 .textStack {
   display: flex;
   flex-direction: column;
@@ -385,6 +397,7 @@
   overflow-y: hidden;
   display: block;
   transition: border-color 0.15s ease;
+  box-sizing: border-box;
 }
 
 .textBlockInput:focus {
@@ -399,13 +412,4 @@
 @keyframes flashDanger {
   from { opacity: 0.5; }
   to { opacity: 1; }
-}
-
-.cropperCanvasWrapper {
-  width: 100%;
-  max-height: 420px;
-  overflow: hidden;
-  display: flex;
-  justify-content: center;
-  align-items: center;
 }

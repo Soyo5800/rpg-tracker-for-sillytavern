@@ -1,12 +1,20 @@
-// src/messagetracker/SnapshotButtonManager.js
-import { rehydrateFromHistoryAsync } from "../core/JSONTracker.js";
+import { rehydrateFromHistoryAsync, resolveActiveSwipeId } from "../core/JSONTracker.js";
+import { getMessageTrackerPayload } from "./SnapshotRenderer.js";
+import { resolveElementMessageIndex } from "./MessageCardRenderer.js";
 
 export function injectSnapshotButtons(getContext) {
-    $('#chat .mes').each(function () {
+    const $ = window.$;
+    if (!$) return;
+
+    const $mesElements = $('#chat .mes').length ? $('#chat .mes') : $('#chat .mes_block');
+    $mesElements.each(function () {
         const $mes = $(this);
-        const mesId = $mes.attr('mesid');
-        const $btnContainer = $mes.find('.mes_buttons');
-        
+        let $btnContainer = $mes.find('.mes_buttons');
+        if ($btnContainer.length === 0) {
+            $btnContainer = $mes.find('.extraMesButtons');
+        }
+
+        if ($btnContainer.length === 0) return;
         if ($btnContainer.find('.rpg-snapshot-btn').length > 0) return;
 
         const brandIconSvg = `
@@ -29,62 +37,54 @@ export function injectSnapshotButtons(getContext) {
                 ${brandIconSvg}
             </div>
         `);
-        
-        $btn.on('click', async () => {
+
+        $btn.on('click', async function (e) {
+            e.stopPropagation();
+
             const context = getContext();
             if (!context || !Array.isArray(context.chat)) return;
 
-            const targetIndex = context.chat.findIndex(m => String(m.mesId) === String(mesId) || String(context.chat.indexOf(m)) === String(mesId));
-            if (targetIndex === -1) return;
+            const $currentMes = $(this).closest('.mes').length ? $(this).closest('.mes') : $(this).closest('.mes_block');
+            const targetIndex = resolveElementMessageIndex($currentMes, context.chat);
+
+            if (targetIndex === -1 || !context.chat[targetIndex]) return;
 
             const msg = context.chat[targetIndex];
-            
+
+            if (!msg.extra) msg.extra = {};
+            if (!msg.extra.rpgTurnId) {
+                msg.extra.rpgTurnId = `turn_${msg.send_date || Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+            }
+            msg._rpgTurnId = msg.extra.rpgTurnId;
+
+            const sendDate = msg.send_date || null;
+            const turnId = msg.extra.rpgTurnId;
+
             let histData = null;
             let existingPayload = null;
 
             if (msg) {
-                let swipeId = msg.swipe_id || 0;
-                if (msg.swipes && msg.swipes.length > 0 && typeof msg.mes === 'string') {
-                    const foundIdx = msg.swipes.findIndex(s => s === msg.mes);
-                    if (foundIdx !== -1) swipeId = foundIdx;
-                }
+                const swipeId = resolveActiveSwipeId(msg);
 
-                // 1. Direct metadata lookup inside swipe_info
                 if (msg.swipe_info && msg.swipe_info[swipeId]?.extra?.rpgTrackerData) {
                     histData = msg.swipe_info[swipeId].extra.rpgTrackerData;
+                } else if (swipeId === 0 && msg.extra?.rpgTrackerData) {
+                    histData = msg.extra.rpgTrackerData;
                 }
 
-                // 2. Fallback: If metadata was purged, reconstruct state up to this turn
                 if (!histData) {
                     const subChatHistory = context.chat.slice(0, targetIndex + 1);
                     histData = await rehydrateFromHistoryAsync(subChatHistory);
                 }
 
-                // Extract existing <rpgmt> tag payload from message text
-                const rpgmtRegex = /(?:<|&lt;)rpgmt(?:>|&gt;)([\s\S]*?)(?:<|&lt;)\/rpgmt(?:>|&gt;)/i;
-                const match = msg.mes.match(rpgmtRegex);
-                if (match && match[1]) {
-                    try {
-                        const cleanJson = match[1]
-                            .replace(/<br\s*\/?>/gi, '\n')
-                            .replace(/&quot;/g, '"')
-                            .replace(/&apos;/g, "'")
-                            .replace(/&#x27;/g, "'")
-                            .replace(/&lt;/g, '<')
-                            .replace(/&gt;/g, '>')
-                            .replace(/&amp;/g, '&');
-                        existingPayload = JSON.parse(cleanJson);
-                    } catch (e) {
-                        console.warn("[RPG Tracker] Failed to parse existing rpgmt tag", e);
-                    }
-                }
+                existingPayload = getMessageTrackerPayload(msg);
             }
 
             if (window.RPGBridge && typeof window.RPGBridge.openSnapshotModal === 'function') {
-                window.RPGBridge.openSnapshotModal(mesId, histData, existingPayload);
+                window.RPGBridge.openSnapshotModal(targetIndex, histData, existingPayload, sendDate, turnId);
             }
         });
-        
+
         $btnContainer.prepend($btn);
     });
 }

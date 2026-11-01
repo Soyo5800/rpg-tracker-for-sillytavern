@@ -1,17 +1,22 @@
-// src/Icons.jsx
 import React from 'react';
 
-// [1] 자물쇠 아이콘 (잠금 여부에 따라 다른 패스 노출)
-export function LockIcon({ isLocked, onClick, className = '', size = 14 }) {
+// [1] Lock Icon
+export function LockIcon({ isLocked, onClick, className = '', size = 14, title, style, ...rest }) {
+  const activeClass = isLocked ? 'active' : '';
+  const combinedClassName = `rpg-lock-icon ${activeClass} ${className}`.trim();
+
   return (
     <svg
       onClick={onClick}
       viewBox="0 0 24 24"
       width={size}
       height={size}
-      className={className}
-      style={{ cursor: onClick ? 'pointer' : 'default', display: 'inline-block', flexShrink: 0 }}
+      className={combinedClassName}
+      title={title}
+      style={{ cursor: onClick ? 'pointer' : 'default', display: 'inline-block', flexShrink: 0, ...style }}
+      {...rest}
     >
+      {title && <title>{title}</title>}
       {isLocked ? (
         <path fill="currentColor" d="M12 17c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm6-9h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zM8.9 6c0-1.71 1.39-3.1 3.1-3.1s3.1 1.39 3.1 3.1v2H8.9V6z" />
       ) : (
@@ -21,8 +26,8 @@ export function LockIcon({ isLocked, onClick, className = '', size = 14 }) {
   );
 }
 
-// [2] 설정 톱니바퀴 아이콘
-export function GearIcon({ onClick, className = '', size = 16 }) {
+// [2] Settings Gear Icon
+export function GearIcon({ onClick, className = '', size = 16, title, style, ...rest }) {
   return (
     <svg
       onClick={onClick}
@@ -35,16 +40,19 @@ export function GearIcon({ onClick, className = '', size = 16 }) {
       strokeLinecap="round"
       strokeLinejoin="round"
       className={className}
-      style={{ cursor: onClick ? 'pointer' : 'default', display: 'inline-block', flexShrink: 0 }}
+      title={title}
+      style={{ cursor: onClick ? 'pointer' : 'default', display: 'inline-block', flexShrink: 0, ...style }}
+      {...rest}
     >
+      {title && <title>{title}</title>}
       <circle cx="12" cy="12" r="3" />
       <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
     </svg>
   );
 }
 
-// [3] 체크 아이콘 (퀘스트 완료여부 상태 제어)
-export function CheckIcon({ checked, onClick, className = '', size = 16 }) {
+// [3] Checkbox Circle Icon
+export function CheckIcon({ checked, onClick, className = '', size = 16, title, style, ...rest }) {
   return (
     <svg
       onClick={onClick}
@@ -52,8 +60,11 @@ export function CheckIcon({ checked, onClick, className = '', size = 16 }) {
       width={size}
       height={size}
       className={className}
-      style={{ cursor: onClick ? 'pointer' : 'default', display: 'inline-block', flexShrink: 0, transition: 'color 0.15s, opacity 0.15s' }}
+      title={title}
+      style={{ cursor: onClick ? 'pointer' : 'default', display: 'inline-block', flexShrink: 0, transition: 'color 0.15s, opacity 0.15s', ...style }}
+      {...rest}
     >
+      {title && <title>{title}</title>}
       {checked ? (
         <path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
       ) : (
@@ -63,7 +74,7 @@ export function CheckIcon({ checked, onClick, className = '', size = 16 }) {
   );
 }
 
-// [4] 프리셋 저장 아이콘 (디스켓)
+// [4] Preset Save Icon
 export function PresetSaveIcon({ className = '', size = 16 }) {
   return (
     <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -74,7 +85,7 @@ export function PresetSaveIcon({ className = '', size = 16 }) {
   );
 }
 
-// [5] 프리셋 불러오기 아이콘 (수신 트레이)
+// [5] Preset Load Icon
 export function PresetLoadIcon({ className = '', size = 16 }) {
   return (
     <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -85,7 +96,7 @@ export function PresetLoadIcon({ className = '', size = 16 }) {
   );
 }
 
-// [6] 프로필 탭 아이콘 (전신 사람형태)
+// [6] Profile Tab Icon
 export function ProfileTabIcon({ className = '', size = 18 }) {
   return (
     <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor" className={className}>
@@ -94,7 +105,7 @@ export function ProfileTabIcon({ className = '', size = 18 }) {
   );
 }
 
-// [7] 관계(Relations) 하트 아이콘
+// [7] Relations Tab Icon
 export function RelationsTabIcon({ className = '', size = 18 }) {
   return (
     <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor" className={className}>
@@ -103,7 +114,7 @@ export function RelationsTabIcon({ className = '', size = 18 }) {
   );
 }
 
-// [8] 인벤토리 가방 아이콘
+// [8] Inventory Tab Icon
 export function InventoryTabIcon({ className = '', size = 18 }) {
   return (
     <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor" className={className}>
@@ -112,7 +123,7 @@ export function InventoryTabIcon({ className = '', size = 18 }) {
   );
 }
 
-// [9] 퀘스트 양장본 문서 아이콘
+// [9] Quests Tab Icon
 export function QuestsTabIcon({ className = '', size = 18 }) {
   return (
     <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor" className={className}>
@@ -121,12 +132,11 @@ export function QuestsTabIcon({ className = '', size = 18 }) {
   );
 }
 
-// [10] 패널 사이드바 닫기 화살표 아이콘
+// [10] Panel Collapse Arrow Icon
 export function CollapseArrowIcon({ className = '', size = 18, direction = 'left' }) {
-  // direction 값에 따라 왼쪽(left)과 오른쪽(right) 화살표 SVG 경로를 분기 처리
   const path = direction === 'right'
-    ? "M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"      // 오른쪽 화살표
-    : "M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z";     // 왼쪽 화살표
+    ? "M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"
+    : "M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z";
   return (
     <svg viewBox="0 0 24 24" width={size} height={size} className={className} fill="currentColor">
       <path d={path} />
@@ -134,7 +144,7 @@ export function CollapseArrowIcon({ className = '', size = 18, direction = 'left
   );
 }
 
-// [11] 트래커 메인 신분증 아이콘
+// [11] Main Brand Badge Icon
 export function BrandIcon({ className = '', size = 18 }) {
   return (
     <svg viewBox="0 0 24 24" width={size} height={size} className={className} fill="currentColor">
@@ -148,7 +158,7 @@ export function BrandIcon({ className = '', size = 18 }) {
   );
 }
 
-// [12] 단독 프롬프트 에디터 연결 펜 아이콘
+// [12] Prompt Editor Pen Icon
 export function PenIcon({ className = '', size = 15 }) {
   return (
     <svg viewBox="0 0 24 24" width={size} height={size} className={className} fill="currentColor">
@@ -157,7 +167,7 @@ export function PenIcon({ className = '', size = 15 }) {
   );
 }
 
-// [13] 우클릭용 십자 드래그 핸들 아이콘
+// [13] Move/Drag Handle Cross Arrows Icon
 export function MoveArrowsIcon({ className = '', size = 13 }) {
   return (
     <svg viewBox="0 0 24 24" width={size} height={size} className={className} fill="currentColor">
@@ -166,7 +176,7 @@ export function MoveArrowsIcon({ className = '', size = 13 }) {
   );
 }
 
-// [14] 설정 원본 초기화용 시계방향 회전 화살표 아이콘
+// [14] Reset Position Arrow Icon
 export function ResetArrowIcon({ className = '', size = 13 }) {
   return (
     <svg viewBox="0 0 24 24" width={size} height={size} className={className} fill="currentColor">
@@ -175,6 +185,7 @@ export function ResetArrowIcon({ className = '', size = 13 }) {
   );
 }
 
+// [15] Manual Update Play Icon
 export function PlayIcon({ className = '', size = 14 }) {
   return (
     <svg
@@ -186,6 +197,51 @@ export function PlayIcon({ className = '', size = 14 }) {
       style={{ display: 'inline-block', flexShrink: 0 }}
     >
       <path d="M8 5v14l11-7z" />
+    </svg>
+  );
+}
+
+// [16] Scissor Crop Icon
+export function ScissorIcon({ className = '', size = 14 }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      style={{ display: 'inline-block', flexShrink: 0 }}
+    >
+      <circle cx="6" cy="6" r="3" />
+      <circle cx="6" cy="18" r="3" />
+      <line x1="20" y1="4" x2="8.12" y2="15.88" />
+      <line x1="14.47" y1="14.48" x2="20" y2="20" />
+      <line x1="8.12" y1="8.12" x2="12" y2="12" />
+    </svg>
+  );
+}
+
+// [17] Camera Asset Manager Icon
+export function CameraIcon({ className = '', size = 14 }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      style={{ display: 'inline-block', flexShrink: 0 }}
+    >
+      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+      <circle cx="12" cy="13" r="4" />
     </svg>
   );
 }

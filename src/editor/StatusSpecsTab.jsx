@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import styles from './StatusEditor.module.css';
 import { AccordionArrow, SortButtons, ToggleSwitch } from '../utils';
 
-// Status 필드 세부 속성 설정 폼 (PromptEditor와 공용으로 사용)
+// Status field configuration form (shared between StatusEditor and PromptEditor)
 export function StatusSpecConfig({
   type = 'consumable',
   min = 0,
@@ -74,7 +74,8 @@ export default function StatusSpecsTab({
   expandedIds,
   setExpandedIds,
   updateSchemaField,
-  handleUpdateNestedField
+  handleUpdateNestedField,
+  onRenameField
 }) {
   const [gaugePreset, setGaugePreset] = useState('0~100');
   const [gaugeMin, setGaugeMin] = useState(0);
@@ -136,17 +137,41 @@ export default function StatusSpecsTab({
     const cleanId = trimmed.replace(/[^\p{L}\p{N}_]/gu, '_').replace(/_+/g, '_').replace(/^_+|_+$/g, '');
     const newId = cleanId || `NewField_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
-    setLocalCharacters(prevChars => prevChars.map(c => {
-      if (c.id !== charId) return c;
+    if (id === newId) {
+      setLocalCharacters(prevChars => prevChars.map(c => {
+        if (c.id !== charId) return c;
+        return {
+          ...c,
+          statusSchema: (c.statusSchema || []).map(s => s.id === id ? { ...s, name: trimmed } : s)
+        };
+      }));
+      return;
+    }
 
-      const otherExists = (c.statusSchema || []).some(s => s.id === newId && s.id !== id);
-      if (otherExists) {
-        alert(`The status field name "${trimmed}" already exists.`);
+    let isConflict = false;
+    for (const c of localCharacters) {
+      if (c.id === charId) {
+        if ((c.statusSchema || []).some(s => s.id === newId && s.id !== id)) {
+          isConflict = true;
+          break;
+        }
+      }
+    }
+
+    if (isConflict) {
+      alert(`The status field name "${trimmed}" already exists.`);
+      setLocalCharacters(prevChars => prevChars.map(c => {
+        if (c.id !== charId) return c;
         return {
           ...c,
           statusSchema: (c.statusSchema || []).map(s => s.id === id ? { ...s, name: id } : s)
         };
-      }
+      }));
+      return;
+    }
+
+    setLocalCharacters(prevChars => prevChars.map(c => {
+      if (c.id !== charId) return c;
 
       const nextSchema = (c.statusSchema || []).map(s => s.id === id ? { ...s, id: newId, name: trimmed } : s);
       const nextStatus = {};
@@ -158,16 +183,18 @@ export default function StatusSpecsTab({
       return { ...c, statusSchema: nextSchema, status: nextStatus };
     }));
 
-    if (id !== newId) {
-      setExpandedIds(prev => {
-        const next = { ...prev };
-        if (next[id] !== undefined) {
-          next[newId] = next[id];
-          delete next[id];
-        }
-        return next;
-      });
+    if (typeof onRenameField === 'function') {
+      onRenameField('status', id, newId);
     }
+
+    setExpandedIds(prev => {
+      const next = { ...prev };
+      if (next[id] !== undefined) {
+        next[newId] = next[id];
+        delete next[id];
+      }
+      return next;
+    });
   };
 
   const removeField = (id) => {
@@ -213,7 +240,7 @@ export default function StatusSpecsTab({
   };
 
   const groupedStatus = getGroupedFields(targetSchema);
-  const profileKeys = targetChar.profile ? Object.keys(targetChar.profile) : ['race', 'height', 'hair', 'eye', 'personality'];
+  const profileKeys = (targetChar.profile && typeof targetChar.profile === 'object') ? Object.keys(targetChar.profile) : [];
 
   return (
     <div className={styles.statEditorDetail}>
@@ -262,7 +289,7 @@ export default function StatusSpecsTab({
         </div>
 
         {groupedStatus.gauge.length === 0 ? (
-          <p className={styles.emptySectionText}>No gauge fields defined.</p>
+          <p className="rpg-empty-text">No gauge fields defined.</p>
         ) : (
           groupedStatus.gauge.map((item, fIdx) => (
             <div key={item.id} className={`${styles.schemaItem} ${expandedIds[item.id] ? styles.itemExpanded : ''}`}>
@@ -365,7 +392,7 @@ export default function StatusSpecsTab({
         </div>
 
         {groupedStatus.integer.length === 0 ? (
-          <p className={styles.emptySectionText}>No integer fields defined.</p>
+          <p className="rpg-empty-text">No integer fields defined.</p>
         ) : (
           groupedStatus.integer.map((item, fIdx) => (
             <div key={item.id} className={`${styles.schemaItem} ${expandedIds[item.id] ? styles.itemExpanded : ''}`}>
@@ -436,7 +463,7 @@ export default function StatusSpecsTab({
         </div>
 
         {groupedStatus.text.length === 0 ? (
-          <p className={styles.emptySectionText}>No custom text fields defined.</p>
+          <p className="rpg-empty-text">No custom text fields defined.</p>
         ) : (
           groupedStatus.text.map((item, fIdx) => (
             <div key={item.id} className={styles.schemaItem}>
@@ -504,7 +531,7 @@ export default function StatusSpecsTab({
 
         <div className={styles.appearanceSection}>
           {profileKeys.length === 0 ? (
-            <p className={styles.emptySectionText}>No profile fields defined.</p>
+            <p className="rpg-empty-text">No profile fields defined.</p>
           ) : (
             profileKeys.map((key, fIdx) => (
               <div key={key} className={styles.schemaItem}>
@@ -543,7 +570,12 @@ export default function StatusSpecsTab({
                               newInjects[k] = pInjects[k];
                             }
                           });
+
                           setLocalCharacters(localCharacters.map(c => c.id === charId ? { ...c, profile: newProf, profileLocks: newLocks, profileInjects: newInjects } : c));
+
+                          if (typeof onRenameField === 'function') {
+                            onRenameField('profile', key, newKey);
+                          }
                         }
                       }}
                       className={styles.nameInput}

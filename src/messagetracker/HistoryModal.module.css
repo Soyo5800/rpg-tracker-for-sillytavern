@@ -1,0 +1,184 @@
+.subHeaderStats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  background: rgba(0, 0, 0, 0.2);
+  border-bottom: 1px solid var(--rpg-border);
+  font-size: 11.5px;
+  color: var(--rpg-text);
+  opacity: 0.85;
+}
+
+.subHeaderStats strong {
+  color: var(--rpg-highlight);
+}
+
+.statsDivider {
+  opacity: 0.3;
+}
+
+.historyList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.turnCard {
+  background: rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--rpg-border);
+  border-radius: 6px;
+  overflow: hidden;
+  transition: border-color 0.15s ease;
+}
+
+.turnCard:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.turnHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  background: rgba(0, 0, 0, 0.1);
+  gap: 8px;
+}
+
+.turnHeaderLeft {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.turnBadge {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--rpg-highlight);
+  font-size: 10px;
+  font-weight: bold;
+  padding: 2px 6px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.senderBadge {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--rpg-text);
+  font-size: 10px;
+  font-weight: bold;
+  padding: 2px 6px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.previewText {
+  font-size: 11.5px;
+  color: var(--rpg-text);
+  opacity: 0.7;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+.turnHeaderRight {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.turnActionBtn {
+  background: transparent;
+  border: none;
+  color: var(--rpg-text);
+  opacity: 0.6;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: all 0.15s ease;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.turnActionBtn:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--rpg-highlight);
+}
+
+.turnActionBtn.pinnedActive {
+  opacity: 1;
+  color: var(--rpg-highlight);
+}
+
+.turnActionBtn.deleteAction:hover {
+  color: #e74c3c;
+  background: rgba(231, 76, 60, 0.12);
+}
+
+.turnBody {
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.18);
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.turnMetaBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.turnSummaryText {
+  font-size: 11px;
+  color: var(--rpg-text);
+  opacity: 0.75;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.jsonEditor {
+  width: 100%;
+  height: 220px;
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--rpg-text);
+  border: 1px solid var(--rpg-border);
+  border-radius: 4px;
+  padding: 8px 10px;
+  font-family: monospace;
+  font-size: 11px;
+  line-height: 1.4;
+  resize: vertical;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.jsonEditorWritable {
+  background: rgba(0, 0, 0, 0.4) !important;
+  color: var(--rpg-text) !important;
+  border-color: var(--rpg-highlight) !important;
+  box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.4);
+}
+
+.editActionsRow {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 2px;
+}

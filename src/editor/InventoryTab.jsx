@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import styles from './StatusEditor.module.css';
 import { AutoGrowingTextArea, SortButtons, AccordionArrow } from '../utils';
 
@@ -36,6 +36,381 @@ function DragHandle({ type, size = 16, ...props }) {
   );
 }
 
+function EquipItemEditor({
+  item,
+  slotKey,
+  onCommit,
+  onDelete,
+  onDragStart,
+  onDragEnd
+}) {
+  const [name, setName] = useState(item?.name || '');
+  const [id, setId] = useState(item?.id || '');
+  const [quantity, setQuantity] = useState(item?.quantity !== undefined ? item.quantity : 1);
+  const [assetAmount, setAssetAmount] = useState(item?.assetValue?.amount !== undefined ? item.assetValue.amount : 0);
+  const [assetCurrency, setAssetCurrency] = useState(item?.assetValue?.currencyName || 'Gold');
+  const [desc, setDesc] = useState(item?.desc || '');
+
+  useEffect(() => {
+    setName(item?.name || '');
+    setId(item?.id || '');
+    setQuantity(item?.quantity !== undefined ? item.quantity : 1);
+    setAssetAmount(item?.assetValue?.amount !== undefined ? item.assetValue.amount : 0);
+    setAssetCurrency(item?.assetValue?.currencyName || 'Gold');
+    setDesc(item?.desc || '');
+  }, [item]);
+
+  const itemType = item?.isContainer ? 'container' : (item?.type || 'general');
+
+  const commit = (overrides = {}) => {
+    const nextName = overrides.name !== undefined ? overrides.name : name;
+    const nextId = overrides.id !== undefined ? overrides.id : id.trim();
+    const nextDesc = overrides.desc !== undefined ? overrides.desc : desc;
+    const nextType = overrides.type !== undefined ? overrides.type : itemType;
+    const nextQty = overrides.quantity !== undefined ? overrides.quantity : (Number(quantity) || 0);
+    const nextAssetAmt = overrides.assetAmount !== undefined ? overrides.assetAmount : (Number(assetAmount) || 0);
+    const nextAssetCur = overrides.assetCurrency !== undefined ? overrides.assetCurrency : (assetCurrency || 'Gold');
+
+    const base = {
+      ...item,
+      name: nextName,
+      id: nextId,
+      type: nextType
+    };
+
+    if (nextType === 'currency') {
+      delete base.desc;
+      delete base.assetValue;
+      base.quantity = nextQty;
+    } else if (nextType === 'asset') {
+      delete base.quantity;
+      base.assetValue = { amount: nextAssetAmt, currencyName: nextAssetCur };
+      base.desc = nextDesc;
+    } else {
+      base.quantity = nextQty || 1;
+      base.desc = nextDesc;
+      delete base.assetValue;
+    }
+
+    onCommit(base);
+  };
+
+  return (
+    <div className={styles.invItemRow} style={{ border: 'none', background: 'rgba(255,255,255,0.03)', padding: '8px' }}>
+      <div className={styles.flexColumnFull} style={{ gap: '6px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
+            <div
+              draggable={true}
+              onDragStart={onDragStart}
+              onDragEnd={onDragEnd}
+              className={styles.dragHandleIconWrapper}
+              title="Drag to move."
+            >
+              <DragHandle type={item.isContainer ? 'container' : itemType} />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }} onBlur={() => commit({ name })}>
+              <AutoGrowingTextArea
+                className={styles.itemTitleInputRefactored}
+                value={name}
+                placeholder="Item name..."
+                onChange={val => setName(val)}
+              />
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+            <div className={styles.itemTypeSelectWrapper}>
+              <select
+                className="rpg-select-custom"
+                value={itemType}
+                disabled={item.isContainer}
+                onChange={e => commit({ type: e.target.value })}
+              >
+                {item.isContainer ? (
+                  <option value="container">Container</option>
+                ) : (
+                  <>
+                    <option value="general">General</option>
+                    <option value="currency">Currency</option>
+                    <option value="asset">Asset</option>
+                  </>
+                )}
+              </select>
+            </div>
+            <button
+              type="button"
+              className="rpg-btn-del"
+              style={{ padding: '2px 6px', fontSize: '11px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              onClick={onDelete}
+            >
+              ×
+            </button>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '8px' }}>
+          <input
+            type="text"
+            className={styles.slotRenameInputRefactored}
+            style={{ flex: 1, minWidth: 0, fontSize: '10.5px', padding: '3px 6px', height: '22px', boxSizing: 'border-box' }}
+            value={id}
+            placeholder="Item ID..."
+            title="Unique Item ID"
+            onChange={e => setId(e.target.value)}
+            onBlur={() => commit({ id: id.trim() })}
+          />
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+            {itemType === 'general' && !item.isContainer && (
+              <div className={styles.itemQtyBox}>
+                <input
+                  type="number"
+                  className={styles.itemQtyInputRefactored}
+                  value={quantity}
+                  onChange={e => setQuantity(e.target.value)}
+                  onBlur={() => commit({ quantity: Number(quantity) || 0 })}
+                />
+              </div>
+            )}
+
+            {itemType === 'currency' && (
+              <div className={styles.itemQtyBox}>
+                <input
+                  type="number"
+                  className={styles.itemQtyInputRefactored}
+                  value={quantity}
+                  onChange={e => setQuantity(e.target.value)}
+                  onBlur={() => commit({ quantity: Number(quantity) || 0 })}
+                />
+              </div>
+            )}
+
+            {itemType === 'asset' && (
+              <div className={styles.assetValueGroup}>
+                <input
+                  type="number"
+                  className={styles.assetAmountInput}
+                  value={assetAmount}
+                  onChange={e => setAssetAmount(e.target.value)}
+                  onBlur={() => commit({ assetAmount: Number(assetAmount) || 0 })}
+                />
+                <input
+                  type="text"
+                  className={styles.assetCurrencyInput}
+                  value={assetCurrency}
+                  onChange={e => setAssetCurrency(e.target.value)}
+                  onBlur={() => commit({ assetCurrency })}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {itemType !== 'currency' && (
+          <div style={{ width: '100%', marginTop: '1px' }} onBlur={() => commit({ desc })}>
+            <AutoGrowingTextArea
+              className={styles.itemDescInputRefactored}
+              value={desc}
+              placeholder="Description..."
+              onChange={val => setDesc(val)}
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function StorageItemEditor({
+  item,
+  onCommit,
+  onDelete,
+  onDragStart,
+  onDragEnd,
+  onDragEnter,
+  onDragOver,
+  onDrop
+}) {
+  const [name, setName] = useState(item?.name || '');
+  const [id, setId] = useState(item?.id || '');
+  const [quantity, setQuantity] = useState(item?.quantity !== undefined ? item.quantity : 1);
+  const [assetAmount, setAssetAmount] = useState(item?.assetValue?.amount !== undefined ? item.assetValue.amount : 0);
+  const [assetCurrency, setAssetCurrency] = useState(item?.assetValue?.currencyName || 'Gold');
+  const [desc, setDesc] = useState(item?.desc || '');
+
+  useEffect(() => {
+    setName(item?.name || '');
+    setId(item?.id || '');
+    setQuantity(item?.quantity !== undefined ? item.quantity : 1);
+    setAssetAmount(item?.assetValue?.amount !== undefined ? item.assetValue.amount : 0);
+    setAssetCurrency(item?.assetValue?.currencyName || 'Gold');
+    setDesc(item?.desc || '');
+  }, [item]);
+
+  const itemType = item?.type || 'general';
+
+  const commit = (overrides = {}) => {
+    const nextName = overrides.name !== undefined ? overrides.name : name;
+    const nextId = overrides.id !== undefined ? overrides.id : id.trim();
+    const nextDesc = overrides.desc !== undefined ? overrides.desc : desc;
+    const nextType = overrides.type !== undefined ? overrides.type : itemType;
+    const nextQty = overrides.quantity !== undefined ? overrides.quantity : (Number(quantity) || 0);
+    const nextAssetAmt = overrides.assetAmount !== undefined ? overrides.assetAmount : (Number(assetAmount) || 0);
+    const nextAssetCur = overrides.assetCurrency !== undefined ? overrides.assetCurrency : (assetCurrency || 'Gold');
+
+    const base = {
+      ...item,
+      name: nextName,
+      id: nextId,
+      type: nextType
+    };
+
+    if (nextType === 'currency') {
+      delete base.desc;
+      delete base.assetValue;
+      base.quantity = nextQty;
+    } else if (nextType === 'asset') {
+      delete base.quantity;
+      base.assetValue = { amount: nextAssetAmt, currencyName: nextAssetCur };
+      base.desc = nextDesc;
+    } else {
+      base.quantity = nextQty || 1;
+      base.desc = nextDesc;
+      delete base.assetValue;
+    }
+
+    onCommit(base);
+  };
+
+  return (
+    <div
+      className={styles.invItemRow}
+      onDragEnter={onDragEnter}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      style={{ padding: '8px' }}
+    >
+      <div className={styles.flexColumnFull} style={{ gap: '6px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
+            <div
+              draggable={true}
+              onDragStart={onDragStart}
+              onDragEnd={onDragEnd}
+              className={styles.dragHandleIconWrapper}
+              title="Drag to move."
+            >
+              <DragHandle type={itemType} />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }} onBlur={() => commit({ name })}>
+              <AutoGrowingTextArea
+                className={styles.itemTitleInputRefactored}
+                value={name}
+                placeholder="Item name..."
+                onChange={val => setName(val)}
+              />
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+            <div className={styles.itemTypeSelectWrapper}>
+              <select
+                className="rpg-select-custom"
+                value={itemType}
+                onChange={e => commit({ type: e.target.value })}
+              >
+                <option value="general">General</option>
+                <option value="currency">Currency</option>
+                <option value="asset">Asset</option>
+              </select>
+            </div>
+            <button
+              type="button"
+              className="rpg-btn-del"
+              style={{ padding: '2px 6px', fontSize: '11px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              onClick={onDelete}
+            >
+              ×
+            </button>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '8px' }}>
+          <input
+            type="text"
+            className={styles.slotRenameInputRefactored}
+            style={{ flex: 1, minWidth: 0, fontSize: '10.5px', padding: '3px 6px', height: '22px', boxSizing: 'border-box' }}
+            value={id}
+            placeholder="Item ID..."
+            title="Unique Item ID"
+            onChange={e => setId(e.target.value)}
+            onBlur={() => commit({ id: id.trim() })}
+          />
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+            {itemType === 'general' && (
+              <div className={styles.itemQtyBox}>
+                <input
+                  type="number"
+                  className={styles.itemQtyInputRefactored}
+                  value={quantity}
+                  onChange={e => setQuantity(e.target.value)}
+                  onBlur={() => commit({ quantity: Number(quantity) || 0 })}
+                />
+              </div>
+            )}
+
+            {itemType === 'currency' && (
+              <div className={styles.itemQtyBox}>
+                <input
+                  type="number"
+                  className={styles.itemQtyInputRefactored}
+                  value={quantity}
+                  onChange={e => setQuantity(e.target.value)}
+                  onBlur={() => commit({ quantity: Number(quantity) || 0 })}
+                />
+              </div>
+            )}
+
+            {itemType === 'asset' && (
+              <div className={styles.assetValueGroup}>
+                <input
+                  type="number"
+                  className={styles.assetAmountInput}
+                  value={assetAmount}
+                  placeholder="Value"
+                  onChange={e => setAssetAmount(e.target.value)}
+                  onBlur={() => commit({ assetAmount: Number(assetAmount) || 0 })}
+                />
+                <input
+                  type="text"
+                  className={styles.assetCurrencyInput}
+                  value={assetCurrency}
+                  placeholder="Unit"
+                  onChange={e => setAssetCurrency(e.target.value)}
+                  onBlur={() => commit({ assetCurrency })}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {itemType !== 'currency' && (
+          <div style={{ width: '100%', marginTop: '1px' }} onBlur={() => commit({ desc })}>
+            <AutoGrowingTextArea
+              className={styles.itemDescInputRefactored}
+              value={desc}
+              placeholder="Description..."
+              onChange={val => setDesc(val)}
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function InventoryTab({
   charId,
   targetChar,
@@ -61,6 +436,7 @@ export default function InventoryTab({
     if (e.dataTransfer) {
       e.dataTransfer.effectAllowed = 'move';
       e.dataTransfer.setData('application/json', payload);
+      e.dataTransfer.setData('application/x-rpg-item', '1');
       e.dataTransfer.setData('text/plain', 'rpg_tracker_item');
     }
   };
@@ -74,8 +450,12 @@ export default function InventoryTab({
     e.stopPropagation();
     stopAutoScroll();
 
+    if (!e.dataTransfer) return;
+    const isRpgItem = e.dataTransfer.types.includes('application/x-rpg-item') ||
+                      e.dataTransfer.getData('application/x-rpg-item') === '1' ||
+                      e.dataTransfer.getData('text/plain') === 'rpg_tracker_item';
     const payload = e.dataTransfer.getData('application/json');
-    if (!payload) return;
+    if (!payload || !isRpgItem) return;
 
     let dragItem;
     try {
@@ -83,62 +463,60 @@ export default function InventoryTab({
     } catch (err) {
       return;
     }
+    if (!dragItem || !dragItem.item) return;
 
     const nextEquip = { ...(targetChar.inventory?.equipment || {}) };
     const nextStorage = { ...(targetChar.inventory?.storage || {}) };
 
-    if (dragItem.loc === 'container' && destLoc === 'storage' && dragItem.item.storageKey === destKey) {
-      return;
-    }
+    if (dragItem.loc === 'container') {
+      if (destLoc === 'storage') return;
 
-    if (dragItem.loc === 'container' && destLoc === 'equipment') {
-      const storageKey = dragItem.item.storageKey;
-      const containerItem = {
-        id: `container_${storageKey}_${Date.now()}`,
-        name: storageKey,
-        isContainer: true,
-        storageKey: storageKey,
-        type: 'general',
-        desc: 'Equipped storage container.'
-      };
+      if (destLoc === 'equipment') {
+        const storageKey = dragItem.item.storageKey || dragItem.item.name;
+        const containerItem = {
+          id: `container_${storageKey}_${Date.now()}`,
+          name: storageKey,
+          isContainer: true,
+          storageKey: storageKey,
+          type: 'general',
+          desc: 'Equipped storage container.'
+        };
 
-      const targetItem = nextEquip[destKey];
-      if (!targetItem) {
-        nextEquip[destKey] = containerItem;
-      } else {
-        const equipEntries = Object.entries(nextEquip);
-        const targetIndex = equipEntries.findIndex(([k]) => k === destKey);
-
-        const existingKeys = new Set(Object.keys(nextEquip));
-        let newSlotKey = 'Slot';
-        let counter = 1;
-        while (existingKeys.has(newSlotKey)) {
-          newSlotKey = `Slot_${counter++}`;
+        const targetItem = nextEquip[destKey];
+        if (targetItem && targetItem.isContainer && targetItem.storageKey === storageKey) {
+          return;
         }
 
-        const insertIndex = (destIdx === 'before') ? Math.max(0, targetIndex) : targetIndex + 1;
-        equipEntries.splice(insertIndex, 0, [newSlotKey, containerItem]);
+        if (targetItem && !targetItem.isContainer) {
+          if (!nextStorage[storageKey]) nextStorage[storageKey] = [];
+          nextStorage[storageKey].push(targetItem);
+        }
 
-        const reorderedEquip = {};
-        equipEntries.forEach(([k, v]) => { reorderedEquip[k] = v; });
-        Object.keys(nextEquip).forEach(k => delete nextEquip[k]);
-        Object.assign(nextEquip, reorderedEquip);
+        nextEquip[destKey] = containerItem;
+
+        setLocalCharacters(localCharacters.map(c => {
+          if (c.id !== charId) return c;
+          return {
+            ...c,
+            inventory: { ...(c.inventory || {}), equipment: nextEquip, storage: nextStorage }
+          };
+        }));
+        return;
       }
-
-      setLocalCharacters(localCharacters.map(c => {
-        if (c.id !== charId) return c;
-        return {
-          ...c,
-          inventory: { ...(c.inventory || {}), equipment: nextEquip }
-        };
-      }));
-      return;
     }
 
     let itemToMove = { ...dragItem.item };
-
     if (itemToMove.isContainer && destLoc === 'storage') {
+      alert("Container items cannot be placed inside another storage container.");
       return;
+    }
+
+    if (destLoc === 'equipment' && dragItem.loc !== 'equipment') {
+      const targetItem = nextEquip[destKey];
+      if (targetItem && targetItem.isContainer) {
+        alert("Cannot swap items with an equipped container. Please unequip or empty the container first.");
+        return;
+      }
     }
 
     const sourceQty = Number(dragItem.item.quantity) || 1;
@@ -147,7 +525,11 @@ export default function InventoryTab({
     let isPartialMove = false;
     let qtyToMove = sourceQty;
 
-    if (isStackable && sourceQty > 1) {
+    const isTargetOccupiedDifferentItem = destLoc === 'equipment' &&
+      nextEquip[destKey] &&
+      nextEquip[destKey].name?.trim().toLowerCase() !== itemToMove.name?.trim().toLowerCase();
+
+    if (isStackable && sourceQty > 1 && !isTargetOccupiedDifferentItem) {
       const inputVal = prompt(`Enter quantity to move (Max: ${sourceQty}):`, sourceQty);
       if (inputVal === null) return;
 
@@ -162,64 +544,74 @@ export default function InventoryTab({
       }
     }
 
-    if (dragItem.loc === 'equipment') {
-      if (isPartialMove) {
-        nextEquip[dragItem.key] = {
-          ...nextEquip[dragItem.key],
-          quantity: sourceQty - qtyToMove
-        };
-      } else {
-        nextEquip[dragItem.key] = null;
-      }
-    } else {
-      const srcList = [...(nextStorage[dragItem.key] || [])];
-      if (isPartialMove) {
-        srcList[dragItem.index] = {
-          ...srcList[dragItem.index],
-          quantity: sourceQty - qtyToMove
-        };
-      } else {
-        srcList.splice(dragItem.index, 1);
-      }
-      nextStorage[dragItem.key] = srcList;
-    }
-
     itemToMove.quantity = qtyToMove;
 
     if (destLoc === 'equipment') {
       const targetItem = nextEquip[destKey];
 
-      if (targetItem && targetItem.name?.trim().toLowerCase() === itemToMove.name?.trim().toLowerCase() && isStackable) {
-        const targetQty = Number(targetItem.quantity) || 1;
-        nextEquip[destKey] = {
-          ...targetItem,
-          quantity: targetQty + qtyToMove
-        };
-      } else if (!targetItem) {
-        nextEquip[destKey] = itemToMove;
-      } else {
-        const equipEntries = Object.entries(nextEquip);
-        const targetIndex = equipEntries.findIndex(([k]) => k === destKey);
-
-        const existingKeys = new Set(Object.keys(nextEquip));
-        let newSlotKey = 'Slot';
-        let counter = 1;
-        while (existingKeys.has(newSlotKey)) {
-          newSlotKey = `Slot_${counter++}`;
+      if (!targetItem) {
+        if (dragItem.loc === 'equipment') {
+          if (isPartialMove) {
+            nextEquip[dragItem.key] = { ...nextEquip[dragItem.key], quantity: sourceQty - qtyToMove };
+          } else {
+            nextEquip[dragItem.key] = null;
+          }
+        } else {
+          const srcList = [...(nextStorage[dragItem.key] || [])];
+          if (isPartialMove) {
+            srcList[dragItem.index] = { ...srcList[dragItem.index], quantity: sourceQty - qtyToMove };
+          } else {
+            srcList.splice(dragItem.index, 1);
+          }
+          nextStorage[dragItem.key] = srcList;
         }
-
-        const insertIndex = (destIdx === 'before') ? Math.max(0, targetIndex) : targetIndex + 1;
-        equipEntries.splice(insertIndex, 0, [newSlotKey, itemToMove]);
-
-        const reorderedEquip = {};
-        equipEntries.forEach(([k, v]) => {
-          reorderedEquip[k] = v;
-        });
-
-        Object.keys(nextEquip).forEach(k => delete nextEquip[k]);
-        Object.assign(nextEquip, reorderedEquip);
+        nextEquip[destKey] = itemToMove;
+      } else if (isStackable && targetItem.name?.trim().toLowerCase() === itemToMove.name?.trim().toLowerCase()) {
+        const targetQty = Number(targetItem.quantity) || 1;
+        if (dragItem.loc === 'equipment') {
+          if (isPartialMove) {
+            nextEquip[dragItem.key] = { ...nextEquip[dragItem.key], quantity: sourceQty - qtyToMove };
+          } else {
+            nextEquip[dragItem.key] = null;
+          }
+        } else {
+          const srcList = [...(nextStorage[dragItem.key] || [])];
+          if (isPartialMove) {
+            srcList[dragItem.index] = { ...srcList[dragItem.index], quantity: sourceQty - qtyToMove };
+          } else {
+            srcList.splice(dragItem.index, 1);
+          }
+          nextStorage[dragItem.key] = srcList;
+        }
+        nextEquip[destKey] = { ...targetItem, quantity: targetQty + qtyToMove };
+      } else {
+        if (dragItem.loc === 'equipment') {
+          nextEquip[destKey] = itemToMove;
+          nextEquip[dragItem.key] = targetItem;
+        } else {
+          const srcList = [...(nextStorage[dragItem.key] || [])];
+          srcList[dragItem.index] = targetItem;
+          nextStorage[dragItem.key] = srcList;
+          nextEquip[destKey] = itemToMove;
+        }
       }
     } else {
+      if (dragItem.loc === 'equipment') {
+        if (isPartialMove) {
+          nextEquip[dragItem.key] = { ...nextEquip[dragItem.key], quantity: sourceQty - qtyToMove };
+        } else {
+          nextEquip[dragItem.key] = null;
+        }
+      } else {
+        const srcList = [...(nextStorage[dragItem.key] || [])];
+        if (isPartialMove) {
+          srcList[dragItem.index] = { ...srcList[dragItem.index], quantity: sourceQty - qtyToMove };
+        } else {
+          srcList.splice(dragItem.index, 1);
+        }
+        nextStorage[dragItem.key] = srcList;
+      }
+
       if (!nextStorage[destKey]) nextStorage[destKey] = [];
       let destList = [...(nextStorage[destKey] || [])];
 
@@ -294,11 +686,15 @@ export default function InventoryTab({
   };
 
   const handleDragOver = (e) => {
+    if (!e.dataTransfer || (!e.dataTransfer.types.includes('application/x-rpg-item') && !e.dataTransfer.types.includes('application/json'))) {
+      return;
+    }
+
     e.preventDefault();
     e.stopPropagation();
 
     const clientY = e.clientY;
-    const scrollParent = e.currentTarget.closest('[class*="editorBody"], [class*="panelBody"], [class*="rpg-modal-body"]');
+    const scrollParent = e.currentTarget.closest('[class*="rpg-modal-body"], [class*="editorBody"]');
     if (!scrollParent) return;
 
     const rect = scrollParent.getBoundingClientRect();
@@ -355,18 +751,13 @@ export default function InventoryTab({
             const slotsList = Object.entries(targetChar.inventory?.equipment || {});
             const totalSlots = slotsList.length;
             return slotsList.map(([slotKey, item], slotIdx) => {
-              const itemType = item?.isContainer ? 'container' : (item?.type || 'general');
               return (
                 <div
                   key={slotKey}
                   className={styles.invSlotCard}
                   onDragEnter={handleDragOver}
                   onDragOver={handleDragOver}
-                  onDrop={e => {
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    const isUpperHalf = (e.clientY - rect.top) < (rect.height / 2);
-                    handleDrop(e, 'equipment', slotKey, isUpperHalf ? 'before' : 'after');
-                  }}
+                  onDrop={e => handleDrop(e, 'equipment', slotKey)}
                 >
                   {/* Slot Header */}
                   <div className={styles.slotHeader}>
@@ -384,10 +775,37 @@ export default function InventoryTab({
                             return;
                           }
                           if (newKey !== slotKey) {
-                            const equip = { ...(targetChar.inventory?.equipment || {}) };
-                            equip[newKey] = equip[slotKey];
-                            delete equip[slotKey];
-                            handleUpdateNestedField("inventory", "equipment", equip);
+                            const currentEquip = targetChar.inventory?.equipment || {};
+                            const nextEquip = {};
+                            Object.keys(currentEquip).forEach(k => {
+                              if (k === slotKey) {
+                                nextEquip[newKey] = currentEquip[slotKey];
+                              } else {
+                                nextEquip[k] = currentEquip[k];
+                              }
+                            });
+
+                            const currentLocks = targetChar.inventory?.equipmentLocks || {};
+                            const nextLocks = {};
+                            Object.keys(currentLocks).forEach(k => {
+                              if (k === slotKey) {
+                                nextLocks[newKey] = currentLocks[slotKey];
+                              } else {
+                                nextLocks[k] = currentLocks[k];
+                              }
+                            });
+
+                            setLocalCharacters(localCharacters.map(c => {
+                              if (c.id !== charId) return c;
+                              return {
+                                ...c,
+                                inventory: {
+                                  ...(c.inventory || {}),
+                                  equipment: nextEquip,
+                                  equipmentLocks: nextLocks
+                                }
+                              };
+                            }));
                           }
                         }}
                       />
@@ -407,7 +825,21 @@ export default function InventoryTab({
                           if (window.confirm(`Are you sure you want to delete the equipment slot "${slotKey}"?`)) {
                             const equip = { ...(targetChar.inventory?.equipment || {}) };
                             delete equip[slotKey];
-                            handleUpdateNestedField('inventory', 'equipment', equip);
+
+                            const locks = { ...(targetChar.inventory?.equipmentLocks || {}) };
+                            delete locks[slotKey];
+
+                            setLocalCharacters(localCharacters.map(c => {
+                              if (c.id !== charId) return c;
+                              return {
+                                ...c,
+                                inventory: {
+                                  ...(c.inventory || {}),
+                                  equipment: equip,
+                                  equipmentLocks: locks
+                                }
+                              };
+                            }));
                           }
                         }}
                       >
@@ -416,188 +848,27 @@ export default function InventoryTab({
                     </div>
                   </div>
 
-                  {/* Slot Item Row */}
+                  {/* Slot Item Content */}
                   {item ? (
-                    <div className={styles.invItemRow} style={{ border: 'none', background: 'rgba(255,255,255,0.03)', padding: '8px' }}>
-                      <div className={styles.flexColumnFull} style={{ gap: '6px' }}>
-                        
-                        {/* Line 1: [Icon + Item Name] ------------------ [Item Type + Delete Button] */}
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '8px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
-                            <div
-                              draggable={true}
-                              onDragStart={e => handleDragStart(e, 'equipment', slotKey, null, item)}
-                              onDragEnd={handleDragEnd}
-                              className={styles.dragHandleIconWrapper}
-                              title="Drag to move."
-                            >
-                              <DragHandle type={item.isContainer ? 'container' : itemType} />
-                            </div>
-                            <AutoGrowingTextArea
-                              className={styles.itemTitleInputRefactored}
-                              value={item.name || ''}
-                              placeholder="Item name..."
-                              onChange={val => {
-                                const equip = { ...(targetChar.inventory?.equipment || {}) };
-                                equip[slotKey] = { ...(equip[slotKey] || {}), name: val };
-                                handleUpdateNestedField('inventory', 'equipment', equip);
-                              }}
-                            />
-                          </div>
-
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-                            <div className={styles.itemTypeSelectWrapper}>
-                              <select
-                                className="rpg-select-custom"
-                                value={itemType}
-                                disabled={item.isContainer}
-                                onChange={e => {
-                                  const equip = { ...(targetChar.inventory?.equipment || {}) };
-                                  const targetVal = e.target.value;
-                                  equip[slotKey].type = targetVal;
-                                  if (targetVal === 'currency') {
-                                    delete equip[slotKey].desc;
-                                    delete equip[slotKey].assetValue;
-                                    equip[slotKey].quantity = equip[slotKey].quantity || 1;
-                                  } else if (targetVal === 'asset') {
-                                    delete equip[slotKey].quantity;
-                                    equip[slotKey].assetValue = equip[slotKey].assetValue || { amount: 0, currencyName: 'Gold' };
-                                    equip[slotKey].desc = equip[slotKey].desc || '';
-                                  } else {
-                                    equip[slotKey].quantity = equip[slotKey].quantity || 1;
-                                    equip[slotKey].desc = equip[slotKey].desc || '';
-                                    delete equip[slotKey].assetValue;
-                                  }
-                                  handleUpdateNestedField('inventory', 'equipment', equip);
-                                }}
-                              >
-                                {item.isContainer ? (
-                                  <option value="container">Container</option>
-                                ) : (
-                                  <>
-                                    <option value="general">General</option>
-                                    <option value="currency">Currency</option>
-                                    <option value="asset">Asset</option>
-                                  </>
-                                )}
-                              </select>
-                            </div>
-                            <button
-                              type="button"
-                              className="rpg-btn-del"
-                              style={{ padding: '2px 6px', fontSize: '11px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                              onClick={() => {
-                                if (window.confirm("Are you sure you want to delete this equipped item?")) {
-                                  const equip = { ...(targetChar.inventory?.equipment || {}) };
-                                  equip[slotKey] = null;
-                                  handleUpdateNestedField('inventory', 'equipment', equip);
-                                }
-                              }}
-                            >
-                              ×
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Line 2: [Item ID] ------------------ [Quantity / Amount] */}
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '8px' }}>
-                          <input
-                            type="text"
-                            className={styles.slotRenameInputRefactored}
-                            style={{ flex: 1, minWidth: 0, fontSize: '10.5px', padding: '3px 6px', height: '22px', boxSizing: 'border-box' }}
-                            value={item.id || ''}
-                            placeholder="Item ID..."
-                            title="Unique Item ID"
-                            onChange={e => {
-                              const equip = { ...(targetChar.inventory?.equipment || {}) };
-                              equip[slotKey] = { ...(equip[slotKey] || {}), id: e.target.value.trim() };
-                              handleUpdateNestedField('inventory', 'equipment', equip);
-                            }}
-                          />
-
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-                            {itemType === 'general' && !item.isContainer && (
-                              <div className={styles.itemQtyBox}>
-                                <input
-                                  type="number"
-                                  className={styles.itemQtyInputRefactored}
-                                  value={item.quantity || 1}
-                                  onChange={e => {
-                                    const equip = { ...(targetChar.inventory?.equipment || {}) };
-                                    equip[slotKey].quantity = Number(e.target.value) || 0;
-                                    handleUpdateNestedField('inventory', 'equipment', equip);
-                                  }}
-                                />
-                              </div>
-                            )}
-
-                            {itemType === 'currency' && (
-                              <div className={styles.itemQtyBox}>
-                                <input
-                                  type="number"
-                                  className={styles.itemQtyInputRefactored}
-                                  value={item.quantity !== undefined ? item.quantity : 0}
-                                  onChange={e => {
-                                    const equip = { ...(targetChar.inventory?.equipment || {}) };
-                                    equip[slotKey].quantity = Number(e.target.value) || 0;
-                                    handleUpdateNestedField('inventory', 'equipment', equip);
-                                  }}
-                                />
-                              </div>
-                            )}
-
-                            {itemType === 'asset' && (
-                              <div className={styles.assetValueGroup}>
-                                <input
-                                  type="number"
-                                  className={styles.assetAmountInput}
-                                  value={item.assetValue?.amount !== undefined ? item.assetValue.amount : 0}
-                                  onChange={e => {
-                                    const equip = { ...(targetChar.inventory?.equipment || {}) };
-                                    equip[slotKey].assetValue = {
-                                      ...(equip[slotKey].assetValue || {}),
-                                      amount: Number(e.target.value) || 0
-                                    };
-                                    handleUpdateNestedField('inventory', 'equipment', equip);
-                                  }}
-                                />
-                                <input
-                                  type="text"
-                                  className={styles.assetCurrencyInput}
-                                  value={item.assetValue?.currencyName || 'Gold'}
-                                  onChange={e => {
-                                    const equip = { ...(targetChar.inventory?.equipment || {}) };
-                                    equip[slotKey].assetValue = {
-                                      ...(equip[slotKey].assetValue || {}),
-                                      currencyName: e.target.value
-                                    };
-                                    handleUpdateNestedField('inventory', 'equipment', equip);
-                                  }}
-                                />
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Line 3: [Description] */}
-                        {itemType !== 'currency' && (
-                          <div style={{ width: '100%', marginTop: '1px' }}>
-                            <AutoGrowingTextArea
-                              className={styles.itemDescInputRefactored}
-                              value={item.desc || ''}
-                              placeholder="Description..."
-                              onChange={val => {
-                                const equip = { ...(targetChar.inventory?.equipment || {}) };
-                                equip[slotKey] = { ...(equip[slotKey] || {}), desc: val };
-                                handleUpdateNestedField('inventory', 'equipment', equip);
-                              }}
-                            />
-                          </div>
-                        )}
-
-                      </div>
-                    </div>
-                  ) : <span className={styles.emptyText}>Empty</span>}
+                    <EquipItemEditor
+                      slotKey={slotKey}
+                      item={item}
+                      onCommit={updatedItem => {
+                        const equip = { ...(targetChar.inventory?.equipment || {}) };
+                        equip[slotKey] = updatedItem;
+                        handleUpdateNestedField('inventory', 'equipment', equip);
+                      }}
+                      onDelete={() => {
+                        if (window.confirm("Are you sure you want to delete this equipped item?")) {
+                          const equip = { ...(targetChar.inventory?.equipment || {}) };
+                          equip[slotKey] = null;
+                          handleUpdateNestedField('inventory', 'equipment', equip);
+                        }
+                      }}
+                      onDragStart={e => handleDragStart(e, 'equipment', slotKey, null, item)}
+                      onDragEnd={handleDragEnd}
+                    />
+                  ) : <span className="rpg-empty-text">Empty</span>}
                 </div>
               );
             });
@@ -685,13 +956,25 @@ export default function InventoryTab({
                             return;
                           }
                           if (newKey !== storageKey) {
-                            const storage = { ...(targetChar.inventory?.storage || {}) };
-                            storage[newKey] = storage[storageKey];
-                            delete storage[storageKey];
+                            const currentStorage = targetChar.inventory?.storage || {};
+                            const storage = {};
+                            Object.keys(currentStorage).forEach(k => {
+                              if (k === storageKey) {
+                                storage[newKey] = currentStorage[storageKey];
+                              } else {
+                                storage[k] = currentStorage[k];
+                              }
+                            });
 
-                            const locks = { ...(targetChar.inventory?.storageLocks || {}) };
-                            locks[newKey] = locks[storageKey] || false;
-                            delete locks[storageKey];
+                            const currentLocks = targetChar.inventory?.storageLocks || {};
+                            const locks = {};
+                            Object.keys(currentLocks).forEach(k => {
+                              if (k === storageKey) {
+                                locks[newKey] = currentLocks[storageKey] || false;
+                              } else {
+                                locks[k] = currentLocks[k];
+                              }
+                            });
 
                             const equip = { ...(targetChar.inventory?.equipment || {}) };
                             let hasLinkChanges = false;
@@ -772,191 +1055,41 @@ export default function InventoryTab({
                   {/* Container Items List */}
                   {isContainerOpen && (
                     <div className={styles.invStorageItemsList}>
-                      {itemList.length === 0 ? <span className={styles.emptyText}>Empty container</span> : (
+                      {itemList.length === 0 ? <span className="rpg-empty-text">Empty container</span> : (
                         itemList.map((item, idx) => {
-                          const itemType = item.type || 'general';
+                          if (!item._clientKey) {
+                            Object.defineProperty(item, '_clientKey', {
+                              value: `c_item_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+                              enumerable: false,
+                              writable: true
+                            });
+                          }
+
                           return (
-                            <div
-                              key={item.id || idx}
-                              className={styles.invItemRow}
+                            <StorageItemEditor
+                              key={item._clientKey}
+                              item={item}
+                              onCommit={updatedItem => {
+                                const storage = { ...(targetChar.inventory?.storage || {}) };
+                                storage[storageKey][idx] = updatedItem;
+                                handleUpdateNestedField('inventory', 'storage', storage);
+                              }}
+                              onDelete={() => {
+                                if (window.confirm("Are you sure you want to delete this item from the container?")) {
+                                  const storage = { ...(targetChar.inventory?.storage || {}) };
+                                  storage[storageKey].splice(idx, 1);
+                                  handleUpdateNestedField('inventory', 'storage', storage);
+                                }
+                              }}
+                              onDragStart={e => handleDragStart(e, 'storage', storageKey, idx, item)}
+                              onDragEnd={stopAutoScroll}
                               onDragEnter={handleDragOver}
                               onDragOver={handleDragOver}
-                              onDrop={e => { e.stopPropagation(); handleDrop(e, 'storage', storageKey, idx); }}
-                              style={{ padding: '8px' }}
-                            >
-                              <div className={styles.flexColumnFull} style={{ gap: '6px' }}>
-                                
-                                {/* Line 1: [Icon + Item Name] ------------------ [Item Type + Delete Button] */}
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '8px' }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
-                                    <div
-                                      draggable={true}
-                                      onDragStart={e => handleDragStart(e, 'storage', storageKey, idx, item)}
-                                      onDragEnd={stopAutoScroll}
-                                      className={styles.dragHandleIconWrapper}
-                                      title="Drag to move."
-                                    >
-                                      <DragHandle type={itemType} />
-                                    </div>
-                                    <AutoGrowingTextArea
-                                      className={styles.itemTitleInputRefactored}
-                                      value={item.name}
-                                      placeholder="Item name..."
-                                      onChange={val => {
-                                        const storage = { ...(targetChar.inventory?.storage || {}) };
-                                        storage[storageKey][idx].name = val;
-                                        handleUpdateNestedField('inventory', 'storage', storage);
-                                      }}
-                                    />
-                                  </div>
-
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-                                    <div className={styles.itemTypeSelectWrapper}>
-                                      <select
-                                        className="rpg-select-custom"
-                                        value={itemType}
-                                        onChange={e => {
-                                          const storage = { ...(targetChar.inventory?.storage || {}) };
-                                          const targetVal = e.target.value;
-                                          storage[storageKey][idx].type = targetVal;
-                                          if (targetVal === 'currency') {
-                                            delete storage[storageKey][idx].desc;
-                                            delete storage[storageKey][idx].assetValue;
-                                            storage[storageKey][idx].quantity = storage[storageKey][idx].quantity || 1;
-                                          } else if (targetVal === 'asset') {
-                                            delete storage[storageKey][idx].quantity;
-                                            storage[storageKey][idx].assetValue = storage[storageKey][idx].assetValue || { amount: 0, currencyName: 'Gold' };
-                                            storage[storageKey][idx].desc = storage[storageKey][idx].desc || '';
-                                          } else {
-                                            storage[storageKey][idx].quantity = storage[storageKey][idx].quantity || 1;
-                                            storage[storageKey][idx].desc = storage[storageKey][idx].desc || '';
-                                            delete storage[storageKey][idx].assetValue;
-                                          }
-                                          handleUpdateNestedField('inventory', 'storage', storage);
-                                        }}
-                                      >
-                                        <option value="general">General</option>
-                                        <option value="currency">Currency</option>
-                                        <option value="asset">Asset</option>
-                                      </select>
-                                    </div>
-                                    <button
-                                      type="button"
-                                      className="rpg-btn-del"
-                                      style={{ padding: '2px 6px', fontSize: '11px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                                      onClick={() => {
-                                        if (window.confirm("Are you sure you want to delete this item from the container?")) {
-                                          const storage = { ...(targetChar.inventory?.storage || {}) };
-                                          storage[storageKey].splice(idx, 1);
-                                          handleUpdateNestedField('inventory', 'storage', storage);
-                                        }
-                                      }}
-                                    >
-                                      ×
-                                    </button>
-                                  </div>
-                                </div>
-
-                                {/* Line 2: [Item ID] ------------------ [Quantity / Amount] */}
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '8px' }}>
-                                  <input
-                                    type="text"
-                                    className={styles.slotRenameInputRefactored}
-                                    style={{ flex: 1, minWidth: 0, fontSize: '10.5px', padding: '3px 6px', height: '22px', boxSizing: 'border-box' }}
-                                    value={item.id || ''}
-                                    placeholder="Item ID..."
-                                    title="Unique Item ID"
-                                    onChange={e => {
-                                      const storage = { ...(targetChar.inventory?.storage || {}) };
-                                      storage[storageKey][idx].id = e.target.value.trim();
-                                      handleUpdateNestedField('inventory', 'storage', storage);
-                                    }}
-                                  />
-
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-                                    {itemType === 'general' && (
-                                      <div className={styles.itemQtyBox}>
-                                        <input
-                                          type="number"
-                                          className={styles.itemQtyInputRefactored}
-                                          value={item.quantity || 1}
-                                          onChange={e => {
-                                            const storage = { ...(targetChar.inventory?.storage || {}) };
-                                            storage[storageKey][idx].quantity = Number(e.target.value) || 0;
-                                            handleUpdateNestedField('inventory', 'storage', storage);
-                                          }}
-                                        />
-                                      </div>
-                                    )}
-
-                                    {itemType === 'currency' && (
-                                      <div className={styles.itemQtyBox}>
-                                        <input
-                                          type="number"
-                                          className={styles.itemQtyInputRefactored}
-                                          value={item.quantity !== undefined ? item.quantity : 0}
-                                          onChange={e => {
-                                            const storage = { ...(targetChar.inventory?.storage || {}) };
-                                            storage[storageKey][idx].quantity = Number(e.target.value) || 0;
-                                            handleUpdateNestedField('inventory', 'storage', storage);
-                                          }}
-                                        />
-                                      </div>
-                                    )}
-
-                                    {itemType === 'asset' && (
-                                      <div className={styles.assetValueGroup}>
-                                        <input
-                                          type="number"
-                                          className={styles.assetAmountInput}
-                                          value={item.assetValue?.amount !== undefined ? item.assetValue.amount : 0}
-                                          placeholder="Value"
-                                          onChange={e => {
-                                            const storage = { ...(targetChar.inventory?.storage || {}) };
-                                            storage[storageKey][idx].assetValue = {
-                                              ...(storage[storageKey][idx].assetValue || {}),
-                                              amount: Number(e.target.value) || 0
-                                            };
-                                            handleUpdateNestedField('inventory', 'storage', storage);
-                                          }}
-                                        />
-                                        <input
-                                          type="text"
-                                          className={styles.assetCurrencyInput}
-                                          value={item.assetValue?.currencyName || 'Gold'}
-                                          placeholder="Unit"
-                                          onChange={e => {
-                                            const storage = { ...(targetChar.inventory?.storage || {}) };
-                                            storage[storageKey][idx].assetValue = {
-                                              ...(storage[storageKey][idx].assetValue || {}),
-                                              currencyName: e.target.value
-                                            };
-                                            handleUpdateNestedField('inventory', 'storage', storage);
-                                          }}
-                                        />
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-
-                                {/* Line 3: [Description] */}
-                                {itemType !== 'currency' && (
-                                  <div style={{ width: '100%', marginTop: '1px' }}>
-                                    <AutoGrowingTextArea
-                                      className={styles.itemDescInputRefactored}
-                                      value={item.desc || ''}
-                                      placeholder="Description..."
-                                      onChange={val => {
-                                        const storage = { ...(targetChar.inventory?.storage || {}) };
-                                        storage[storageKey][idx].desc = val;
-                                        handleUpdateNestedField('inventory', 'storage', storage);
-                                      }}
-                                    />
-                                  </div>
-                                )}
-
-                              </div>
-                            </div>
+                              onDrop={e => {
+                                e.stopPropagation();
+                                handleDrop(e, 'storage', storageKey, idx);
+                              }}
+                            />
                           );
                         })
                       )}

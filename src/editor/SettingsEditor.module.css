@@ -1,7 +1,7 @@
 .section {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   height: auto;
 }
 
@@ -20,25 +20,198 @@
 .settingsDesc {
   font-size: 11px;
   opacity: 0.6;
-  margin-bottom: 8px;
-  margin-top: -4px;
-  line-height: 1.4;
+  margin: 0;
+  line-height: 1.3;
 }
 
 .settingsSelect {
   width: 100%;
-  padding: 6px 10px;
+  height: 28px;
+  padding: 4px 8px;
   background: rgba(0, 0, 0, 0.2);
   color: inherit;
   border: 1px solid var(--rpg-border);
   border-radius: 4px;
   outline: none;
   font-family: inherit;
-  margin-bottom: 8px;
+  font-size: 11px;
+  margin: 0;
+  box-sizing: border-box;
+  min-width: 0;
 }
 
 .settingsSelect:focus {
   border-color: var(--rpg-highlight);
+}
+
+.toggleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 0;
+}
+
+.rowItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.labelGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.itemLabel {
+  font-size: 12px;
+  font-weight: bold;
+  color: var(--rpg-text);
+}
+
+.itemSubText {
+  font-size: 10.5px;
+  opacity: 0.6;
+  line-height: 1.3;
+}
+
+.numberInput {
+  width: 60px;
+  height: 28px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--rpg-border);
+  color: var(--rpg-text);
+  padding: 0 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: bold;
+  text-align: center;
+  outline: none;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.numberInput:focus {
+  border-color: var(--rpg-highlight);
+}
+
+.modelSubBox {
+  background: rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--rpg-border);
+  border-radius: 6px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.fieldHeaderRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.fieldLabel {
+  font-size: 11.5px;
+  font-weight: bold;
+  opacity: 0.8;
+  color: var(--rpg-text);
+}
+
+.textInput {
+  width: 100%;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--rpg-border);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 11px;
+  color: var(--rpg-text);
+  outline: none;
+  box-sizing: border-box;
+}
+
+.textInput:focus {
+  border-color: var(--rpg-highlight);
+}
+
+.modelInputControl {
+  height: 28px !important;
+  font-size: 11px !important;
+  line-height: normal !important;
+  box-sizing: border-box !important;
+  margin: 0 !important;
+}
+
+.providerSection {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px dashed var(--rpg-border);
+  border-radius: 6px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.providerHeaderRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.providerList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.providerRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.providerRow .settingsSelect {
+  flex: 1;
+  min-width: 0;
+}
+
+.providerIndexBadge {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--rpg-border);
+  color: var(--rpg-highlight);
+  font-size: 10px;
+  font-weight: bold;
+  border-radius: 4px;
+  width: 22px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.fallbackRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  padding-top: 6px;
+  margin-top: 2px;
+}
+
+.sectionDivider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 8px 0;
+  width: 100%;
+  flex-shrink: 0;
 }
 
 .colorPaletteGrid {
@@ -49,7 +222,7 @@
   border: 1px solid var(--rpg-border);
   border-radius: 6px;
   padding: 12px;
-  margin-top: 4px;
+  margin-top: 2px;
 }
 
 .colorRow {
@@ -80,57 +253,19 @@
 
 .colorTextInput {
   flex: 1;
+  height: 28px;
   background: rgba(0, 0, 0, 0.2);
   border: 1px solid var(--rpg-border);
   color: var(--rpg-text);
-  padding: 5px 8px;
+  padding: 4px 8px;
   border-radius: 4px;
   font-size: 11.5px;
   outline: none;
   text-transform: uppercase;
   font-family: monospace;
+  box-sizing: border-box;
 }
 
 .colorTextInput:focus {
   border-color: var(--rpg-highlight);
-}
-
-/* History snapshot controls */
-.snapshotControlsRow {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 6px;
-}
-
-.snapshotLabel {
-  font-size: 12px;
-  font-weight: bold;
-  color: var(--rpg-text);
-}
-
-.snapshotButtonGroup {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.snapshotNumberInput {
-  width: 55px;
-  padding: 4px 6px;
-  background: rgba(0, 0, 0, 0.25);
-  border: 1px solid var(--rpg-border);
-  border-radius: 4px;
-  color: var(--rpg-text);
-  font-size: 11.5px;
-  font-weight: bold;
-  text-align: center;
-  outline: none;
-  transition: all 0.15s ease;
-}
-
-.snapshotNumberInput:disabled {
-  background: rgba(0, 0, 0, 0.1);
-  opacity: 0.5;
-  cursor: not-allowed;
 }

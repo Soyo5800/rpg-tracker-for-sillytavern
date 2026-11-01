@@ -1,4 +1,4 @@
-/* 전역 모달 배경 오버레이 */
+/* Global modal background overlay */
 .rpg-modal-overlay {
   position: fixed;
   top: 0;
@@ -14,7 +14,7 @@
   box-sizing: border-box;
 }
 
-/* 전역 모달 창 본체 */
+/* Modal window container frame */
 .rpg-modal-container {
   background: var(--rpg-bg);
   border: 1px solid var(--rpg-border);
@@ -30,7 +30,7 @@
   overflow: hidden;
 }
 
-/* 상단 헤더 영역 */
+/* Modal top header area */
 .rpg-modal-header {
   display: flex;
   align-items: center;
@@ -50,7 +50,7 @@
   letter-spacing: 0.7px;
 }
 
-/* 상단 우측 닫기 버튼 */
+/* Top-right close button */
 .rpg-modal-close-btn {
   background: transparent;
   border: none;
@@ -72,7 +72,7 @@
   opacity: 1;
 }
 
-/* 중앙 바디 스크롤 영역 */
+/* Scrollable modal content body */
 .rpg-modal-body {
   flex: 1;
   overflow-y: auto;
@@ -83,7 +83,7 @@
   box-sizing: border-box;
 }
 
-/* 하단 푸터 영역 */
+/* Modal bottom footer area */
 .rpg-modal-footer {
   display: flex;
   align-items: center;
@@ -104,7 +104,7 @@
   gap: 6px;
 }
 
-/* 푸터 표준 액션 버튼 시스템 */
+/* Standardized modal action buttons */
 .rpg-modal-btn {
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--rpg-border);
@@ -126,7 +126,7 @@
 }
 
 .rpg-modal-btn.save {
-  background: var(--rpg-highlight-bg);
+  background: var(--rpg-highlight-bg, rgba(255, 255, 255, 0.08));
   border: 1px solid var(--rpg-highlight);
   color: var(--rpg-highlight);
 }
@@ -145,6 +145,7 @@
   border-color: #e74c3c;
 }
 
+/* High-priority overlay layer (for image crop modal, etc.) */
 .rpg-modal-overlay.high-priority {
   z-index: 5000 !important;
 }

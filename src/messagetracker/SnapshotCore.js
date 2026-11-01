@@ -1,11 +1,9 @@
-// src/messagetracker/SnapshotCore.js
-
 export function buildSnapshotPayload(targetData, selections, customNote) {
     if (!targetData) return {};
 
     const payload = {};
 
-    // 1. 월드 상태 세부 선택 필드별 정밀 수집
+    // 1. Collect granular world state parameters based on selections
     const isWorldObj = selections.world && typeof selections.world === 'object';
     const isWorldSelected = isWorldObj ? selections.world.selected : !!selections.world;
 
@@ -32,12 +30,12 @@ export function buildSnapshotPayload(targetData, selections, customNote) {
         }
     }
 
-    // 2. 캐릭터별 옵션에 맞춘 정밀 수집
+    // 2. Collect character data based on granular selections
     const activeChars = {};
     if (targetData.characters && Array.isArray(targetData.characters)) {
         targetData.characters.forEach(char => {
             const charSel = selections.chars[char.id];
-            
+
             if (charSel && charSel.selected) {
                 const charData = {};
 
@@ -68,7 +66,7 @@ export function buildSnapshotPayload(targetData, selections, customNote) {
         payload.chars = activeChars;
     }
 
-    // 3. 커스텀 노트 수집
+    // 3. Collect optional custom notes
     if (customNote && customNote.trim() !== "") {
         payload.note = customNote.trim();
     }

@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styles from './StatusEditor.module.css';
 import { ToggleSwitch, SortButtons, AccordionArrow } from '../utils';
+import { deepClone } from '../core/StateHelpers';
 
 // Form component for configuring individual relation metric properties
 export function RelationMetricConfig({
@@ -11,6 +12,22 @@ export function RelationMetricConfig({
   disabled = false,
   onChange
 }) {
+  const parsedMin = parseInt(min, 10);
+  const safeMin = !isNaN(parsedMin) ? parsedMin : -100;
+  const parsedMax = parseInt(max, 10);
+  const safeMax = !isNaN(parsedMax) ? parsedMax : 100;
+
+  const [minText, setMinText] = useState(String(safeMin));
+  const [maxText, setMaxText] = useState(String(safeMax));
+
+  useEffect(() => {
+    setMinText(String(safeMin));
+  }, [safeMin]);
+
+  useEffect(() => {
+    setMaxText(String(safeMax));
+  }, [safeMax]);
+
   return (
     <div className={styles.metricConfigRow} style={{ borderTop: 'none', paddingTop: 0 }}>
       <div className={styles.flexCenterGroupSmall} title="Negative Color">
@@ -39,9 +56,23 @@ export function RelationMetricConfig({
         <span className={styles.metricLimitLabel}>Min:</span>
         <input
           type="number"
+          step="1"
           disabled={disabled}
-          value={min !== undefined && min !== null ? min : -100}
-          onChange={(e) => onChange && onChange('min', Number(e.target.value))}
+          value={minText}
+          onChange={(e) => {
+            const raw = e.target.value;
+            setMinText(raw);
+            const parsed = parseInt(raw, 10);
+            if (!isNaN(parsed)) {
+              onChange && onChange('min', parsed);
+            }
+          }}
+          onBlur={() => {
+            const parsed = parseInt(minText, 10);
+            const finalVal = !isNaN(parsed) ? parsed : -100;
+            setMinText(String(finalVal));
+            onChange && onChange('min', finalVal);
+          }}
           className={styles.metricLimitInput}
         />
       </div>
@@ -50,9 +81,23 @@ export function RelationMetricConfig({
         <span className={styles.metricLimitLabel}>Max:</span>
         <input
           type="number"
+          step="1"
           disabled={disabled}
-          value={max !== undefined && max !== null ? max : 100}
-          onChange={(e) => onChange && onChange('max', Number(e.target.value))}
+          value={maxText}
+          onChange={(e) => {
+            const raw = e.target.value;
+            setMaxText(raw);
+            const parsed = parseInt(raw, 10);
+            if (!isNaN(parsed)) {
+              onChange && onChange('max', parsed);
+            }
+          }}
+          onBlur={() => {
+            const parsed = parseInt(maxText, 10);
+            const finalVal = !isNaN(parsed) ? parsed : 100;
+            setMaxText(String(finalVal));
+            onChange && onChange('max', finalVal);
+          }}
           className={styles.metricLimitInput}
         />
       </div>
@@ -66,7 +111,8 @@ export default function RelationsTab({
   localCharacters,
   setLocalCharacters,
   expandedIds,
-  setExpandedIds
+  setExpandedIds,
+  onRenameField
 }) {
   const [relationPreset, setRelationPreset] = useState('-100~100');
   const [relationMin, setRelationMin] = useState(-100);
@@ -88,8 +134,9 @@ export default function RelationsTab({
             values: {
               'Affection': {
                 value: 0,
-                min: relationMin,
-                max: relationMax,
+                type: 'integer',
+                min: Number.isFinite(parseInt(relationMin, 10)) ? parseInt(relationMin, 10) : -100,
+                max: Number.isFinite(parseInt(relationMax, 10)) ? parseInt(relationMax, 10) : 100,
                 colorNegative: '#e74c3c',
                 colorPositive: '#2ecc71'
               }
@@ -106,28 +153,48 @@ export default function RelationsTab({
       }
 
       const targetData = nextRelations[targetName]
-        ? JSON.parse(JSON.stringify(nextRelations[targetName]))
+        ? deepClone(nextRelations[targetName])
         : { text: '', targetText: '', isLocked: false, isInject: true, values: {}, targetValues: {} };
 
       if (action === 'updateField') {
         targetData.text = data.value;
       } else if (action === 'updateMetricValue') {
+        const parsedVal = parseInt(data.value, 10);
+        const safeVal = !isNaN(parsedVal) ? parsedVal : 0;
         const old = targetData.values[data.field];
+
         if (typeof old === 'object' && old !== null) {
-          targetData.values[data.field] = { ...old, value: data.value };
+          targetData.values[data.field] = { ...old, value: safeVal, type: 'integer' };
         } else {
-          targetData.values[data.field] = { value: data.value, min: -100, max: 100, colorNegative: '#e74c3c', colorPositive: '#2ecc71' };
+          targetData.values[data.field] = {
+            value: safeVal,
+            type: 'integer',
+            min: -100,
+            max: 100,
+            colorNegative: '#e74c3c',
+            colorPositive: '#2ecc71'
+          };
         }
       } else if (action === 'updateMetricConfig') {
         const mKey = data.metric;
         const old = targetData.values[mKey];
-        const currentObj = typeof old === 'object' && old !== null ? old : { value: old || 0, min: -100, max: 100, colorNegative: '#e74c3c', colorPositive: '#2ecc71' };
-        targetData.values[mKey] = { ...currentObj, ...data.config };
+        const currentObj = typeof old === 'object' && old !== null
+          ? old
+          : { value: 0, type: 'integer', min: -100, max: 100, colorNegative: '#e74c3c', colorPositive: '#2ecc71' };
+
+        const cleanConfig = { ...data.config };
+        if (cleanConfig.min !== undefined) cleanConfig.min = parseInt(cleanConfig.min, 10) || 0;
+        if (cleanConfig.max !== undefined) cleanConfig.max = parseInt(cleanConfig.max, 10) || 0;
+
+        targetData.values[mKey] = { ...currentObj, ...cleanConfig, type: 'integer' };
       } else if (action === 'renameMetric') {
         const nextValues = { ...targetData.values };
         nextValues[data.newKey] = nextValues[data.oldKey];
         delete nextValues[data.oldKey];
         targetData.values = nextValues;
+        if (typeof onRenameField === 'function') {
+          onRenameField('relation', data.oldKey, data.newKey);
+        }
       } else if (action === 'removeMetric') {
         const nextValues = { ...targetData.values };
         delete nextValues[data.metric];
@@ -135,7 +202,14 @@ export default function RelationsTab({
       } else if (action === 'addMetric') {
         targetData.values = {
           ...(targetData.values || {}),
-          [data.metric]: { value: 0, min: relationMin, max: relationMax, colorNegative: '#e74c3c', colorPositive: '#2ecc71' }
+          [data.metric]: {
+            value: 0,
+            type: 'integer',
+            min: Number.isFinite(parseInt(relationMin, 10)) ? parseInt(relationMin, 10) : -100,
+            max: Number.isFinite(parseInt(relationMax, 10)) ? parseInt(relationMax, 10) : 100,
+            colorNegative: '#e74c3c',
+            colorPositive: '#2ecc71'
+          }
         };
       }
       nextRelations[targetName] = targetData;
@@ -149,32 +223,51 @@ export default function RelationsTab({
     const myName = (targetChar.name || 'New Character').trim();
 
     setLocalCharacters(localCharacters.map(c => {
-      // If target is an independent character card, update that card directly
       if (targetCharObj && c.id === targetCharObj.id) {
         const nextRelations = { ...(c.relations || {}) };
         const matchedKey = Object.keys(nextRelations).find(k => k.trim().toLowerCase() === myName.toLowerCase()) || myName;
         const myDataInTarget = nextRelations[matchedKey]
-          ? JSON.parse(JSON.stringify(nextRelations[matchedKey]))
+          ? deepClone(nextRelations[matchedKey])
           : { text: '', isLocked: false, isInject: true, values: {} };
 
         if (action === 'updateField') {
           myDataInTarget.text = data.value;
         } else if (action === 'updateMetricValue') {
+          const parsedVal = parseInt(data.value, 10);
+          const safeVal = !isNaN(parsedVal) ? parsedVal : 0;
           const old = myDataInTarget.values[data.field];
+
           if (typeof old === 'object' && old !== null) {
-            myDataInTarget.values[data.field] = { ...old, value: data.value };
+            myDataInTarget.values[data.field] = { ...old, value: safeVal, type: 'integer' };
           } else {
-            myDataInTarget.values[data.field] = { value: data.value, min: -100, max: 100, colorNegative: '#e74c3c', colorPositive: '#2ecc71' };
+            myDataInTarget.values[data.field] = {
+              value: safeVal,
+              type: 'integer',
+              min: -100,
+              max: 100,
+              colorNegative: '#e74c3c',
+              colorPositive: '#2ecc71'
+            };
           }
         } else if (action === 'updateMetricConfig') {
           const old = myDataInTarget.values[data.metric];
-          const currentObj = typeof old === 'object' && old !== null ? old : { value: old || 0, min: -100, max: 100, colorNegative: '#e74c3c', colorPositive: '#2ecc71' };
-          myDataInTarget.values[data.metric] = { ...currentObj, ...data.config };
+          const currentObj = typeof old === 'object' && old !== null
+            ? old
+            : { value: 0, type: 'integer', min: -100, max: 100, colorNegative: '#e74c3c', colorPositive: '#2ecc71' };
+
+          const cleanConfig = { ...data.config };
+          if (cleanConfig.min !== undefined) cleanConfig.min = parseInt(cleanConfig.min, 10) || 0;
+          if (cleanConfig.max !== undefined) cleanConfig.max = parseInt(cleanConfig.max, 10) || 0;
+
+          myDataInTarget.values[data.metric] = { ...currentObj, ...cleanConfig, type: 'integer' };
         } else if (action === 'renameMetric') {
           const nextValues = { ...myDataInTarget.values };
           nextValues[data.newKey] = nextValues[data.oldKey];
           delete nextValues[data.oldKey];
           myDataInTarget.values = nextValues;
+          if (typeof onRenameField === 'function') {
+            onRenameField('relation', data.oldKey, data.newKey);
+          }
         } else if (action === 'removeMetric') {
           const nextValues = { ...myDataInTarget.values };
           delete nextValues[data.metric];
@@ -182,51 +275,83 @@ export default function RelationsTab({
         } else if (action === 'addMetric') {
           myDataInTarget.values = {
             ...(myDataInTarget.values || {}),
-            [data.metric]: { value: 0, min: relationMin, max: relationMax, colorNegative: '#e74c3c', colorPositive: '#2ecc71' }
+            [data.metric]: {
+              value: 0,
+              type: 'integer',
+              min: Number.isFinite(parseInt(relationMin, 10)) ? parseInt(relationMin, 10) : -100,
+              max: Number.isFinite(parseInt(relationMax, 10)) ? parseInt(relationMax, 10) : 100,
+              colorNegative: '#e74c3c',
+              colorPositive: '#2ecc71'
+            }
           };
         }
         nextRelations[matchedKey] = myDataInTarget;
         return { ...c, relations: nextRelations };
       }
 
-      // If target is a minor NPC without a card, update targetText/targetValues in this character's relation object
       if (!targetCharObj && c.id === charId) {
         const nextRelations = { ...(c.relations || {}) };
         const targetData = nextRelations[targetName]
-          ? JSON.parse(JSON.stringify(nextRelations[targetName]))
+          ? deepClone(nextRelations[targetName])
           : { text: '', targetText: '', isLocked: false, isInject: true, values: {}, targetValues: {} };
 
         if (action === 'updateField') {
           targetData.targetText = data.value;
         } else if (action === 'updateMetricValue') {
           targetData.targetValues = targetData.targetValues || {};
+          const parsedVal = parseInt(data.value, 10);
+          const safeVal = !isNaN(parsedVal) ? parsedVal : 0;
           const old = targetData.targetValues[data.field];
+
           if (typeof old === 'object' && old !== null) {
-            targetData.targetValues[data.field] = { ...old, value: data.value };
+            targetData.targetValues[data.field] = { ...old, value: safeVal, type: 'integer' };
           } else {
-            targetData.targetValues[data.field] = { value: data.value, min: -100, max: 100, colorNegative: '#e74c3c', colorPositive: '#2ecc71' };
+            targetData.targetValues[data.field] = {
+              value: safeVal,
+              type: 'integer',
+              min: -100,
+              max: 100,
+              colorNegative: '#e74c3c',
+              colorPositive: '#2ecc71'
+            };
           }
         } else if (action === 'updateMetricConfig') {
           targetData.targetValues = targetData.targetValues || {};
           const mKey = data.metric;
           const old = targetData.targetValues[mKey];
-          const currentObj = typeof old === 'object' && old !== null ? old : { value: old || 0, min: -100, max: 100, colorNegative: '#e74c3c', colorPositive: '#2ecc71' };
-          targetData.targetValues[mKey] = { ...currentObj, ...data.config };
+          const currentObj = typeof old === 'object' && old !== null
+            ? old
+            : { value: 0, type: 'integer', min: -100, max: 100, colorNegative: '#e74c3c', colorPositive: '#2ecc71' };
+
+          const cleanConfig = { ...data.config };
+          if (cleanConfig.min !== undefined) cleanConfig.min = parseInt(cleanConfig.min, 10) || 0;
+          if (cleanConfig.max !== undefined) cleanConfig.max = parseInt(cleanConfig.max, 10) || 0;
+
+          targetData.targetValues[mKey] = { ...currentObj, ...cleanConfig, type: 'integer' };
         } else if (action === 'renameMetric') {
           targetData.targetValues = targetData.targetValues || {};
           const nextValues = { ...targetData.targetValues };
           nextValues[data.newKey] = nextValues[data.oldKey];
           delete nextValues[data.oldKey];
           targetData.targetValues = nextValues;
+          if (typeof onRenameField === 'function') {
+            onRenameField('relation', data.oldKey, data.newKey);
+          }
         } else if (action === 'removeMetric') {
-          targetData.targetValues = targetData.targetValues || {};
-          const nextValues = { ...targetData.targetValues };
+          const nextValues = { ...(targetData.targetValues || {}) };
           delete nextValues[data.metric];
           targetData.targetValues = nextValues;
         } else if (action === 'addMetric') {
           targetData.targetValues = {
             ...(targetData.targetValues || {}),
-            [data.metric]: { value: 0, min: relationMin, max: relationMax, colorNegative: '#e74c3c', colorPositive: '#2ecc71' }
+            [data.metric]: {
+              value: 0,
+              type: 'integer',
+              min: parseInt(relationMin, 10) || -100,
+              max: parseInt(relationMax, 10) || 100,
+              colorNegative: '#e74c3c',
+              colorPositive: '#2ecc71'
+            }
           };
         }
         nextRelations[targetName] = targetData;
@@ -288,17 +413,19 @@ export default function RelationsTab({
             <span className={styles.metricLimitLabel}>min</span>
             <input
               type="number"
+              step="1"
               value={relationMin}
               disabled={relationPreset !== 'custom'}
-              onChange={e => setRelationMin(Number(e.target.value))}
+              onChange={e => setRelationMin(parseInt(e.target.value, 10) || 0)}
               className={styles.limitInput}
             />
             <span className={styles.metricLimitLabel}>max</span>
             <input
               type="number"
+              step="1"
               value={relationMax}
               disabled={relationPreset !== 'custom'}
-              onChange={e => setRelationMax(Number(e.target.value))}
+              onChange={e => setRelationMax(parseInt(e.target.value, 10) || 0)}
               className={styles.limitInput}
             />
           </div>
@@ -323,7 +450,7 @@ export default function RelationsTab({
       </div>
 
       {totalRelations === 0 ? (
-        <p className={styles.emptySectionText}>No relations recorded.</p>
+        <p className="rpg-empty-text">No relations recorded.</p>
       ) : (
         relationsList.map(([targetName, data], rIdx) => {
           const isExpanded = !!expandedIds[`relation_${targetName}`];
@@ -379,7 +506,7 @@ export default function RelationsTab({
                     onMoveUp={() => handleReorderRelation(targetName, 'up')}
                     onMoveDown={() => handleReorderRelation(targetName, 'down')}
                   />
-                  {isRealCharacter && <span className={styles.syncBadge}>Synced</span>}
+                  {isRealCharacter && <span className="rpg-sync-badge">Synced</span>}
 
                   <ToggleSwitch
                     label="Inject"
@@ -434,9 +561,10 @@ export default function RelationsTab({
 
                     {Object.entries(data.values || {}).map(([mName, mVal]) => {
                       const isObj = typeof mVal === 'object' && mVal !== null;
-                      const mValue = isObj ? mVal.value : mVal;
-                      const mMin = isObj && mVal.min !== undefined ? mVal.min : -100;
-                      const mMax = isObj && mVal.max !== undefined ? mVal.max : 100;
+                      const parsedValue = parseInt(isObj ? mVal.value : mVal, 10);
+                      const mValue = !isNaN(parsedValue) ? parsedValue : 0;
+                      const mMin = isObj && Number.isFinite(parseInt(mVal.min, 10)) ? parseInt(mVal.min, 10) : -100;
+                      const mMax = isObj && Number.isFinite(parseInt(mVal.max, 10)) ? parseInt(mVal.max, 10) : 100;
                       const mColorNegative = isObj && mVal.colorNegative ? mVal.colorNegative : '#e74c3c';
                       const mColorPositive = isObj && mVal.colorPositive ? mVal.colorPositive : '#2ecc71';
 
@@ -465,8 +593,9 @@ export default function RelationsTab({
                             <div className={styles.metricValueGroup}>
                               <input
                                 type="number"
-                                value={mValue !== undefined ? mValue : 0}
-                                onChange={e => handleUpdateRelations(targetName, 'updateMetricValue', { field: mName, value: Number(e.target.value) })}
+                                step="1"
+                                value={mValue}
+                                onChange={e => handleUpdateRelations(targetName, 'updateMetricValue', { field: mName, value: parseInt(e.target.value, 10) || 0 })}
                                 className={styles.metricValueInput}
                               />
                               <button
@@ -521,9 +650,10 @@ export default function RelationsTab({
 
                     {Object.entries(targetMetricsSource || {}).map(([tmName, tmVal]) => {
                       const isObj = typeof tmVal === 'object' && tmVal !== null;
-                      const tmValue = isObj ? tmVal.value : tmVal;
-                      const tmMin = isObj && tmVal.min !== undefined ? tmVal.min : -100;
-                      const tmMax = isObj && tmVal.max !== undefined ? tmVal.max : 100;
+                      const parsedValue = parseInt(isObj ? tmVal.value : tmVal, 10);
+                      const tmValue = !isNaN(parsedValue) ? parsedValue : 0;
+                      const tmMin = isObj && Number.isFinite(parseInt(tmVal.min, 10)) ? parseInt(tmVal.min, 10) : -100;
+                      const tmMax = isObj && Number.isFinite(parseInt(tmVal.max, 10)) ? parseInt(tmVal.max, 10) : 100;
                       const tmColorNegative = isObj && tmVal.colorNegative ? tmVal.colorNegative : '#e74c3c';
                       const tmColorPositive = isObj && tmVal.colorPositive ? tmVal.colorPositive : '#2ecc71';
 
@@ -552,8 +682,9 @@ export default function RelationsTab({
                             <div className={styles.metricValueGroup}>
                               <input
                                 type="number"
-                                value={tmValue !== undefined ? tmValue : 0}
-                                onChange={e => handleUpdateTargetRelation(targetName, 'updateMetricValue', { field: tmName, value: Number(e.target.value) })}
+                                step="1"
+                                value={tmValue}
+                                onChange={e => handleUpdateTargetRelation(targetName, 'updateMetricValue', { field: tmName, value: parseInt(e.target.value, 10) || 0 })}
                                 className={styles.metricValueInput}
                               />
                               <button

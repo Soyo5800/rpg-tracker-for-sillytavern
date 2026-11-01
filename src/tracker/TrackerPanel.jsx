@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { useRPG } from '../core/RPGControl';
 import styles from './TrackerPanel.module.css';
-import { CollapseArrowIcon, BrandIcon, PlayIcon, PenIcon, GearIcon, ResetArrowIcon } from '../Icons';
+import { CollapseArrowIcon, BrandIcon, PlayIcon } from '../Icons';
 
 import StatusSection from './StatusSection';
 import StatusEditor from '../editor/StatusEditor';
+import AssetManagerModal from '../editor/AssetManagerModal';
 import PromptEditor from '../editor/PromptEditor';
 import SettingsEditor from '../editor/SettingsEditor';
 import WorldSection from './WorldSection';
@@ -15,7 +16,6 @@ export default function TrackerPanel() {
     settings,
     updateSettings,
     isChatConnected,
-    revertToOriginalTurnState,
     uiState,
     updateUiState
   } = useRPG();
@@ -25,6 +25,7 @@ export default function TrackerPanel() {
 
   const [editorCharId, setEditorCharId] = useState(null);
   const [editorTab, setEditorTab] = useState('status');
+  const [assetManagerCharId, setAssetManagerCharId] = useState(null);
   const [showPromptEditor, setShowPromptEditor] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
 
@@ -48,7 +49,7 @@ export default function TrackerPanel() {
       try {
         await window.RPGBridge.triggerManualUpdate();
       } catch (e) {
-        console.error('[RPG Tracker] Manual update failed', e);
+        console.error('[RPG Tracker] Manual update failed:', e);
       }
     }
   };
@@ -85,41 +86,13 @@ export default function TrackerPanel() {
               <button
                 type="button"
                 className={`rpg-btn ${styles.headerBtn}`}
-                onClick={() => setShowPromptEditor(true)}
+                onClick={handleManualUpdateClick}
+                title="Trigger Manual Status Update"
               >
-                <PenIcon className={styles.headerBtnIcon} />
-                <span>Prompt</span>
+                <PlayIcon className={styles.headerBtnIcon} />
+                <span>Update</span>
               </button>
-              <button
-                type="button"
-                className={`rpg-btn ${styles.headerBtn}`}
-                onClick={() => setShowSettings(true)}
-              >
-                <GearIcon className={styles.headerBtnIcon} />
-                <span>Settings</span>
-              </button>
-            </div>
-
-            <div className={styles.headerButtonRow}>
-              {(settings.updateMode === 'isolated' || settings.updateMode === 'separated') && (
-                <button
-                  type="button"
-                  className={`rpg-btn ${styles.headerBtn}`}
-                  onClick={handleManualUpdateClick}
-                >
-                  <PlayIcon className={styles.headerBtnIcon} />
-                  <span>Update</span>
-                </button>
-              )}
-              <button
-                type="button"
-                className={`rpg-btn ${styles.headerBtn}`}
-                title="Revert to Original Turn State"
-                onClick={revertToOriginalTurnState}
-              >
-                <ResetArrowIcon className={styles.headerBtnIcon} />
-                <span>TurnBack</span>
-              </button>
+              {/* Roll button for combat & dice checks will be placed here */}
             </div>
           </div>
         </header>
@@ -143,10 +116,15 @@ export default function TrackerPanel() {
 
             <main className={styles.panelBody}>
               {activeTab === 'status' && (
-                <StatusSection onOpenEditor={(charId, tab = 'status') => {
-                  setEditorCharId(charId);
-                  setEditorTab(tab);
-                }} />
+                <StatusSection
+                  onOpenEditor={(charId, tab = 'status') => {
+                    setEditorCharId(charId);
+                    setEditorTab(tab);
+                  }}
+                  onOpenAssetManager={(charId) => {
+                    setAssetManagerCharId(charId);
+                  }}
+                />
               )}
 
               {activeTab === 'world' && (
@@ -154,7 +132,10 @@ export default function TrackerPanel() {
               )}
 
               {activeTab === 'function' && (
-                <FuncSection />
+                <FuncSection
+                  onOpenPromptSettings={() => setShowPromptEditor(true)}
+                  onOpenSettings={() => setShowSettings(true)}
+                />
               )}
             </main>
           </div>
@@ -166,6 +147,13 @@ export default function TrackerPanel() {
           charId={editorCharId}
           initialTab={editorTab}
           onClose={() => setEditorCharId(null)}
+        />
+      )}
+
+      {assetManagerCharId && (
+        <AssetManagerModal
+          charId={assetManagerCharId}
+          onClose={() => setAssetManagerCharId(null)}
         />
       )}
 

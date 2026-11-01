@@ -1,61 +1,119 @@
 import React, { useState, useEffect } from 'react';
 import { useRPG } from '../core/RPGControl';
 import styles from './StatusEditor.module.css';
-import { sanitizeTrackerData, syncCrossRelations } from '../core/JSONTracker';
-import { setNestedValue } from '../core/StateHelpers';
+import {
+  sanitizeTrackerData,
+  syncCrossRelations,
+  migrateCharacterSchema,
+  isBase64Image
+} from '../core/JSONTracker';
+import { setNestedValue, deepClone } from '../core/StateHelpers';
 import { GearIcon } from '../Icons';
-import { DEFAULT_STATUS_SCHEMAS, DEFAULT_STATUS, getDefaultCharacters } from '../core/PromptSchema';
-import { resolveSillyTavernAvatarUrl } from '../utils';
+import { DEFAULT_STATUS_SCHEMAS, DEFAULT_STATUS, DEFAULT_PROFILE, DEFAULT_PROFILE_LOCKS, getDefaultCharacters } from '../core/PromptSchema';
+import { resolveSillyTavernAvatarUrl, buildCharacterSpriteUrl, normalizeCropOffset, extractVisualMetadata } from '../core/AvatarResolver';
 
 import StatusSpecsTab from './StatusSpecsTab';
 import RelationsTab from './RelationsTab';
 import InventoryTab from './InventoryTab';
 
 import CardSyncComponent, { savePresetToSillyTavernCard } from './CardSyncComponent';
+import ModalLayout from '../ModalLayout';
 
-export default function StatusEditor({ charId, initialTab = 'status', onClose, characters, onUpdateCharacters }) {
-  const { trackerData, updateTrackerData, syncCharacterToCard } = useRPG();
+function extractRawCardPreset(matchedCard) {
+
+  if (!matchedCard || typeof matchedCard !== 'object') return null;
+
+  const raw = matchedCard.data?.extensions?.rpg_tracker
+    || matchedCard.extensions?.rpg_tracker
+    || null;
+
+  if (!raw || typeof raw !== 'object') return null;
+
+  if (Array.isArray(raw.characters) && raw.characters.length > 0) {
+    return raw.characters[0];
+  }
+  if (Array.isArray(raw) && raw.length > 0) {
+    return raw[0];
+  }
+
+  return raw;
+}
+
+export default function StatusEditor({ charId, initialTab = 'status', onClose }) {
+  const {
+    trackerData,
+    updateTrackerData,
+    syncCharacterToCard,
+    removeCharacterSync,
+    updateCustomAvatar
+  } = useRPG();
 
   const [localCharacters, setLocalCharacters] = useState(() => {
-    const getActiveCharacters = () => {
-      if (characters && characters.length > 0) return characters;
-      if (trackerData.characters && trackerData.characters.length > 0) return trackerData.characters;
-      return getDefaultCharacters();
-    };
-    return JSON.parse(JSON.stringify(getActiveCharacters()));
+    const activeChars = trackerData.characters && trackerData.characters.length > 0
+      ? trackerData.characters
+      : getDefaultCharacters();
+    return deepClone(activeChars);
   });
+
+  const [localGlobalDefs, setLocalGlobalDefs] = useState(() =>
+    trackerData.globalDefinitions ? deepClone(trackerData.globalDefinitions) : {}
+  );
 
   const [expandedIds, setExpandedIds] = useState({});
   const [activeTab, setActiveTab] = useState(initialTab);
-
   const [presetEditingTarget, setPresetEditingTarget] = useState(null);
+  const [pendingAvatarUpdate, setPendingAvatarUpdate] = useState(undefined);
+  const [pendingCardSync, setPendingCardSync] = useState(undefined);
 
   useEffect(() => {
     const getActiveCharacters = () => {
-      if (characters && characters.length > 0) return characters;
       if (trackerData.characters && trackerData.characters.length > 0) return trackerData.characters;
       return getDefaultCharacters();
     };
-    setLocalCharacters(JSON.parse(JSON.stringify(getActiveCharacters())));
-  }, [trackerData.characters, characters]);
+    setLocalCharacters(deepClone(getActiveCharacters()));
+    setLocalGlobalDefs(trackerData.globalDefinitions ? JSON.parse(JSON.stringify(trackerData.globalDefinitions)) : {});
+    setPendingAvatarUpdate(undefined);
+    setPendingCardSync(undefined);
+  }, [charId]);
 
   const targetChar = localCharacters.find(c => c.id === charId);
 
-  const context = window.SillyTavern?.getContext?.();
-  let liveName = targetChar ? targetChar.name : '';
-  let liveAvatarUrl = targetChar ? targetChar.avatarUrl : '';
+  if (!charId || !targetChar) {
+    return null;
+  }
 
-  if (context && targetChar) {
+  const context = window.SillyTavern?.getContext?.();
+
+  let liveName = targetChar.name || '';
+  let liveAvatarUrl = targetChar.avatarUrl || '';
+
+  if (isBase64Image(liveAvatarUrl)) {
+    liveAvatarUrl = '';
+  }
+
+  if (targetChar.assetName) {
+    liveAvatarUrl = buildCharacterSpriteUrl(targetChar.assetName, targetChar.selectedSprite, targetChar.isFolder);
+  }
+
+  if (context) {
     if (targetChar.syncedCardType === 'Persona') {
       liveName = context.name1 || window.name1 || targetChar.name;
-      const userAvatarFile = context.user_avatar || window.user_avatar || 'default.png';
-      liveAvatarUrl = resolveSillyTavernAvatarUrl(userAvatarFile, 'Persona');
+      if (!liveAvatarUrl) {
+        const userAvatarFile = context.user_avatar || window.user_avatar || null;
+        liveAvatarUrl = resolveSillyTavernAvatarUrl(userAvatarFile, 'Persona');
+      }
     } else if (targetChar.syncedCardAvatar && targetChar.syncedCardType === 'Card') {
-      const allChars = Array.isArray(context.characters) ? context.characters : (Array.isArray(window.characters) ? window.characters : []);
+      const allChars = Array.isArray(context.characters)
+        ? context.characters
+        : (Array.isArray(window.characters) ? window.characters : []);
       const matched = allChars.find(c => c.avatar === targetChar.syncedCardAvatar);
       if (matched) {
         liveName = matched.name;
-        liveAvatarUrl = resolveSillyTavernAvatarUrl(matched.avatar, 'Card');
+        if (!liveAvatarUrl) {
+          liveAvatarUrl = resolveSillyTavernAvatarUrl(matched.avatar, 'Card');
+        }
+      } else if (!liveAvatarUrl) {
+        liveAvatarUrl = resolveSillyTavernAvatarUrl(targetChar.syncedCardAvatar, 'Card');
       }
     }
   }
@@ -63,6 +121,20 @@ export default function StatusEditor({ charId, initialTab = 'status', onClose, c
   const isEditingPreset = presetEditingTarget !== null;
   const currentEditingChar = isEditingPreset ? presetEditingTarget : targetChar;
   const currentEditingList = isEditingPreset ? [presetEditingTarget] : localCharacters;
+
+  const handleRenameFieldInDefs = (category, oldKey, newKey) => {
+    if (!oldKey || !newKey || oldKey === newKey) return;
+    const oldFullKey = `${category}_${oldKey}`;
+    const newFullKey = `${category}_${newKey}`;
+
+    setLocalGlobalDefs(prev => {
+      if (!prev || prev[oldFullKey] === undefined) return prev;
+      const next = { ...prev };
+      next[newFullKey] = next[oldFullKey];
+      delete next[oldFullKey];
+      return next;
+    });
+  };
 
   const handleUpdateList = (updater) => {
     if (isEditingPreset) {
@@ -91,39 +163,6 @@ export default function StatusEditor({ charId, initialTab = 'status', onClose, c
     ));
   };
 
-  const handleAddCharacter = () => {
-    const name = "New Character";
-    const newChar = JSON.parse(JSON.stringify(getDefaultCharacters()[0]));
-    newChar.id = `char_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-    newChar.name = name;
-    newChar.activePlayer = false;
-    newChar.activeInjection = true;
-
-    let nextChars;
-    if (localCharacters.length === 1 && localCharacters[0].id === 'char_user' && localCharacters[0].name === 'New') {
-      nextChars = [newChar];
-    } else {
-      nextChars = [...localCharacters, newChar];
-    }
-
-    if (onUpdateCharacters) {
-      onUpdateCharacters(nextChars);
-    } else if (updateTrackerData) {
-      updateTrackerData({ ...trackerData, characters: nextChars });
-    }
-  };
-
-  if (!charId || !targetChar) {
-    if (!charId) {
-      return (
-        <button type="button" className="rpg-btn-dashed" onClick={handleAddCharacter}>
-          + Add Character
-        </button>
-      );
-    }
-    return null;
-  }
-
   const handleSyncCard = (target) => {
     setLocalCharacters(prev => prev.map(c => {
       if (c.id !== charId) return c;
@@ -132,34 +171,75 @@ export default function StatusEditor({ charId, initialTab = 'status', onClose, c
         return {
           ...c,
           syncedCardAvatar: null,
-          syncedCardType: null
+          syncedCardType: null,
+          avatarUrl: c.assetName ? buildCharacterSpriteUrl(c.assetName, c.selectedSprite, c.isFolder) : null
         };
       }
+
+      const cardPreset = target.preset || null;
+      const hasPresetVisual = Boolean(cardPreset && (cardPreset.assetName || cardPreset.isFolder !== undefined));
+      const isCardChanged = c.syncedCardAvatar !== target.avatarFile;
+
+      const effectiveAssetName = hasPresetVisual
+        ? cardPreset.assetName
+        : (isCardChanged ? target.avatarFile : (c.assetName || target.avatarFile));
+      const effectiveIsFolder = hasPresetVisual
+        ? Boolean(cardPreset.isFolder)
+        : (isCardChanged ? false : (c.isFolder !== undefined ? c.isFolder : false));
+      const effectiveSelectedSprite = hasPresetVisual
+        ? (cardPreset.selectedSprite || null)
+        : (isCardChanged ? null : c.selectedSprite);
+      const effectiveAvailableSprites = hasPresetVisual
+        ? (Array.isArray(cardPreset.availableSprites) ? cardPreset.availableSprites : [])
+        : (isCardChanged ? [] : (c.availableSprites || []));
+      const effectiveEnableExpression = hasPresetVisual
+        ? Boolean(cardPreset.enableExpression)
+        : (isCardChanged ? false : Boolean(c.enableExpression));
+      const effectiveCropOffset = hasPresetVisual && cardPreset.cropOffset
+        ? normalizeCropOffset(cardPreset.cropOffset)
+        : (c.cropOffset ? normalizeCropOffset(c.cropOffset) : { x: 50, y: 50, zoom: 1 });
+      const effectiveViewportScale = hasPresetVisual && cardPreset.viewportScale !== undefined
+        ? Math.min(100, Math.max(20, cardPreset.viewportScale))
+        : (c.viewportScale ?? 100);
+      const effectiveViewportOpacity = hasPresetVisual && cardPreset.viewportOpacity !== undefined
+        ? Math.min(1.0, Math.max(0.1, cardPreset.viewportOpacity))
+        : (c.viewportOpacity ?? 0.95);
+
+      const effectiveAvatarUrl = effectiveAssetName
+        ? buildCharacterSpriteUrl(effectiveAssetName, effectiveSelectedSprite, effectiveIsFolder)
+        : (target.avatarUrl || resolveSillyTavernAvatarUrl(target.avatarFile, target.type));
 
       return {
         ...c,
         name: target.name,
-        avatarUrl: target.avatarUrl,
-        syncedCardAvatar: target.avatarFile,
-        syncedCardType: target.type
+        avatarUrl: effectiveAvatarUrl,
+        syncedCardAvatar: target.avatarFile || null,
+        syncedCardType: target.type,
+        assetName: effectiveAssetName,
+        isFolder: effectiveIsFolder,
+        selectedSprite: effectiveSelectedSprite,
+        availableSprites: effectiveAvailableSprites,
+        enableExpression: effectiveEnableExpression,
+        cropOffset: effectiveCropOffset,
+        viewportScale: effectiveViewportScale,
+        viewportOpacity: effectiveViewportOpacity
       };
     }));
 
-    if (syncCharacterToCard) {
-      syncCharacterToCard(charId, target);
-    }
+    setPendingCardSync(target);
 
     if (target.type === 'Unsync') {
-      alert("Card synchronization has been removed. Current values have been kept.");
+      alert("Card synchronization removed. Click 'Save' to apply changes.");
     } else {
-      alert(`"${target.name}" card synchronization completed successfully.`);
+      alert(`Card "${target.name}" linked. Click 'Save' to apply changes.`);
     }
   };
 
   const handleLoadPresetToActive = () => {
-    const context = window.SillyTavern?.getContext?.();
     const syncedAvatar = targetChar.syncedCardAvatar;
-    const allChars = Array.isArray(context?.characters) ? context.characters : (Array.isArray(window.characters) ? window.characters : []);
+    const allChars = Array.isArray(context?.characters)
+      ? context.characters
+      : (Array.isArray(window.characters) ? window.characters : []);
     const matchedCard = allChars.find(c => c.avatar === syncedAvatar);
 
     if (!matchedCard) {
@@ -167,48 +247,103 @@ export default function StatusEditor({ charId, initialTab = 'status', onClose, c
       return;
     }
 
-    const cardPreset = matchedCard.data?.extensions?.rpg_tracker;
-    if (!cardPreset) {
+    const rawPreset = extractRawCardPreset(matchedCard);
+    if (!rawPreset) {
       alert("No preset data found inside this card. You can edit and save a preset first.");
       return;
     }
 
-    if (window.confirm(`Are you sure you want to load the preset template of "${liveName}" into the active session? This will overwrite your current status and features for this turn.`)) {
+    if (window.confirm(`Load preset template of "${liveName}" into active session? Current turn edits will be overwritten.`)) {
+      const cardPreset = migrateCharacterSchema(JSON.parse(JSON.stringify(rawPreset)));
+      const visualMeta = extractVisualMetadata(cardPreset, targetChar);
+
+      let nextAvatarUrl = null;
+      if (visualMeta.assetName) {
+        nextAvatarUrl = buildCharacterSpriteUrl(visualMeta.assetName, visualMeta.selectedSprite, visualMeta.isFolder);
+      } else if (targetChar.syncedCardAvatar) {
+        nextAvatarUrl = resolveSillyTavernAvatarUrl(targetChar.syncedCardAvatar, targetChar.syncedCardType || 'Card');
+      }
+
       setLocalCharacters(localCharacters.map(c => {
         if (c.id !== charId) return c;
         return {
           ...c,
           statusSchema: JSON.parse(JSON.stringify(cardPreset.statusSchema || DEFAULT_STATUS_SCHEMAS)),
           status: JSON.parse(JSON.stringify(cardPreset.status || DEFAULT_STATUS)),
-          profile: JSON.parse(JSON.stringify(cardPreset.profile || { Race: '', Height: '', Appearance: '' })),
-          inventory: JSON.parse(JSON.stringify(cardPreset.inventory || { equipment: {}, storage: {} })),
+          profile: JSON.parse(JSON.stringify(cardPreset.profile || (c.activePlayer ? DEFAULT_PROFILE : {}))),
+          inventory: JSON.parse(JSON.stringify(cardPreset.inventory || (c.activePlayer ? {
+            equipIsLocked: false,
+            equipIsInject: true,
+            storageIsLocked: false,
+            storageIsInject: true,
+            equipmentLocks: {},
+            storageLocks: {},
+            equipment: { 'Right Hand': null, 'Left Hand': null },
+            storage: { 'Backpack': [] }
+          } : {
+            equipIsLocked: false,
+            equipIsInject: false,
+            storageIsLocked: false,
+            storageIsInject: false,
+            equipmentLocks: {},
+            storageLocks: {},
+            equipment: {},
+            storage: {}
+          }))),
           quests: JSON.parse(JSON.stringify(cardPreset.quests || { main: { name: '', desc: '' }, sides: [] })),
-          relations: JSON.parse(JSON.stringify(cardPreset.relations || {}))
+          relations: JSON.parse(JSON.stringify(cardPreset.relations || {})),
+          ...visualMeta,
+          avatarUrl: nextAvatarUrl
         };
       }));
-      alert("Preset loaded into the active session successfully.");
+
+      setPendingAvatarUpdate(visualMeta);
+
+      alert("Preset template loaded into editor. Click 'Save' to apply to the active session.");
     }
   };
 
   const handleLoadActiveToPreset = () => {
-    if (window.confirm("Are you sure you want to copy the active session's current status and features into this preset editor? This will overwrite your working preset edits.")) {
+    if (window.confirm("Copy active session values into this preset editor? Unsaved working preset edits will be replaced.")) {
+      const visualMeta = extractVisualMetadata(targetChar);
+
       setPresetEditingTarget(prev => ({
         ...prev,
         statusSchema: JSON.parse(JSON.stringify(targetChar.statusSchema || DEFAULT_STATUS_SCHEMAS)),
         status: JSON.parse(JSON.stringify(targetChar.status || DEFAULT_STATUS)),
-        profile: JSON.parse(JSON.stringify(targetChar.profile || { Race: '', Height: '', Appearance: '' })),
-        inventory: JSON.parse(JSON.stringify(targetChar.inventory || { equipment: {}, storage: {} })),
+        profile: JSON.parse(JSON.stringify(targetChar.profile || {})),
+        inventory: JSON.parse(JSON.stringify(targetChar.inventory || (targetChar.activePlayer ? {
+          equipIsLocked: false,
+          equipIsInject: true,
+          storageIsLocked: false,
+          storageIsInject: true,
+          equipmentLocks: {},
+          storageLocks: {},
+          equipment: { 'Right Hand': null, 'Left Hand': null },
+          storage: { 'Backpack': [] }
+        } : {
+          equipIsLocked: false,
+          equipIsInject: false,
+          storageIsLocked: false,
+          storageIsInject: false,
+          equipmentLocks: {},
+          storageLocks: {},
+          equipment: {},
+          storage: {}
+        }))),
         quests: JSON.parse(JSON.stringify(targetChar.quests || { main: { name: '', desc: '' }, sides: [] })),
-        relations: JSON.parse(JSON.stringify(targetChar.relations || {}))
+        relations: JSON.parse(JSON.stringify(targetChar.relations || {})),
+        ...visualMeta
       }));
-      alert("Active session status copied to the preset editor. Click 'Save Preset to Card' to permanently write it to the card PNG.");
+      alert("Active session values copied to preset editor. Click 'Save Preset to Card' to persist changes.");
     }
   };
 
   const handleOpenPresetEditor = () => {
-    const context = window.SillyTavern?.getContext?.();
     const syncedAvatar = targetChar.syncedCardAvatar;
-    const allChars = Array.isArray(context?.characters) ? context.characters : (Array.isArray(window.characters) ? window.characters : []);
+    const allChars = Array.isArray(context?.characters)
+      ? context.characters
+      : (Array.isArray(window.characters) ? window.characters : []);
     const matchedCard = allChars.find(c => c.avatar === syncedAvatar);
 
     if (!matchedCard) {
@@ -216,17 +351,39 @@ export default function StatusEditor({ charId, initialTab = 'status', onClose, c
       return;
     }
 
-    const presetData = matchedCard.data?.extensions?.rpg_tracker || {};
+    const rawPresetData = extractRawCardPreset(matchedCard) || {};
+    const presetData = migrateCharacterSchema(JSON.parse(JSON.stringify(rawPresetData)));
+    const visualMeta = extractVisualMetadata(presetData, targetChar);
+
     const virtualPresetChar = {
       id: `preset_${syncedAvatar}`,
       name: `${matchedCard.name}`,
       activePlayer: targetChar.activePlayer,
       statusSchema: presetData.statusSchema || JSON.parse(JSON.stringify(DEFAULT_STATUS_SCHEMAS)),
       status: presetData.status || JSON.parse(JSON.stringify(DEFAULT_STATUS)),
-      profile: presetData.profile || { Race: '', Height: '', Appearance: '' },
-      inventory: presetData.inventory || { equipment: {}, storage: {} },
+      profile: presetData.profile || (targetChar.activePlayer ? JSON.parse(JSON.stringify(DEFAULT_PROFILE)) : {}),
+      inventory: presetData.inventory || (targetChar.activePlayer ? {
+        equipIsLocked: false,
+        equipIsInject: true,
+        storageIsLocked: false,
+        storageIsInject: true,
+        equipmentLocks: {},
+        storageLocks: {},
+        equipment: { 'Right Hand': null, 'Left Hand': null },
+        storage: { 'Backpack': [] }
+      } : {
+        equipIsLocked: false,
+        equipIsInject: false,
+        storageIsLocked: false,
+        storageIsInject: false,
+        equipmentLocks: {},
+        storageLocks: {},
+        equipment: {},
+        storage: {}
+      }),
       quests: presetData.quests || { main: { name: '', desc: '' }, sides: [] },
-      relations: presetData.relations || {}
+      relations: presetData.relations || {},
+      ...visualMeta
     };
 
     setPresetEditingTarget(virtualPresetChar);
@@ -234,9 +391,10 @@ export default function StatusEditor({ charId, initialTab = 'status', onClose, c
 
   const handleResetCharacter = () => {
     if (isEditingPreset) {
-      const context = window.SillyTavern?.getContext?.();
       const syncedAvatar = targetChar.syncedCardAvatar;
-      const allChars = Array.isArray(context?.characters) ? context.characters : (Array.isArray(window.characters) ? window.characters : []);
+      const allChars = Array.isArray(context?.characters)
+        ? context.characters
+        : (Array.isArray(window.characters) ? window.characters : []);
       const matchedCard = allChars.find(c => c.avatar === syncedAvatar);
 
       if (!matchedCard) {
@@ -244,56 +402,142 @@ export default function StatusEditor({ charId, initialTab = 'status', onClose, c
         return;
       }
 
-      if (window.confirm("Are you sure you want to revert your unsaved preset changes and load the last saved preset from the card?")) {
-        const presetData = matchedCard.data?.extensions?.rpg_tracker || {};
+      if (window.confirm("Revert unsaved preset changes and reload the last saved preset from the card?")) {
+        const rawPresetData = extractRawCardPreset(matchedCard) || {};
+        const presetData = migrateCharacterSchema(JSON.parse(JSON.stringify(rawPresetData)));
+        const visualMeta = extractVisualMetadata(presetData, targetChar);
+
         setPresetEditingTarget(prev => ({
           ...prev,
           statusSchema: JSON.parse(JSON.stringify(presetData.statusSchema || DEFAULT_STATUS_SCHEMAS)),
           status: JSON.parse(JSON.stringify(presetData.status || DEFAULT_STATUS)),
-          profile: JSON.parse(JSON.stringify(presetData.profile || { Race: '', Height: '', Appearance: '' })),
-          inventory: JSON.parse(JSON.stringify(presetData.inventory || { equipment: {}, storage: {} })),
+          profile: JSON.parse(JSON.stringify(presetData.profile || (targetChar.activePlayer ? DEFAULT_PROFILE : {}))),
+          inventory: JSON.parse(JSON.stringify(presetData.inventory || (targetChar.activePlayer ? {
+            equipIsLocked: false,
+            equipIsInject: true,
+            storageIsLocked: false,
+            storageIsInject: true,
+            equipmentLocks: {},
+            storageLocks: {},
+            equipment: { 'Right Hand': null, 'Left Hand': null },
+            storage: { 'Backpack': [] }
+          } : {
+            equipIsLocked: false,
+            equipIsInject: false,
+            storageIsLocked: false,
+            storageIsInject: false,
+            equipmentLocks: {},
+            storageLocks: {},
+            equipment: {},
+            storage: {}
+          }))),
           quests: JSON.parse(JSON.stringify(presetData.quests || { main: { name: '', desc: '' }, sides: [] })),
-          relations: JSON.parse(JSON.stringify(presetData.relations || {}))
+          relations: JSON.parse(JSON.stringify(presetData.relations || {})),
+          ...visualMeta
         }));
       }
     } else {
-      const context = window.SillyTavern?.getContext?.();
-      const allChars = Array.isArray(context?.characters) ? context.characters : (Array.isArray(window.characters) ? window.characters : []);
+      const allChars = Array.isArray(context?.characters)
+        ? context.characters
+        : (Array.isArray(window.characters) ? window.characters : []);
       const matchedCard = allChars.find(c => c.avatar === targetChar.syncedCardAvatar);
-      const cardPreset = matchedCard?.data?.extensions?.rpg_tracker;
+      const rawCardPreset = extractRawCardPreset(matchedCard);
+      const cardPreset = rawCardPreset ? migrateCharacterSchema(JSON.parse(JSON.stringify(rawCardPreset))) : null;
 
       const confirmMessage = cardPreset
-        ? `Do you want to restore the character data of "${liveName}" to the synced card template?`
-        : `Do you want to restore the character data of "${liveName}" to default factory schemas?`;
+        ? `Reset "${liveName}" to the synchronized card preset template?`
+        : `Reset "${liveName}" to default factory schema?`;
 
       if (window.confirm(confirmMessage)) {
         setLocalCharacters(localCharacters.map(c => {
           if (c.id !== charId) return c;
 
           if (cardPreset) {
+            const visualMeta = extractVisualMetadata(cardPreset, c);
+            let nextAvatarUrl = null;
+            if (visualMeta.assetName) {
+              nextAvatarUrl = buildCharacterSpriteUrl(visualMeta.assetName, visualMeta.selectedSprite, visualMeta.isFolder);
+            } else if (c.syncedCardAvatar) {
+              nextAvatarUrl = resolveSillyTavernAvatarUrl(c.syncedCardAvatar, c.syncedCardType || 'Card');
+            }
+
+            setPendingAvatarUpdate(visualMeta);
+
             return {
               ...c,
               statusSchema: JSON.parse(JSON.stringify(cardPreset.statusSchema || DEFAULT_STATUS_SCHEMAS)),
               status: JSON.parse(JSON.stringify(cardPreset.status || DEFAULT_STATUS)),
-              profile: JSON.parse(JSON.stringify(cardPreset.profile || { Race: '', Height: '', Appearance: '' })),
-              inventory: JSON.parse(JSON.stringify(cardPreset.inventory || { equipment: {}, storage: {} })),
+              profile: JSON.parse(JSON.stringify(cardPreset.profile || (c.activePlayer ? DEFAULT_PROFILE : {}))),
+              inventory: JSON.parse(JSON.stringify(cardPreset.inventory || (c.activePlayer ? {
+                equipIsLocked: false,
+                equipIsInject: true,
+                storageIsLocked: false,
+                storageIsInject: true,
+                equipmentLocks: {},
+                storageLocks: {},
+                equipment: { 'Right Hand': null, 'Left Hand': null },
+                storage: { 'Backpack': [] }
+              } : {
+                equipIsLocked: false,
+                equipIsInject: false,
+                storageIsLocked: false,
+                storageIsInject: false,
+                equipmentLocks: {},
+                storageLocks: {},
+                equipment: {},
+                storage: {}
+              }))),
               quests: JSON.parse(JSON.stringify(cardPreset.quests || { main: { name: '', desc: '' }, sides: [] })),
-              relations: JSON.parse(JSON.stringify(cardPreset.relations || {}))
+              relations: JSON.parse(JSON.stringify(cardPreset.relations || {})),
+              ...visualMeta,
+              avatarUrl: nextAvatarUrl
             };
+          }
+
+          setPendingAvatarUpdate(null);
+
+          let defaultAvatarUrl = null;
+          if (c.syncedCardAvatar) {
+            defaultAvatarUrl = resolveSillyTavernAvatarUrl(c.syncedCardAvatar, c.syncedCardType || 'Card');
           }
 
           return {
             ...c,
             statusSchema: JSON.parse(JSON.stringify(DEFAULT_STATUS_SCHEMAS)),
             status: JSON.parse(JSON.stringify(DEFAULT_STATUS)),
-            profile: { Race: '', Height: '', Appearance: '' },
-            inventory: {
-              equipIsLocked: false, equipIsInject: true, storageIsLocked: false, storageIsInject: true,
-              equipmentLocks: {}, storageLocks: {},
-              equipment: { 'Right Hand': null, 'Left Hand': null }, storage: { 'Backpack': [] }
+            profile: JSON.parse(JSON.stringify(c.activePlayer ? DEFAULT_PROFILE : {})),
+            profileLocks: JSON.parse(JSON.stringify(c.activePlayer ? DEFAULT_PROFILE_LOCKS : {})),
+            profileInjects: {},
+            inventory: c.activePlayer ? {
+              equipIsLocked: false,
+              equipIsInject: true,
+              storageIsLocked: false,
+              storageIsInject: true,
+              equipmentLocks: {},
+              storageLocks: {},
+              equipment: { 'Right Hand': null, 'Left Hand': null },
+              storage: { 'Backpack': [] }
+            } : {
+              equipIsLocked: false,
+              equipIsInject: false,
+              storageIsLocked: false,
+              storageIsInject: false,
+              equipmentLocks: {},
+              storageLocks: {},
+              equipment: {},
+              storage: {}
             },
             quests: { main: { name: '', desc: '' }, sides: [] },
-            relations: {}
+            relations: {},
+            assetName: null,
+            isFolder: true,
+            enableExpression: false,
+            selectedSprite: null,
+            availableSprites: [],
+            cropOffset: { x: 50, y: 50, zoom: 1 },
+            viewportScale: 100,
+            viewportOpacity: 0.95,
+            avatarUrl: defaultAvatarUrl
           };
         }));
       }
@@ -301,46 +545,82 @@ export default function StatusEditor({ charId, initialTab = 'status', onClose, c
   };
 
   const handleDeletePresetFromCard = async () => {
-    if (window.confirm("Are you sure you want to permanently delete the custom preset metadata inside this PNG file?\nThis action cannot be undone, and the active session will be reset to default schemas.")) {
+    if (window.confirm("Permanently delete custom preset metadata from this card file?\nThis action cannot be undone.")) {
       const success = await savePresetToSillyTavernCard(targetChar.syncedCardAvatar, null);
       if (success) {
-        alert("The stored preset info inside the character card has been cleared.");
+        alert("Card preset cleared successfully.");
+        if (updateCustomAvatar) {
+          updateCustomAvatar(charId, null);
+        }
+
         setLocalCharacters(prev => prev.map(c => {
           if (c.id !== charId) return c;
+          let defaultAvatarUrl = null;
+          if (c.syncedCardAvatar) {
+            defaultAvatarUrl = resolveSillyTavernAvatarUrl(c.syncedCardAvatar, c.syncedCardType || 'Card');
+          }
           return {
             ...c,
             statusSchema: JSON.parse(JSON.stringify(DEFAULT_STATUS_SCHEMAS)),
             status: JSON.parse(JSON.stringify(DEFAULT_STATUS)),
-            profile: { Race: '', Height: '', Appearance: '' },
-            inventory: {
-              equipIsLocked: false, equipIsInject: true, storageIsLocked: false, storageIsInject: true,
-              equipmentLocks: {}, storageLocks: {},
-              equipment: { 'Right Hand': null, 'Left Hand': null }, storage: { 'Backpack': [] }
+            profile: JSON.parse(JSON.stringify(c.activePlayer ? DEFAULT_PROFILE : {})),
+            profileLocks: JSON.parse(JSON.stringify(c.activePlayer ? DEFAULT_PROFILE_LOCKS : {})),
+            profileInjects: {},
+            inventory: c.activePlayer ? {
+              equipIsLocked: false,
+              equipIsInject: true,
+              storageIsLocked: false,
+              storageIsInject: true,
+              equipmentLocks: {},
+              storageLocks: {},
+              equipment: { 'Right Hand': null, 'Left Hand': null },
+              storage: { 'Backpack': [] }
+            } : {
+              equipIsLocked: false,
+              equipIsInject: false,
+              storageIsLocked: false,
+              storageIsInject: false,
+              equipmentLocks: {},
+              storageLocks: {},
+              equipment: {},
+              storage: {}
             },
             quests: { main: { name: '', desc: '' }, sides: [] },
-            relations: {}
+            relations: {},
+            assetName: null,
+            isFolder: true,
+            enableExpression: false,
+            selectedSprite: null,
+            availableSprites: [],
+            cropOffset: { x: 50, y: 50, zoom: 1 },
+            viewportScale: 100,
+            viewportOpacity: 0.95,
+            avatarUrl: defaultAvatarUrl
           };
         }));
         setPresetEditingTarget(null);
       } else {
-        alert("An error occurred during communication with the server.");
+        alert("Failed to communicate with SillyTavern server.");
       }
     }
   };
 
   const handleSavePresetToCard = async () => {
+    const visualMeta = extractVisualMetadata(presetEditingTarget, targetChar);
+
     const presetPayload = {
       statusSchema: presetEditingTarget.statusSchema,
       status: presetEditingTarget.status,
       profile: presetEditingTarget.profile,
       inventory: presetEditingTarget.inventory,
       quests: presetEditingTarget.quests,
-      relations: presetEditingTarget.relations
+      relations: presetEditingTarget.relations,
+      ...visualMeta
     };
 
     const success = await savePresetToSillyTavernCard(targetChar.syncedCardAvatar, presetPayload);
     if (success) {
-      alert("Preset modifications have been permanently written to the character card PNG metadata.");
+      alert("Preset saved to character card metadata successfully.");
       setPresetEditingTarget(null);
     } else {
       alert("Failed to write preset. Please check SillyTavern server connection.");
@@ -353,9 +633,17 @@ export default function StatusEditor({ charId, initialTab = 'status', onClose, c
       return;
     }
     if (window.confirm("Are you sure you want to delete this character?")) {
+      if (removeCharacterSync) {
+        removeCharacterSync(charId);
+      }
+      if (updateCustomAvatar) {
+        updateCustomAvatar(charId, null);
+      }
+
       const newChars = localCharacters.filter(c => c.id !== charId);
-      if (updateTrackerData) updateTrackerData({ ...trackerData, characters: newChars });
-      if (onUpdateCharacters) onUpdateCharacters(newChars);
+      if (updateTrackerData) {
+        updateTrackerData({ ...trackerData, characters: newChars });
+      }
       onClose();
     }
   };
@@ -373,25 +661,34 @@ export default function StatusEditor({ charId, initialTab = 'status', onClose, c
   const handleImportCharacter = (e) => {
     const file = e.target.files[0];
     if (!file) return;
+
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
         const importedData = JSON.parse(event.target.result);
-        if (importedData && importedData.id) {
+        if (importedData && typeof importedData === 'object') {
+          const migrated = migrateCharacterSchema(JSON.parse(JSON.stringify(importedData)));
+          const visualMeta = extractVisualMetadata(importedData, currentEditingChar);
+
+          const tempTracker = { characters: [{ ...migrated, ...visualMeta }] };
+          const sanitizedTemp = sanitizeTrackerData(tempTracker);
+          const importedChar = sanitizedTemp.characters[0];
+
           handleUpdateList(currentEditingList.map(c =>
             c.id === currentEditingChar.id ? {
-              ...(() => {
-                const tempTracker = { characters: [importedData] };
-                const sanitizedTemp = sanitizeTrackerData(tempTracker);
-                return sanitizedTemp.characters[0];
-              })(), id: currentEditingChar.id
+              ...importedChar,
+              id: currentEditingChar.id
             } : c
           ));
+
+          if (!isEditingPreset) {
+            setPendingAvatarUpdate(visualMeta);
+          }
         } else {
           alert("Invalid character JSON file.");
         }
       } catch (error) {
-        alert("Error parsing JSON file.");
+        alert("Failed to parse JSON file.");
       }
     };
     reader.readAsText(file);
@@ -400,36 +697,80 @@ export default function StatusEditor({ charId, initialTab = 'status', onClose, c
 
   const handleSaveChanges = () => {
     if (updateTrackerData) {
+      if (pendingCardSync !== undefined && syncCharacterToCard) {
+        syncCharacterToCard(charId, pendingCardSync);
+      }
+      if (pendingAvatarUpdate !== undefined && updateCustomAvatar) {
+        updateCustomAvatar(charId, pendingAvatarUpdate);
+      }
+
       const stContext = window.SillyTavern?.getContext?.();
-      const updatedList = localCharacters.map(c => {
+      const originalChar = (trackerData.characters || []).find(c => c.id === charId);
+      const oldName = originalChar?.name?.trim() || '';
+
+      let updatedList = localCharacters.map(c => {
         if (c.id === charId) {
+          let targetAvatarUrl = null;
+          if (c.assetName) {
+            targetAvatarUrl = buildCharacterSpriteUrl(c.assetName, c.selectedSprite, c.isFolder);
+          } else if (c.avatarUrl && !isBase64Image(c.avatarUrl)) {
+            targetAvatarUrl = c.avatarUrl;
+          }
+
           if (c.syncedCardType === 'Card' && c.syncedCardAvatar) {
-            const allChars = Array.isArray(stContext?.characters) ? stContext.characters : (Array.isArray(window.characters) ? window.characters : []);
+            const allChars = Array.isArray(stContext?.characters)
+              ? stContext.characters
+              : (Array.isArray(window.characters) ? window.characters : []);
             const matched = allChars.find(stChar => stChar.avatar === c.syncedCardAvatar);
-            if (matched) {
-              return {
-                ...c,
-                name: matched.name || c.name,
-                avatarUrl: resolveSillyTavernAvatarUrl(matched.avatar, 'Card')
-              };
-            }
-          } else if (c.syncedCardType === 'Persona' && c.syncedCardAvatar) {
-            const userAvatarFile = stContext?.user_avatar || window.user_avatar || 'default.png';
-            const liveName = stContext?.name1 || window.name1 || c.name;
+            const resolvedCardUrl = matched
+              ? resolveSillyTavernAvatarUrl(matched.avatar, 'Card')
+              : resolveSillyTavernAvatarUrl(c.syncedCardAvatar, 'Card');
+
             return {
               ...c,
-              name: liveName,
-              avatarUrl: resolveSillyTavernAvatarUrl(userAvatarFile, 'Persona')
+              name: matched?.name || c.name,
+              avatarUrl: targetAvatarUrl || resolvedCardUrl
+            };
+          } else if (c.syncedCardType === 'Persona') {
+            const userAvatarFile = stContext?.user_avatar || window.user_avatar || null;
+            const currentLiveName = stContext?.name1 || window.name1 || c.name;
+            const resolvedPersonaUrl = resolveSillyTavernAvatarUrl(userAvatarFile, 'Persona');
+
+            return {
+              ...c,
+              name: currentLiveName,
+              avatarUrl: targetAvatarUrl || resolvedPersonaUrl
+            };
+          } else {
+            return {
+              ...c,
+              avatarUrl: targetAvatarUrl || null
             };
           }
-          return c;
         }
         return c;
       });
 
+      const savedTarget = updatedList.find(c => c.id === charId);
+      const newName = savedTarget?.name?.trim() || '';
+      if (oldName && newName && oldName !== newName) {
+        updatedList = updatedList.map(c => {
+          if (c.id === charId || !c.relations || c.relations[oldName] === undefined) return c;
+          const nextRelations = {};
+          Object.keys(c.relations).forEach(relKey => {
+            if (relKey === oldName && c.relations[newName] === undefined) {
+              nextRelations[newName] = c.relations[relKey];
+            } else {
+              nextRelations[relKey] = c.relations[relKey];
+            }
+          });
+          return { ...c, relations: nextRelations };
+        });
+      }
+
       const tempTracker = {
         characters: JSON.parse(JSON.stringify(updatedList)),
-        globalDefinitions: JSON.parse(JSON.stringify(trackerData.globalDefinitions || {}))
+        globalDefinitions: JSON.parse(JSON.stringify(localGlobalDefs))
       };
 
       const sanitizedTracker = sanitizeTrackerData(tempTracker);
@@ -441,71 +782,72 @@ export default function StatusEditor({ charId, initialTab = 'status', onClose, c
         characters: syncedCharacters,
         globalDefinitions: sanitizedTracker.globalDefinitions
       });
+
       alert("Character configuration saved successfully.");
       onClose();
     }
   };
 
-  const isSyncedCard = targetChar.syncedCardAvatar && targetChar.syncedCardType === 'Card';
+  const isSyncedCard = Boolean(targetChar.syncedCardAvatar && targetChar.syncedCardType === 'Card');
+  const isAnySyncActive = Boolean(targetChar.syncedCardAvatar || targetChar.syncedCardType);
 
   return (
-    <div className="rpg-modal-overlay">
-      <div className="rpg-modal-container" onClick={(e) => e.stopPropagation()}>
-        <header className="rpg-modal-header">
-          {isEditingPreset ? (
-            <div className={styles.headerNav} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <button
-                type="button"
-                className="rpg-btn rpg-btn-sm"
-                onClick={() => setPresetEditingTarget(null)}
-              >
-                Back
-              </button>
-              <span style={{ fontWeight: 'bold', color: 'var(--rpg-highlight)', fontSize: '14px' }}>
-                Editing Card Preset: {liveName}
-              </span>
-            </div>
-          ) : (
-            <div className={styles.headerNav} style={{ flexWrap: 'wrap', gap: '6px' }}>
-              <GearIcon size={20} style={{ marginRight: '2px', opacity: 0.8, flexShrink: 0 }} />
-              <input
-                type="text"
-                className={styles.charNameInput}
-                value={liveName}
-                disabled={!!targetChar.syncedCardAvatar}
-                onChange={e => setLocalCharacters(localCharacters.map(c => c.id === charId ? { ...c, name: e.target.value } : c))}
-                style={{ width: '130px', flexShrink: 0 }}
-                title={targetChar.syncedCardAvatar ? "Name is managed by SillyTavern Card Sync" : "Edit Name"}
-              />
+    <ModalLayout
+      onClose={isEditingPreset ? () => setPresetEditingTarget(null) : onClose}
+      headerContent={
+        isEditingPreset ? (
+          <div className={styles.headerNav} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <button
+              type="button"
+              className="rpg-btn-sm"
+              onClick={() => setPresetEditingTarget(null)}
+            >
+              Back
+            </button>
+            <span style={{ fontWeight: 'bold', color: 'var(--rpg-highlight)', fontSize: '14px' }}>
+              Editing Card Preset: {liveName}
+            </span>
+          </div>
+        ) : (
+          <div className={styles.headerNav} style={{ flexWrap: 'wrap', gap: '6px' }}>
+            <GearIcon size={20} style={{ marginRight: '2px', opacity: 0.8, flexShrink: 0 }} />
+            <input
+              type="text"
+              className={styles.charNameInput}
+              value={liveName}
+              disabled={isAnySyncActive}
+              onChange={e => setLocalCharacters(localCharacters.map(c => c.id === charId ? { ...c, name: e.target.value } : c))}
+              style={{ width: '130px', flexShrink: 0 }}
+              title={isAnySyncActive ? "Name is managed by SillyTavern Card Sync" : "Edit Name"}
+            />
 
-              <CardSyncComponent
-                onSync={handleSyncCard}
-                isSynced={!!targetChar.syncedCardAvatar}
-              />
+            <CardSyncComponent
+              onSync={handleSyncCard}
+              isSynced={isAnySyncActive}
+            />
 
-              {isSyncedCard && (
-                <>
-                  <button
-                    type="button"
-                    className="rpg-btn rpg-btn-sm"
-                    onClick={handleOpenPresetEditor}
-                  >
-                    Edit Preset
-                  </button>
-                  <button
-                    type="button"
-                    className="rpg-btn rpg-btn-sm"
-                    onClick={handleLoadPresetToActive}
-                  >
-                    Load Preset
-                  </button>
-                </>
-              )}
-            </div>
-          )}
-          <button className="rpg-modal-close-btn" onClick={isEditingPreset ? () => setPresetEditingTarget(null) : onClose}>×</button>
-        </header>
-
+            {isSyncedCard && (
+              <>
+                <button
+                  type="button"
+                  className="rpg-btn-sm"
+                  onClick={handleOpenPresetEditor}
+                >
+                  Edit Preset
+                </button>
+                <button
+                  type="button"
+                  className="rpg-btn-sm"
+                  onClick={handleLoadPresetToActive}
+                >
+                  Load Preset
+                </button>
+              </>
+            )}
+          </div>
+        )
+      }
+      subHeader={
         <div className="rpg-tab-nav">
           <button
             type="button"
@@ -529,73 +871,71 @@ export default function StatusEditor({ charId, initialTab = 'status', onClose, c
             Inventory
           </button>
         </div>
-
-        <div className="rpg-modal-body">
-          {activeTab === 'status' && (
-            <StatusSpecsTab
-              charId={currentEditingChar.id}
-              targetChar={currentEditingChar}
-              localCharacters={currentEditingList}
-              setLocalCharacters={handleUpdateList}
-              expandedIds={expandedIds}
-              setExpandedIds={setExpandedIds}
-              updateSchemaField={updateSchemaField}
-              handleUpdateNestedField={handleUpdateNestedField}
-            />
-          )}
-          {activeTab === 'relations' && (
-            <RelationsTab
-              charId={currentEditingChar.id}
-              targetChar={currentEditingChar}
-              localCharacters={currentEditingList}
-              setLocalCharacters={handleUpdateList}
-              expandedIds={expandedIds}
-              setExpandedIds={setExpandedIds}
-            />
-          )}
-          {activeTab === 'inventory' && (
-            <InventoryTab
-              charId={currentEditingChar.id}
-              targetChar={currentEditingChar}
-              localCharacters={currentEditingList}
-              setLocalCharacters={handleUpdateList}
-              expandedIds={expandedIds}
-              setExpandedIds={setExpandedIds}
-              handleUpdateNestedField={handleUpdateNestedField}
-            />
-          )}
-        </div>
-
-        <footer className="rpg-modal-footer">
-          {isEditingPreset ? (
-            <>
-              <div className="rpg-modal-footer-left">
-                <button className="rpg-modal-btn reset" onClick={handleResetCharacter}>Reset</button>
-                <button className="rpg-modal-btn reset" onClick={handleDeletePresetFromCard}>Delete</button>
-                <button className="rpg-modal-btn" onClick={handleLoadActiveToPreset}>Load</button>
-              </div>
-              <div className="rpg-modal-footer-right">
-                <button className="rpg-modal-btn save" onClick={handleSavePresetToCard}>Save Preset to Card</button>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="rpg-modal-footer-left">
-                <button className="rpg-modal-btn reset" onClick={handleResetCharacter}>Reset</button>
-                <button className="rpg-modal-btn reset" onClick={handleDeleteCharacter}>Delete</button>
-              </div>
-              <div className="rpg-modal-footer-right">
-                <button className="rpg-modal-btn" onClick={handleExportCharacter}>Export</button>
-                <label className="rpg-modal-btn" style={{ cursor: 'pointer' }}>
-                  Import
-                  <input type="file" accept=".json" style={{ display: 'none' }} onChange={handleImportCharacter} />
-                </label>
-                <button className="rpg-modal-btn save" onClick={handleSaveChanges}>Save</button>
-              </div>
-            </>
-          )}
-        </footer>
-      </div>
-    </div>
+      }
+      footerLeft={
+        isEditingPreset ? (
+          <>
+            <button type="button" className="rpg-modal-btn reset" onClick={handleResetCharacter}>Reset</button>
+            <button type="button" className="rpg-modal-btn reset" onClick={handleDeletePresetFromCard}>Delete</button>
+            <button type="button" className="rpg-modal-btn" onClick={handleLoadActiveToPreset}>Load</button>
+          </>
+        ) : (
+          <>
+            <button type="button" className="rpg-modal-btn reset" onClick={handleResetCharacter}>Reset</button>
+            <button type="button" className="rpg-modal-btn reset" onClick={handleDeleteCharacter}>Delete</button>
+          </>
+        )
+      }
+      footerRight={
+        isEditingPreset ? (
+          <button type="button" className="rpg-modal-btn save" onClick={handleSavePresetToCard}>Save Preset to Card</button>
+        ) : (
+          <>
+            <button type="button" className="rpg-modal-btn" onClick={handleExportCharacter}>Export</button>
+            <label className="rpg-modal-btn" style={{ cursor: 'pointer' }}>
+              Import
+              <input type="file" accept=".json" style={{ display: 'none' }} onChange={handleImportCharacter} />
+            </label>
+            <button type="button" className="rpg-modal-btn save" onClick={handleSaveChanges}>Save</button>
+          </>
+        )
+      }
+    >
+      {activeTab === 'status' && (
+        <StatusSpecsTab
+          charId={currentEditingChar.id}
+          targetChar={currentEditingChar}
+          localCharacters={currentEditingList}
+          setLocalCharacters={handleUpdateList}
+          expandedIds={expandedIds}
+          setExpandedIds={setExpandedIds}
+          updateSchemaField={updateSchemaField}
+          handleUpdateNestedField={handleUpdateNestedField}
+          onRenameField={handleRenameFieldInDefs}
+        />
+      )}
+      {activeTab === 'relations' && (
+        <RelationsTab
+          charId={currentEditingChar.id}
+          targetChar={currentEditingChar}
+          localCharacters={currentEditingList}
+          setLocalCharacters={handleUpdateList}
+          expandedIds={expandedIds}
+          setExpandedIds={setExpandedIds}
+          onRenameField={handleRenameFieldInDefs}
+        />
+      )}
+      {activeTab === 'inventory' && (
+        <InventoryTab
+          charId={currentEditingChar.id}
+          targetChar={currentEditingChar}
+          localCharacters={currentEditingList}
+          setLocalCharacters={handleUpdateList}
+          expandedIds={expandedIds}
+          setExpandedIds={setExpandedIds}
+          handleUpdateNestedField={handleUpdateNestedField}
+        />
+      )}
+    </ModalLayout>
   );
 }

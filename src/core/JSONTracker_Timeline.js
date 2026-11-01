@@ -1,51 +1,129 @@
-// src/core/JSONTracker_Timeline.js
-
-import { getDefaultCharacters, getInitialTrackerData } from './PromptSchema.js';
-import { sanitizeTrackerData } from './JSONTracker_Migrator.js';
-import { applyLLMPatch } from './JSONTracker_Patcher.js';
+import {
+    getInitialTrackerData,
+    createDefaultCharacter,
+    DEFAULT_STATUS_SCHEMAS,
+    DEFAULT_STATUS
+} from './PromptSchema.js';
+import { sanitizeTrackerData, stripPromptSettings, getNextCharacterId } from './JSONTracker_Migrator.js';
+import { applyLLMPatch, extractNormalizedPatch } from './JSONTracker_Patcher.js';
+import { resolveActiveSwipeId, isTurnSnapshotPinned, extractTurnSnapshotData } from './JSONTracker_History.js';
+import { parseResponse } from './ResponseParser.js';
+import {
+    cleanAllMessageTrackerTags,
+    RPG_DELTA_TAG_REGEX,
+    RPGMT_TAG_REGEX,
+    RPGMT_DIV_REGEX
+} from '../messagetracker/MessageCardRenderer.js';
 
 const DEFAULT_MAX_KEEP = 20;
 
 /**
- * Remove large Base64 image data from the backup object to prevent chat file size bloat
- */
-function stripBase64Avatars(data) {
-    if (data && Array.isArray(data.characters)) {
-        data.characters.forEach(char => {
-            if (typeof char.avatarUrl === 'string' && char.avatarUrl.startsWith('data:')) {
-                delete char.avatarUrl;
-            }
-        });
-    }
-    return data;
-}
-
-/**
- * Merge UI state changes directly into active tracker schemas
+ * Defensively merges snapshot data directly into active tracker schemas.
+ * Ensures historical character IDs, names, and schemas are fully protected against drops,
+ * falling back safely to default templates when snapshot characters lack explicit statusSchema.
+ * @param {Object} masterSchema - Active or default baseline schema.
+ * @param {Object} backupData - Recovered snapshot or historical backup payload.
+ * @returns {Object} Merged and schema-preserved tracker state.
  */
 export function defensiveMerge(masterSchema, backupData) {
-    if (!backupData) return masterSchema;
+    if (!backupData || typeof backupData !== 'object') return masterSchema;
 
     const merged = { ...masterSchema };
 
     Object.keys(masterSchema).forEach(key => {
         if (backupData[key] !== undefined) {
             if (key === 'characters' && Array.isArray(masterSchema.characters) && Array.isArray(backupData.characters)) {
-                merged.characters = backupData.characters.map(backupChar => {
-                    const masterChar = masterSchema.characters.find(c => c.id === backupChar.id) || {};
+                merged.characters = backupData.characters.map((backupChar, index) => {
+                    if (!backupChar || typeof backupChar !== 'object') return backupChar;
+
+                    const bName = backupChar.name?.trim()?.toLowerCase();
+
+                    const matchedMaster = (bName && masterSchema.characters.find(c => c.name?.trim()?.toLowerCase() === bName))
+                        || masterSchema.characters.find(c => c.id === backupChar.id)
+                        || null;
+
                     const cleanBackupChar = backupChar;
-                    const cleanMasterChar = masterChar;
+                    const isUserPlayer = cleanBackupChar.activePlayer !== undefined
+                        ? Boolean(cleanBackupChar.activePlayer)
+                        : (index === 0 && (cleanBackupChar.id === 'char_user' || cleanBackupChar.name === 'New'));
+
+                    const cleanMasterChar = matchedMaster || createDefaultCharacter({
+                        id: cleanBackupChar.id || (index === 0 && isUserPlayer ? 'char_user' : getNextCharacterId()),
+                        name: cleanBackupChar.name || 'Character',
+                        activePlayer: isUserPlayer
+                    });
+
+                    const effectiveId = cleanBackupChar.id || cleanMasterChar.id;
+                    const effectiveName = (cleanBackupChar.name && cleanBackupChar.name.trim() !== 'New')
+                        ? cleanBackupChar.name
+                        : (cleanMasterChar.name || cleanBackupChar.name || 'Character');
+
+                    let effectiveStatusSchema = [];
+                    if (Array.isArray(cleanBackupChar.statusSchema) && cleanBackupChar.statusSchema.length > 0) {
+                        effectiveStatusSchema = cleanBackupChar.statusSchema;
+                    } else if (Array.isArray(cleanMasterChar.statusSchema) && cleanMasterChar.statusSchema.length > 0) {
+                        effectiveStatusSchema = cleanMasterChar.statusSchema;
+                    } else {
+                        effectiveStatusSchema = JSON.parse(JSON.stringify(DEFAULT_STATUS_SCHEMAS));
+                    }
+
+                    const masterInv = cleanMasterChar.inventory || {};
+                    const backupInv = cleanBackupChar.inventory || {};
+                    const effectiveInventory = {
+                        equipIsLocked: backupInv.equipIsLocked ?? masterInv.equipIsLocked ?? false,
+                        equipIsInject: backupInv.equipIsInject ?? masterInv.equipIsInject ?? isUserPlayer,
+                        storageIsLocked: backupInv.storageIsLocked ?? masterInv.storageIsLocked ?? false,
+                        storageIsInject: backupInv.storageIsInject ?? masterInv.storageIsInject ?? isUserPlayer,
+                        equipmentLocks: { ...(masterInv.equipmentLocks || {}), ...(backupInv.equipmentLocks || {}) },
+                        storageLocks: { ...(masterInv.storageLocks || {}), ...(backupInv.storageLocks || {}) },
+                        equipment: (backupInv.equipment && typeof backupInv.equipment === 'object')
+                            ? backupInv.equipment
+                            : (masterInv.equipment || (isUserPlayer ? { 'Right Hand': null, 'Left Hand': null } : {})),
+                        storage: (backupInv.storage && typeof backupInv.storage === 'object')
+                            ? backupInv.storage
+                            : (masterInv.storage || (isUserPlayer ? { 'Backpack': [] } : {}))
+                    };
+
+                    const masterQuests = cleanMasterChar.quests || {};
+                    const backupQuests = cleanBackupChar.quests || {};
+                    const effectiveQuests = {
+                        main: backupQuests.main || masterQuests.main || { name: '', desc: '', isCompleted: false, isLocked: false },
+                        sides: Array.isArray(backupQuests.sides) ? backupQuests.sides : (Array.isArray(masterQuests.sides) ? masterQuests.sides : [])
+                    };
+
+                    const hasBackupProfile = cleanBackupChar.profile && typeof cleanBackupChar.profile === 'object';
+                    const effectiveProfile = hasBackupProfile
+                        ? { ...cleanBackupChar.profile }
+                        : { ...(cleanMasterChar.profile || {}) };
+                    const effectiveProfileLocks = {};
+                    const effectiveProfileInjects = {};
+                    Object.keys(effectiveProfile).forEach(k => {
+                        effectiveProfileLocks[k] = cleanBackupChar.profileLocks?.[k] !== undefined
+                            ? Boolean(cleanBackupChar.profileLocks[k])
+                            : Boolean(cleanMasterChar.profileLocks?.[k]);
+                        effectiveProfileInjects[k] = cleanBackupChar.profileInjects?.[k] !== undefined
+                            ? Boolean(cleanBackupChar.profileInjects[k])
+                            : (cleanMasterChar.profileInjects?.[k] !== undefined ? Boolean(cleanMasterChar.profileInjects[k]) : true);
+                    });
+
+                    const hasBackupRelations = cleanBackupChar.relations && typeof cleanBackupChar.relations === 'object';
+                    const effectiveRelations = hasBackupRelations
+                        ? { ...cleanBackupChar.relations }
+                        : { ...(cleanMasterChar.relations || {}) };
+
                     return {
                         ...cleanMasterChar,
                         ...cleanBackupChar,
-                        statusSchema: cleanBackupChar.statusSchema || cleanMasterChar.statusSchema,
-                        status: { ...(cleanMasterChar.status || {}), ...(cleanBackupChar.status || {}) },
-                        profile: { ...(cleanMasterChar.profile || {}), ...(cleanBackupChar.profile || {}) },
-                        profileLocks: { ...(cleanMasterChar.profileLocks || {}), ...(cleanBackupChar.profileLocks || {}) },
-                        profileInjects: { ...(cleanMasterChar.profileInjects || {}), ...(cleanBackupChar.profileInjects || {}) },
-                        inventory: { ...(cleanMasterChar.inventory || {}), ...(cleanBackupChar.inventory || {}) },
-                        quests: { ...(cleanMasterChar.quests || {}), ...(cleanBackupChar.quests || {}) },
-                        relations: { ...(cleanMasterChar.relations || {}), ...(cleanBackupChar.relations || {}) }
+                        id: effectiveId,
+                        name: effectiveName,
+                        statusSchema: effectiveStatusSchema,
+                        status: { ...(cleanMasterChar.status || DEFAULT_STATUS), ...(cleanBackupChar.status || {}) },
+                        profile: effectiveProfile,
+                        profileLocks: effectiveProfileLocks,
+                        profileInjects: effectiveProfileInjects,
+                        inventory: effectiveInventory,
+                        quests: effectiveQuests,
+                        relations: effectiveRelations
                     };
                 });
             } else if (typeof masterSchema[key] === 'object' && !Array.isArray(masterSchema[key])) {
@@ -56,114 +134,168 @@ export function defensiveMerge(masterSchema, backupData) {
         }
     });
 
-    if (Array.isArray(backupData.inventory)) merged.inventory = [...backupData.inventory];
-    if (Array.isArray(backupData.quests)) merged.quests = [...backupData.quests];
+    if (backupData.currentPresetId !== undefined) {
+        merged.currentPresetId = backupData.currentPresetId;
+    }
+    if (backupData.currentPresetName !== undefined) {
+        merged.currentPresetName = backupData.currentPresetName;
+    }
 
     return merged;
 }
 
 /**
- * Remove older timeline backups to keep save files lightweight unless unlimited mode is enabled
+ * Prunes older hidden snapshots across turns when exceeding the retention limit.
+ * Turns marked with a pinned retention lock are strictly exempt from pruning.
+ * @param {Array<Object>} chat - SillyTavern chat message list.
+ * @param {number} maxKeep - Number of recent snapshots to preserve.
+ * @param {Function|null} updateMessageFn - Message update callback.
  */
-export function purgeOldBackups(chat, maxKeep = DEFAULT_MAX_KEEP) {
+export function purgeOldBackups(chat, maxKeep = DEFAULT_MAX_KEEP, updateMessageFn = null) {
     if (!Array.isArray(chat)) return;
-
-    // maxKeep이 -1 이하이거나 Infinity이면 무제한 보관 모드이므로 백업 정리를 스킵합니다.
     if (maxKeep < 0 || maxKeep === Infinity) return;
 
-    let foundCount = 0;
+    let backedUpMessagesCount = 0;
 
     for (let i = chat.length - 1; i >= 0; i--) {
         const message = chat[i];
         if (!message) continue;
 
-        let swipeId = message.swipe_id || 0;
-        if (message.swipes && message.swipes.length > 0 && typeof message.mes === 'string') {
-            const foundIdx = message.swipes.findIndex(s => s === message.mes);
-            if (foundIdx !== -1) swipeId = foundIdx;
+        const activeSwipe = resolveActiveSwipeId(message);
+        const text = typeof message.mes === 'string' ? message.mes : '';
+        const hasCardTag = RPGMT_TAG_REGEX.test(text) || RPGMT_DIV_REGEX.test(text);
+
+        let hasHiddenBackup = Boolean(
+            message.swipe_info?.[activeSwipe]?.extra?.rpgTrackerData ||
+            (activeSwipe === 0 && message.extra?.rpgTrackerData) ||
+            hasCardTag
+        );
+
+        if (!hasHiddenBackup) continue;
+
+        if (isTurnSnapshotPinned(message, activeSwipe)) {
+            continue;
         }
 
-        const hasHiddenBackup = message.swipe_info && message.swipe_info[swipeId] &&
-            message.swipe_info[swipeId].extra && message.swipe_info[swipeId].extra.rpgTrackerData;
+        backedUpMessagesCount++;
 
-        if (hasHiddenBackup) {
-            foundCount++;
-            if (foundCount > maxKeep) {
-                delete message.swipe_info[swipeId].extra.rpgTrackerData;
+        if (backedUpMessagesCount > maxKeep) {
+            let changed = false;
+
+            if (message.swipe_info?.[activeSwipe]?.extra?.rpgTrackerData) {
+                delete message.swipe_info[activeSwipe].extra.rpgTrackerData;
+                changed = true;
+            }
+            if (activeSwipe === 0 && message.extra?.rpgTrackerData) {
+                delete message.extra.rpgTrackerData;
+                changed = true;
+            }
+
+            if (hasCardTag) {
+                message.mes = cleanAllMessageTrackerTags(message.mes, { stripDelta: false });
+                if (Array.isArray(message.swipes) && message.swipes[activeSwipe]) {
+                    message.swipes[activeSwipe] = cleanAllMessageTrackerTags(message.swipes[activeSwipe], { stripDelta: false });
+                }
+                changed = true;
+            }
+
+            if (changed && typeof updateMessageFn === 'function') {
+                updateMessageFn(i, message);
             }
         }
     }
 }
 
 /**
- * Back up current state variables inside the active ST message timeline
+ * Stores current tracker state inside hidden message metadata.
+ * Strips prompt configurations to ensure lightweight message persistence.
+ * @param {Array<Object>} chat - SillyTavern chat message list.
+ * @param {number} index - Message index.
+ * @param {Object} trackerData - State payload to persist.
+ * @param {Function} updateMessageFn - Message update callback.
+ * @param {Function} saveChatFn - Storage commit callback.
+ * @param {number} maxKeep - Snapshot retention limit.
+ * @param {number|undefined} savedSwipeId - Target swipe index.
+ * @param {boolean} shouldPurge - Whether to execute backup pruning.
  */
-export function backupToMessage(chat, index, trackerData, updateMessageFn, saveChatFn, maxKeep = DEFAULT_MAX_KEEP) {
+export function backupToMessage(
+    chat,
+    index,
+    trackerData,
+    updateMessageFn,
+    saveChatFn,
+    maxKeep = DEFAULT_MAX_KEEP,
+    savedSwipeId = undefined,
+    shouldPurge = false
+) {
     if (!Array.isArray(chat) || index < 0 || !chat[index]) return;
 
     const targetMessage = chat[index];
 
     let strippedData = JSON.parse(JSON.stringify(trackerData));
-    strippedData = stripBase64Avatars(strippedData);
+    strippedData = stripPromptSettings(strippedData);
 
-    let swipeId = targetMessage.swipe_id || 0;
-    if (targetMessage.swipes && targetMessage.swipes.length > 0 && typeof targetMessage.mes === 'string') {
-        const foundIdx = targetMessage.swipes.findIndex(s => s === targetMessage.mes);
-        if (foundIdx !== -1) swipeId = foundIdx;
+    const swipeId = (Number.isInteger(savedSwipeId) && savedSwipeId >= 0)
+        ? savedSwipeId
+        : resolveActiveSwipeId(targetMessage);
+
+    if (!Array.isArray(targetMessage.swipe_info)) {
+        targetMessage.swipe_info = [];
     }
-
-    if (!Array.isArray(targetMessage.swipe_info)) targetMessage.swipe_info = [];
-    if (!targetMessage.swipe_info[swipeId]) targetMessage.swipe_info[swipeId] = { extra: {} };
-    if (!targetMessage.swipe_info[swipeId].extra) targetMessage.swipe_info[swipeId].extra = {};
+    if (!targetMessage.swipe_info[swipeId]) {
+        targetMessage.swipe_info[swipeId] = { extra: {} };
+    }
+    if (!targetMessage.swipe_info[swipeId].extra) {
+        targetMessage.swipe_info[swipeId].extra = {};
+    }
 
     targetMessage.swipe_info[swipeId].extra.rpgTrackerData = strippedData;
 
-    purgeOldBackups(chat, maxKeep);
+    if (swipeId === 0) {
+        targetMessage.extra = targetMessage.extra || {};
+        targetMessage.extra.rpgTrackerData = strippedData;
+    }
 
-    if (typeof saveChatFn === 'function') saveChatFn();
-}
+    if (shouldPurge) {
+        purgeOldBackups(chat, maxKeep, updateMessageFn);
+    }
 
-/**
- * Fast synchronous restoration from the closest historical message metadata
- */
-export function rehydrateFromHistory(chat) {
-    if (!Array.isArray(chat) || chat.length === 0) return null;
+    if (typeof updateMessageFn === 'function') {
+        updateMessageFn(index, targetMessage);
+    }
 
-    for (let i = chat.length - 1; i >= 0; i--) {
-        const message = chat[i];
-        if (!message) continue;
-
-        let swipeId = message.swipe_id || 0;
-        if (message.swipes && message.swipes.length > 0 && typeof message.mes === 'string') {
-            const foundIdx = message.swipes.findIndex(s => s === message.mes);
-            if (foundIdx !== -1) swipeId = foundIdx;
-        }
-
-        if (message.swipe_info && message.swipe_info[swipeId] && message.swipe_info[swipeId].extra && message.swipe_info[swipeId].extra.rpgTrackerData) {
-            const extraData = message.swipe_info[swipeId].extra.rpgTrackerData;
-            if (extraData && typeof extraData === 'object' && extraData.characters !== undefined) {
-                return sanitizeTrackerData(extraData);
-            }
+    if (typeof saveChatFn === 'function') {
+        const savePromise = saveChatFn();
+        if (savePromise && typeof savePromise.catch === 'function') {
+            savePromise.catch(err => console.warn("[RPG Tracker] saveChatFn error in backupToMessage:", err));
         }
     }
-    return null;
 }
 
 /**
- * Deep asynchronous restoration with swipe_info delta patch replaying
+ * Synchronously recovers the most recent state snapshot from message metadata history.
+ * @param {Array<Object>} chat - SillyTavern chat message list.
+ * @returns {Object|null} Recovered and sanitized tracker data or null.
  */
-export async function rehydrateFromHistoryAsync(chat) {
+/**
+ * Core engine for reconstructing state history from message backups and sequential deltas.
+ */
+function rehydrateCore(chat, isAsync) {
     if (!Array.isArray(chat) || chat.length === 0) return null;
 
     const lastMsg = chat[chat.length - 1];
     if (lastMsg) {
-        let lastSwipeId = lastMsg.swipe_id || 0;
-        if (lastMsg.swipes && lastMsg.swipes.length > 0 && typeof lastMsg.mes === 'string') {
-            const foundIdx = lastMsg.swipes.findIndex(s => s === lastMsg.mes);
-            if (foundIdx !== -1) lastSwipeId = foundIdx;
+        const lastSwipeId = resolveActiveSwipeId(lastMsg);
+        let directData = lastMsg.swipe_info?.[lastSwipeId]?.extra?.rpgTrackerData
+            ?? (lastSwipeId === 0 ? lastMsg.extra?.rpgTrackerData : null);
+
+        if (!directData) {
+            const snap = extractTurnSnapshotData(lastMsg);
+            if (snap?.data) directData = snap.data;
         }
-        if (lastMsg.swipe_info?.[lastSwipeId]?.extra?.rpgTrackerData) {
-            return sanitizeTrackerData(lastMsg.swipe_info[lastSwipeId].extra.rpgTrackerData);
+
+        if (directData && typeof directData === 'object' && directData.characters !== undefined) {
+            return sanitizeTrackerData(directData);
         }
     }
 
@@ -174,14 +306,17 @@ export async function rehydrateFromHistoryAsync(chat) {
         const message = chat[i];
         if (!message) continue;
 
-        let swipeId = message.swipe_id || 0;
-        if (message.swipes && message.swipes.length > 0 && typeof message.mes === 'string') {
-            const foundIdx = message.swipes.findIndex(s => s === message.mes);
-            if (foundIdx !== -1) swipeId = foundIdx;
+        const swipeId = resolveActiveSwipeId(message);
+        let backupData = message.swipe_info?.[swipeId]?.extra?.rpgTrackerData
+            ?? (swipeId === 0 ? message.extra?.rpgTrackerData : null);
+
+        if (!backupData) {
+            const snap = extractTurnSnapshotData(message);
+            if (snap?.data) backupData = snap.data;
         }
 
-        if (message.swipe_info?.[swipeId]?.extra?.rpgTrackerData) {
-            accumulatedData = JSON.parse(JSON.stringify(message.swipe_info[swipeId].extra.rpgTrackerData));
+        if (backupData && typeof backupData === 'object' && backupData.characters !== undefined) {
+            accumulatedData = JSON.parse(JSON.stringify(backupData));
             baseIndex = i;
             break;
         }
@@ -194,93 +329,72 @@ export async function rehydrateFromHistoryAsync(chat) {
 
     let anyUpdateApplied = baseIndex !== -1;
 
-    for (let i = baseIndex + 1; i < chat.length; i++) {
-        if (i % 15 === 0) {
-            await new Promise(resolve => setTimeout(resolve, 0));
+    const applyTurnDelta = (message) => {
+        if (!message) return;
+        const swipeId = resolveActiveSwipeId(message);
+        let deltaPatch = message.swipe_info?.[swipeId]?.extra?.rpgTrackerDelta
+            ?? (swipeId === 0 ? message.extra?.rpgTrackerDelta : null);
+
+        if (!deltaPatch && typeof message.mes === 'string') {
+            const deltaMatch = message.mes.match(RPG_DELTA_TAG_REGEX);
+            if (deltaMatch && deltaMatch[1]) {
+                try {
+                    deltaPatch = JSON.parse(deltaMatch[1]);
+                } catch {
+                    // Ignore parsing failure
+                }
+            }
         }
-
-        const message = chat[i];
-        if (!message) continue;
-
-        let swipeId = message.swipe_id || 0;
-        if (message.swipes && message.swipes.length > 0 && typeof message.mes === 'string') {
-            const foundIdx = message.swipes.findIndex(s => s === message.mes);
-            if (foundIdx !== -1) swipeId = foundIdx;
-        }
-
-        const deltaPatch = message.swipe_info?.[swipeId]?.extra?.rpgTrackerDelta || message.extra?.rpgTrackerDelta;
 
         if (deltaPatch && typeof deltaPatch === 'object' && Object.keys(deltaPatch).length > 0) {
             accumulatedData = applyLLMPatch(accumulatedData, deltaPatch, false, 'patch', true);
             anyUpdateApplied = true;
         } else if (typeof message.mes === 'string') {
-            const extractJsonFromComment = (text) => {
-                const trackerRegex = /<!--RPG_TRACKER:?([\s\S]*?)-->/g;
-                let match;
-                while ((match = trackerRegex.exec(text)) !== null) {
-                    let innerText = match[1].trim();
-                    const markdownJsonRegex = /```(?:json|markdown)?\s*\n?(\{[\s\S]*?\})\s*\n?```/i;
-                    const mdMatch = innerText.match(markdownJsonRegex);
-                    if (mdMatch) innerText = mdMatch[1].trim();
-                    try {
-                        const parsed = JSON.parse(innerText);
-                        if (parsed && typeof parsed === 'object') return parsed;
-                    } catch (e) { }
-                }
-
-                const legacyRegex = /<!--RPG_DATA:([\s\S]*?)-->/g;
-                let legacyMatch;
-                while ((legacyMatch = legacyRegex.exec(text)) !== null) {
-                    try {
-                        const parsed = JSON.parse(legacyMatch[1]);
-                        if (parsed && typeof parsed === 'object') return parsed;
-                    } catch (e) { }
-                }
-                return null;
-            };
-
-            const parsed = extractJsonFromComment(message.mes);
-            if (parsed) {
-                if (parsed.characters !== undefined) {
-                    accumulatedData = JSON.parse(JSON.stringify(parsed));
+            const { patch } = parseResponse(message.mes);
+            if (patch && typeof patch === 'object' && Object.keys(patch).length > 0) {
+                if (Array.isArray(patch.characters)) {
+                    accumulatedData = JSON.parse(JSON.stringify(patch));
                 } else {
-                    accumulatedData = applyLLMPatch(accumulatedData, parsed, false, 'patch', true);
+                    const normPatch = extractNormalizedPatch(patch);
+                    accumulatedData = applyLLMPatch(accumulatedData, normPatch, false, 'patch', true);
                 }
                 anyUpdateApplied = true;
             }
         }
+    };
+
+    if (isAsync) {
+        return (async () => {
+            for (let i = baseIndex + 1; i < chat.length; i++) {
+                if (i % 15 === 0) {
+                    await new Promise(resolve => setTimeout(resolve, 0));
+                }
+                applyTurnDelta(chat[i]);
+            }
+            return anyUpdateApplied ? sanitizeTrackerData(accumulatedData) : null;
+        })();
     }
 
-    return anyUpdateApplied
-        ? JSON.parse(JSON.stringify(sanitizeTrackerData(accumulatedData)))
-        : null;
+    for (let i = baseIndex + 1; i < chat.length; i++) {
+        applyTurnDelta(chat[i]);
+    }
+    return anyUpdateApplied ? sanitizeTrackerData(accumulatedData) : null;
 }
 
 /**
- * Reconstruct turn state by combining N-1 clean data with current N AI delta patch
+ * Recovers tracker state from chat history by scanning backwards for turn backups.
+ * @param {Array<Object>} chat - SillyTavern chat message list.
+ * @returns {Object|null} Recovered and sanitized tracker data or null.
  */
-export async function reconstructTurnState(chat, defaultData) {
-    if (!Array.isArray(chat) || chat.length === 0) return null;
+export function rehydrateFromHistory(chat) {
+    return rehydrateCore(chat, false);
+}
 
-    const lastIndex = chat.length - 1;
-    const lastMsg = chat[lastIndex];
-
-    const previousChatHistory = chat.slice(0, lastIndex);
-    const previousState = await rehydrateFromHistoryAsync(previousChatHistory) || defaultData;
-
-    let swipeId = lastMsg.swipe_id || 0;
-    if (lastMsg.swipes && lastMsg.swipes.length > 0 && typeof lastMsg.mes === 'string') {
-        const foundIdx = lastMsg.swipes.findIndex(s => s === lastMsg.mes);
-        if (foundIdx !== -1) swipeId = foundIdx;
-    }
-
-    const currentDelta = (lastMsg.swipe_info && lastMsg.swipe_info[swipeId]?.extra?.rpgTrackerDelta)
-        || lastMsg.extra?.rpgTrackerDelta
-        || null;
-
-    if (currentDelta && Object.keys(currentDelta).length > 0) {
-        return applyLLMPatch(previousState, currentDelta, false, 'patch', false);
-    }
-
-    return previousState;
+/**
+ * Asynchronously restores state history, sequentially replaying intermediate deltas if needed.
+ * @param {Array<Object>} chat - SillyTavern chat message list.
+ * @returns {Promise<Object|null>} Restored tracker data or null.
+ */
+export async function rehydrateFromHistoryAsync(chat) {
+    return rehydrateCore(chat, true);
 }

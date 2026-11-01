@@ -1,9 +1,51 @@
 .container {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding: 12px 10px;
+  gap: 10px;
+  padding: 0 0 10px 0;
   color: var(--rpg-text);
+  box-sizing: border-box;
+}
+
+.launcherGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
+}
+
+.launcherBtn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--rpg-border);
+  color: var(--rpg-text);
+  font-size: 11.5px;
+  font-weight: bold;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.launcherBtn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--rpg-highlight);
+  color: var(--rpg-highlight);
+}
+
+.launcherIcon {
+  opacity: 0.75;
+  flex-shrink: 0;
+  transition: opacity 0.15s ease;
+}
+
+.launcherBtn:hover .launcherIcon {
+  opacity: 1;
 }
 
 .sectionBlock {
@@ -27,23 +69,6 @@
 .sectionTitle {
   font-size: 13px;
   font-weight: bold;
-  color: var(--rpg-highlight);
-}
-
-.refreshBtn {
-  background: transparent;
-  border: none;
-  color: var(--rpg-text);
-  font-size: 14px;
-  cursor: pointer;
-  opacity: 0.6;
-  padding: 0 4px;
-  line-height: 1;
-  transition: opacity 0.15s, color 0.15s;
-}
-
-.refreshBtn:hover {
-  opacity: 1;
   color: var(--rpg-highlight);
 }
 
@@ -86,8 +111,13 @@
   outline: none;
 }
 
-.numberInput:focus {
+.numberInput:focus:not(:disabled) {
   border-color: var(--rpg-highlight);
+}
+
+.numberInput:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
 }
 
 .inputGroup {
@@ -119,19 +149,24 @@
   border-color: var(--rpg-highlight);
 }
 
-.selectInput {
-  width: 100%;
-  height: 28px;
-  padding: 4px 8px;
-  font-size: 11.5px;
-  color: var(--rpg-text);
-  box-sizing: border-box;
-}
-
 .buttonGroup {
   display: flex;
   gap: 8px;
   margin-top: 4px;
+}
+
+/* Secondary cleanup action with muted red border */
+.dangerBtn {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(231, 76, 60, 0.45) !important;
+  color: var(--rpg-text) !important;
+  font-weight: normal !important;
+}
+
+.dangerBtn:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: #e74c3c !important;
+  color: #ff7675 !important;
 }
 
 .toggleRow {
