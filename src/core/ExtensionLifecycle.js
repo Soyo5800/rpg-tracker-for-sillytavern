@@ -2,12 +2,11 @@ import { getContext, extension_settings } from "../../../../../extensions.js";
 import { eventSource, event_types, setExtensionPrompt, extension_prompt_types, extension_prompt_roles } from "../../../../../../script.js";
 import { rehydrateFromHistory, rehydrateFromHistoryAsync, applyLLMPatch, extractNormalizedPatch, sanitizeTrackerData, resolveActiveSwipeId } from "./JSONTracker.js";
 import { buildModularPrompts } from "./ActivePrompt.js";
-import { DEFAULT_INJECTION_SETTINGS, INJECTION_TARGETS } from "./PromptSchema.js";
+import { DEFAULT_INJECTION_SETTINGS, INJECTION_TARGETS, normalizeInjectionSettings } from "./PromptSchema.js";
 import { parseResponse } from "./ResponseParser.js";
 import { setDeltaLog } from "../messagetracker/DeltaLogRenderer.js";
 import { safeUpdateMessageBlock } from "./ExtensionBridge.js";
 import { triggerObserverNow } from "./ExtensionObserver.js";
-import { registerOutletMacro } from "./ContextManager.js";
 import { getChatKey } from "./TrackerLocks.js";
 import { getAppliedDelta } from "./AppliedDelta.js";
 
@@ -17,19 +16,15 @@ export const EXTENSION_PROMPT_KEYS = {
     addons_enforcer: 'addons'
 };
 
-const WORLD_INFO_OUTLET_POSITION = 7;
-const activeWiOutletKeys = new Set(['customWIOutlet_rpg_rules', 'customWIOutlet_rpg_status', 'customWIOutlet_rpg_addons']);
-
 /**
- * Clears all registered extension prompt keys and resets outlet memory.
+ * Clears all registered extension prompt keys.
  */
 export function clearAllExtensionPrompts(extensionName) {
     const keys = [
         `${extensionName}_def`,
         `${extensionName}_rules`,
         `${extensionName}_status`,
-        `${extensionName}_addons`,
-        ...Array.from(activeWiOutletKeys)
+        `${extensionName}_addons`
     ];
 
     keys.forEach(k => {
@@ -44,10 +39,6 @@ export function clearAllExtensionPrompts(extensionName) {
             }
         }
     });
-
-    if (globalThis.rpgTrackerOutlets) {
-        globalThis.rpgTrackerOutlets = {};
-    }
 }
 
 /**
@@ -67,20 +58,13 @@ export function applyModularExtensionPrompts(extensionName, trackerData, updateM
         }
     }
 
-    activeWiOutletKeys.forEach(wiKey => {
-        if (extension_settings.extension_prompts?.[wiKey]) {
-            delete extension_settings.extension_prompts[wiKey];
-        }
-    });
-
     const cleanTrackerData = sanitizeTrackerData(trackerData);
     const promptConfig = promptSettings || window.RPGBridge?.currentPromptSettings || window.RPGBridge?.getChatPromptSettings?.() || cleanTrackerData;
     const modularContents = buildModularPrompts(cleanTrackerData, updateMode, { promptSettings: promptConfig });
 
-    const injectionSettings = promptConfig.injectionSettings || cleanTrackerData.injectionSettings || DEFAULT_INJECTION_SETTINGS;
-    const modulesConfig = injectionSettings.modules || DEFAULT_INJECTION_SETTINGS.modules;
-
-    globalThis.rpgTrackerOutlets = {};
+    const rawInjectionSettings = promptConfig.injectionSettings || cleanTrackerData.injectionSettings || DEFAULT_INJECTION_SETTINGS;
+    const injectionSettings = normalizeInjectionSettings(rawInjectionSettings);
+    const modulesConfig = injectionSettings.modules;
 
     Object.entries(EXTENSION_PROMPT_KEYS).forEach(([moduleKey, suffix]) => {
         const promptKey = `${extensionName}_${suffix}`;
@@ -90,7 +74,6 @@ export function applyModularExtensionPrompts(extensionName, trackerData, updateM
         const target = config.target || (moduleKey === 'rules_defs' ? INJECTION_TARGETS.SYSTEM : INJECTION_TARGETS.CHAT);
         const depth = typeof config.depth === 'number' ? config.depth : (moduleKey === 'status' ? 1 : 0);
         const role = typeof config.role === 'number' ? config.role : (extension_prompt_roles?.SYSTEM ?? 0);
-        const outletName = config.outletName || `rpg_${suffix}`;
 
         if (config.enabled === false || !content || content.trim() === '') {
             if (extension_settings.extension_prompts?.[promptKey]) {
@@ -101,63 +84,6 @@ export function applyModularExtensionPrompts(extensionName, trackerData, updateM
             } catch {
                 // Ignore prompt reset error
             }
-
-            const wiOutletKey = `customWIOutlet_${outletName}`;
-            if (extension_settings.extension_prompts?.[wiOutletKey]) {
-                delete extension_settings.extension_prompts[wiOutletKey];
-            }
-            try {
-                const nonePosition = extension_prompt_types.NONE !== undefined ? extension_prompt_types.NONE : -1;
-                setExtensionPrompt(wiOutletKey, '', nonePosition, 0, false);
-            } catch {
-                // Ignore outlet prompt reset error
-            }
-
-            delete globalThis.rpgTrackerOutlets?.[outletName];
-            return;
-        }
-
-        if (target === INJECTION_TARGETS.OUTLET) {
-            const cleanContent = content.trim();
-            globalThis.rpgTrackerOutlets[outletName] = cleanContent;
-
-            if (extension_settings.extension_prompts?.[promptKey]) {
-                delete extension_settings.extension_prompts[promptKey];
-            }
-            try {
-                setExtensionPrompt(promptKey, '', extension_prompt_types.IN_PROMPT, 0, false);
-            } catch {
-                // Ignore prompt reset error
-            }
-
-            const wiOutletKey = `customWIOutlet_${outletName}`;
-            activeWiOutletKeys.add(wiOutletKey);
-            const nonePosition = extension_prompt_types.NONE !== undefined ? extension_prompt_types.NONE : -1;
-            try {
-                setExtensionPrompt(
-                    wiOutletKey,
-                    cleanContent,
-                    nonePosition,
-                    0,
-                    Boolean(config.scan),
-                    role
-                );
-            } catch {
-                // Ignore outlet prompt registration error
-            }
-            return;
-        }
-
-        if (target === INJECTION_TARGETS.BEFORE_PROMPT || target === 'before_prompt') {
-            const beforeType = extension_prompt_types.BEFORE_PROMPT ?? 2;
-            setExtensionPrompt(
-                promptKey,
-                content.trim(),
-                beforeType,
-                0,
-                false,
-                role
-            );
             return;
         }
 
@@ -184,8 +110,6 @@ export function applyModularExtensionPrompts(extensionName, trackerData, updateM
             );
         }
     });
-
-    registerOutletMacro();
 }
 
 /**
@@ -196,57 +120,6 @@ export function registerLifecycleEvents(extensionName) {
     let isCurrentGenerationQuiet = false;
     let isProcessingGenerationEnd = false;
     let lastProcessedGenEndAt = 0;
-
-    eventSource.on(event_types.WORLDINFO_ENTRIES_LOADED, ({ chatLore }) => {
-        if (!extension_settings[extensionName]?.enabled) return;
-        if (window.RPGBridge?.isQuietUpdating || globalThis.rpgTracker_isQuietUpdating) return;
-
-        const context = getContext();
-        const trackerData = window.RPGBridge?.currentTrackerData || (context?.chatId ? rehydrateFromHistory(context.chat) : null);
-        if (!trackerData || !Array.isArray(trackerData.characters)) return;
-
-        const cleanTracker = sanitizeTrackerData(trackerData);
-        const promptConfig = window.RPGBridge?.currentPromptSettings || window.RPGBridge?.getChatPromptSettings?.() || cleanTracker;
-        const updateMode = extension_settings[extensionName].updateMode || 'merged';
-        const modularContents = buildModularPrompts(cleanTracker, updateMode, { promptSettings: promptConfig });
-
-        const injectionSettings = promptConfig.injectionSettings || cleanTracker.injectionSettings || DEFAULT_INJECTION_SETTINGS;
-        const modulesConfig = injectionSettings.modules || DEFAULT_INJECTION_SETTINGS.modules;
-
-        Object.entries(EXTENSION_PROMPT_KEYS).forEach(([moduleKey, suffix]) => {
-            const config = modulesConfig[moduleKey] || {};
-            if (config.enabled === false) return;
-            if (config.target !== INJECTION_TARGETS.OUTLET) return;
-
-            const content = modularContents[moduleKey];
-            if (!content || !content.trim()) return;
-
-            const outletName = config.outletName || `rpg_${suffix}`;
-
-            chatLore.push({
-                uid: `rpg_tracker_virtual_${suffix}`,
-                world: 'rpg_tracker',
-                key: [],
-                keysecondary: [],
-                comment: `RPG Tracker Outlet: ${outletName}`,
-                content: content.trim(),
-                constant: true,
-                disable: false,
-                position: WORLD_INFO_OUTLET_POSITION,
-                outletName: outletName,
-                ignoreBudget: true,
-                useProbability: false,
-                probability: 100,
-                selective: false,
-                order: 100,
-                extensions: {
-                    position: WORLD_INFO_OUTLET_POSITION,
-                    outlet_name: outletName,
-                    ignore_budget: true
-                }
-            });
-        });
-    });
 
     eventSource.on(event_types.GENERATION_STARTED, () => {
         lastProcessedGenEndAt = 0;

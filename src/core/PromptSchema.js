@@ -215,8 +215,7 @@ Output ONLY the \`<!--RPG_TRACKER\` ... \`-->\` block containing the delta JSON.
 
 export const INJECTION_TARGETS = {
   SYSTEM: 'system',
-  CHAT: 'chat',
-  OUTLET: 'outlet'
+  CHAT: 'chat'
 };
 
 export const DEFAULT_INJECTION_SETTINGS = {
@@ -225,23 +224,59 @@ export const DEFAULT_INJECTION_SETTINGS = {
     rules_defs: {
       enabled: true,
       target: INJECTION_TARGETS.SYSTEM,
-      depth: 0,
-      outletName: 'rpg_rules'
+      depth: 0
     },
     status: {
       enabled: true,
       target: INJECTION_TARGETS.CHAT,
-      depth: 1,
-      outletName: 'rpg_status'
+      depth: 1
     },
     addons_enforcer: {
       enabled: true,
       target: INJECTION_TARGETS.CHAT,
-      depth: 0,
-      outletName: 'rpg_addons'
+      depth: 0
     }
   }
 };
+
+/**
+ * Normalizes injection settings and falls back any unsupported or legacy targets to module defaults.
+ */
+export function normalizeInjectionSettings(rawSettings) {
+  const base = deepClone(DEFAULT_INJECTION_SETTINGS);
+  if (!rawSettings || typeof rawSettings !== 'object') {
+    return base;
+  }
+
+  const validTargets = new Set(Object.values(INJECTION_TARGETS));
+  const rawModules = (rawSettings.modules && typeof rawSettings.modules === 'object') ? rawSettings.modules : {};
+  const modules = {};
+
+  Object.keys(base.modules).forEach(moduleKey => {
+    const defaultMod = base.modules[moduleKey];
+    const incomingMod = rawModules[moduleKey];
+
+    if (!incomingMod || typeof incomingMod !== 'object') {
+      modules[moduleKey] = defaultMod;
+      return;
+    }
+
+    const target = validTargets.has(incomingMod.target) ? incomingMod.target : defaultMod.target;
+    const parsedDepth = typeof incomingMod.depth === 'number' ? incomingMod.depth : parseInt(incomingMod.depth, 10);
+    const depth = !isNaN(parsedDepth) ? Math.max(0, parsedDepth) : defaultMod.depth;
+
+    modules[moduleKey] = {
+      enabled: incomingMod.enabled !== false,
+      target,
+      depth
+    };
+  });
+
+  return {
+    preset: typeof rawSettings.preset === 'string' ? rawSettings.preset : base.preset,
+    modules
+  };
+}
 
 export const PROMPT_SETTING_KEYS = [
   'systemPromptHeader_merged',
@@ -291,7 +326,9 @@ export function extractPromptSettings(source = {}) {
   const extracted = {};
   PROMPT_SETTING_KEYS.forEach(key => {
     if (source[key] !== undefined && source[key] !== null) {
-      extracted[key] = deepClone(source[key]);
+      extracted[key] = key === 'injectionSettings'
+        ? normalizeInjectionSettings(source[key])
+        : deepClone(source[key]);
     }
   });
   return extracted;

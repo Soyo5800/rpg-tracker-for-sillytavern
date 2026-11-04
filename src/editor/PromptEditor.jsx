@@ -11,6 +11,7 @@ import {
   DEFAULT_OUTPUT_ENFORCER_SEP,
   DEFAULT_INJECTION_SETTINGS,
   INJECTION_TARGETS,
+  normalizeInjectionSettings,
   DEFAULT_GUIDE_PROMPTS,
   DEFAULT_ADD_CHAR_PROMPT,
   DEFAULT_ADD_PLAYER_CHAR_PROMPT,
@@ -36,9 +37,7 @@ export default function PromptEditor({ onClose }) {
   // Injection Settings State
   const [localInjectionSettings, setLocalInjectionSettings] = useState(() => {
     const src = promptSettings?.injectionSettings || trackerData?.injectionSettings;
-    return src
-      ? JSON.parse(JSON.stringify(src))
-      : JSON.parse(JSON.stringify(DEFAULT_INJECTION_SETTINGS));
+    return normalizeInjectionSettings(src);
   });
   const [localEnforcerPrompt, setLocalEnforcerPrompt] = useState('');
   const [isEditEnforcer, setIsEditEnforcer] = useState(false);
@@ -91,11 +90,7 @@ export default function PromptEditor({ onClose }) {
     setLocalSepHeader(src.systemPromptHeader_separated ?? DEFAULT_PROMPT_HEADER_SEP);
     setLocalSepFooter(src.systemPromptFooter_separated ?? DEFAULT_PROMPT_FOOTER_SEP);
 
-    setLocalInjectionSettings(
-      src.injectionSettings
-        ? JSON.parse(JSON.stringify(src.injectionSettings))
-        : JSON.parse(JSON.stringify(DEFAULT_INJECTION_SETTINGS))
-    );
+    setLocalInjectionSettings(normalizeInjectionSettings(src.injectionSettings));
     setLocalEnforcerPrompt(src.outputEnforcerPrompt ?? DEFAULT_OUTPUT_ENFORCER);
 
     setLocalAddCharPrompt(src.addCharPrompt ?? DEFAULT_ADD_CHAR_PROMPT);
@@ -192,33 +187,25 @@ export default function PromptEditor({ onClose }) {
       setLocalInjectionSettings({
         preset: 'optimized',
         modules: {
-          rules_defs: { enabled: true, target: INJECTION_TARGETS.SYSTEM, depth: 0, outletName: 'rpg_rules' },
-          status: { enabled: true, target: INJECTION_TARGETS.CHAT, depth: 1, outletName: 'rpg_status' },
-          addons_enforcer: { enabled: true, target: INJECTION_TARGETS.CHAT, depth: 0, outletName: 'rpg_addons' }
+          rules_defs: { enabled: true, target: INJECTION_TARGETS.SYSTEM, depth: 0 },
+          status: { enabled: true, target: INJECTION_TARGETS.CHAT, depth: 1 },
+          addons_enforcer: { enabled: true, target: INJECTION_TARGETS.CHAT, depth: 0 }
         }
       });
     } else if (presetType === 'simple') {
       setLocalInjectionSettings({
         preset: 'simple',
         modules: {
-          rules_defs: { enabled: true, target: INJECTION_TARGETS.SYSTEM, depth: 0, outletName: 'rpg_rules' },
-          status: { enabled: true, target: INJECTION_TARGETS.SYSTEM, depth: 0, outletName: 'rpg_status' },
-          addons_enforcer: { enabled: true, target: INJECTION_TARGETS.SYSTEM, depth: 0, outletName: 'rpg_addons' }
+          rules_defs: { enabled: true, target: INJECTION_TARGETS.SYSTEM, depth: 0 },
+          status: { enabled: true, target: INJECTION_TARGETS.SYSTEM, depth: 0 },
+          addons_enforcer: { enabled: true, target: INJECTION_TARGETS.SYSTEM, depth: 0 }
         }
       });
     }
   };
 
   const handleSave = () => {
-    const normalizedInjectionSettings = JSON.parse(JSON.stringify(localInjectionSettings));
-    if (normalizedInjectionSettings.modules) {
-      Object.keys(normalizedInjectionSettings.modules).forEach(key => {
-        const mod = normalizedInjectionSettings.modules[key];
-        if (mod) {
-          mod.depth = typeof mod.depth === 'number' ? mod.depth : (parseInt(mod.depth, 10) || 0);
-        }
-      });
-    }
+    const normalizedInjectionSettings = normalizeInjectionSettings(localInjectionSettings);
 
     const cleanedWorldSchema = { ...localWorldSchema };
     if (cleanedWorldSchema.relationsFieldType !== undefined) {
@@ -305,7 +292,7 @@ export default function PromptEditor({ onClose }) {
           if (importedData.systemPrompt_readonly !== undefined) setLocalReadOnlyPrompt(importedData.systemPrompt_readonly);
           if (importedData.systemPromptHeader_separated !== undefined) setLocalSepHeader(importedData.systemPromptHeader_separated);
           if (importedData.systemPromptFooter_separated !== undefined) setLocalSepFooter(importedData.systemPromptFooter_separated);
-          if (importedData.injectionSettings && typeof importedData.injectionSettings === 'object') setLocalInjectionSettings(importedData.injectionSettings);
+          if (importedData.injectionSettings && typeof importedData.injectionSettings === 'object') setLocalInjectionSettings(normalizeInjectionSettings(importedData.injectionSettings));
           if (importedData.outputEnforcerPrompt !== undefined) setLocalEnforcerPrompt(importedData.outputEnforcerPrompt);
           if (Array.isArray(importedData.guidePrompts)) setLocalGuidePrompts(importedData.guidePrompts);
           if (importedData.worldSchema && typeof importedData.worldSchema === 'object') {
@@ -661,9 +648,8 @@ export default function PromptEditor({ onClose }) {
           {/* Module: Rules & Definitions */}
           {(() => {
             const mod = modulesConfig.rules_defs || {};
-            const target = mod.target || INJECTION_TARGETS.SYSTEM;
+            const target = mod.target === INJECTION_TARGETS.CHAT ? INJECTION_TARGETS.CHAT : INJECTION_TARGETS.SYSTEM;
             const depth = mod.depth;
-            const outletName = mod.outletName || 'rpg_rules';
 
             return (
               <div className={styles.injectionModuleCard}>
@@ -686,7 +672,6 @@ export default function PromptEditor({ onClose }) {
                     >
                       <option value={INJECTION_TARGETS.SYSTEM}>System Prompt (After Main)</option>
                       <option value={INJECTION_TARGETS.CHAT}>In-Chat Log (@ Depth)</option>
-                      <option value={INJECTION_TARGETS.OUTLET}>Outlet Macro Replacement</option>
                     </select>
                   </div>
 
@@ -705,22 +690,6 @@ export default function PromptEditor({ onClose }) {
                       />
                     </div>
                   )}
-
-                  {target === INJECTION_TARGETS.OUTLET && (
-                    <div className={styles.injectionFieldCol} style={{ flex: 2 }}>
-                      <label className={styles.formSubLabel}>
-                        Outlet Name <code className={styles.outletTagPreview}>{`{{outlet:${outletName || 'rpg_rules'}}}`}</code>
-                      </label>
-                      <input
-                        type="text"
-                        className="rpg-input"
-                        style={{ height: '28px' }}
-                        value={outletName}
-                        placeholder="Outlet name..."
-                        onChange={(e) => handleUpdateModuleField('rules_defs', 'outletName', e.target.value.trim())}
-                      />
-                    </div>
-                  )}
                 </div>
               </div>
             );
@@ -729,9 +698,8 @@ export default function PromptEditor({ onClose }) {
           {/* Module: Status Reference */}
           {(() => {
             const mod = modulesConfig.status || {};
-            const target = mod.target || INJECTION_TARGETS.CHAT;
+            const target = mod.target === INJECTION_TARGETS.SYSTEM ? INJECTION_TARGETS.SYSTEM : INJECTION_TARGETS.CHAT;
             const depth = mod.depth;
-            const outletName = mod.outletName || 'rpg_status';
 
             return (
               <div className={styles.injectionModuleCard}>
@@ -754,7 +722,6 @@ export default function PromptEditor({ onClose }) {
                     >
                       <option value={INJECTION_TARGETS.SYSTEM}>System Prompt (After Main)</option>
                       <option value={INJECTION_TARGETS.CHAT}>In-Chat Log (@ Depth)</option>
-                      <option value={INJECTION_TARGETS.OUTLET}>Outlet Macro Replacement</option>
                     </select>
                   </div>
 
@@ -773,22 +740,6 @@ export default function PromptEditor({ onClose }) {
                       />
                     </div>
                   )}
-
-                  {target === INJECTION_TARGETS.OUTLET && (
-                    <div className={styles.injectionFieldCol} style={{ flex: 2 }}>
-                      <label className={styles.formSubLabel}>
-                        Outlet Name <code className={styles.outletTagPreview}>{`{{outlet:${outletName || 'rpg_status'}}}`}</code>
-                      </label>
-                      <input
-                        type="text"
-                        className="rpg-input"
-                        style={{ height: '28px' }}
-                        value={outletName}
-                        placeholder="Outlet name..."
-                        onChange={(e) => handleUpdateModuleField('status', 'outletName', e.target.value.trim())}
-                      />
-                    </div>
-                  )}
                 </div>
               </div>
             );
@@ -797,9 +748,8 @@ export default function PromptEditor({ onClose }) {
           {/* Module: Add-ons & Output Enforcer */}
           {(() => {
             const mod = modulesConfig.addons_enforcer || {};
-            const target = mod.target || INJECTION_TARGETS.CHAT;
+            const target = mod.target === INJECTION_TARGETS.SYSTEM ? INJECTION_TARGETS.SYSTEM : INJECTION_TARGETS.CHAT;
             const depth = mod.depth;
-            const outletName = mod.outletName || 'rpg_addons';
 
             return (
               <div className={styles.injectionModuleCard}>
@@ -822,7 +772,6 @@ export default function PromptEditor({ onClose }) {
                     >
                       <option value={INJECTION_TARGETS.SYSTEM}>System Prompt (After Main)</option>
                       <option value={INJECTION_TARGETS.CHAT}>In-Chat Log (@ Depth)</option>
-                      <option value={INJECTION_TARGETS.OUTLET}>Outlet Macro Replacement</option>
                     </select>
                   </div>
 
@@ -838,22 +787,6 @@ export default function PromptEditor({ onClose }) {
                         value={depth !== undefined ? depth : 0}
                         onChange={(e) => handleDepthChange('addons_enforcer', e.target.value)}
                         onBlur={(e) => handleDepthBlur('addons_enforcer', e.target.value, 0)}
-                      />
-                    </div>
-                  )}
-
-                  {target === INJECTION_TARGETS.OUTLET && (
-                    <div className={styles.injectionFieldCol} style={{ flex: 2 }}>
-                      <label className={styles.formSubLabel}>
-                        Outlet Name <code className={styles.outletTagPreview}>{`{{outlet:${outletName || 'rpg_addons'}}}`}</code>
-                      </label>
-                      <input
-                        type="text"
-                        className="rpg-input"
-                        style={{ height: '28px' }}
-                        value={outletName}
-                        placeholder="Outlet name..."
-                        onChange={(e) => handleUpdateModuleField('addons_enforcer', 'outletName', e.target.value.trim())}
                       />
                     </div>
                   )}
