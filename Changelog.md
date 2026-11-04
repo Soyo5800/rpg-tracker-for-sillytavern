@@ -4,27 +4,33 @@ All notable changes and updates to the RPG Tracker extension are documented in t
 
 ---
 
+## v1.3.1 Update
+
+* Cleaned up related features to resolve an outlet macro override issue.
+
+---
+
 ## v1.3.0 Update
 
 [ Characters ]
-- Visual Stage: Click any avatar thumbnail to display a character standee, with real-time expression tracking for sprite folders.
-- Unified Presets: Character sheets and field definitions are now managed together in server-synced presets.
-- Upgrade Tip: Save or load your preset once in Character List to upgrade existing characters to the new ID system.
+* Visual Stage: Click any avatar thumbnail to display a character standee, with real-time expression tracking for sprite folders.
+* Unified Presets: Character sheets and field definitions are now managed together in server-synced presets.
+* Upgrade Tip: Save or load your preset once in Character List to upgrade existing characters to the new ID system.
 
 [ History ]
-- Turn History: Roll back live states to previous messages, edit snapshot data, or pin turns to prevent auto-cleanup.
-- Clean Storage: State history is stored invisibly in message metadata with an adjustable auto-prune retention limit (default: 20 turns).
+* Turn History: Roll back live states to previous messages, edit snapshot data, or pin turns to prevent auto-cleanup.
+* Clean Storage: State history is stored invisibly in message metadata with an adjustable auto-prune retention limit (default: 20 turns).
 
 [ Injection ]
-- Modular Blocks: Prompts are split into Rules, Status, and Add-ons for custom placement in System, In-Chat depths, or {{outlet}} macros.
-- Quick Presets: Apply Optimized or Simple injection layouts with one click.
+* Modular Blocks: Prompts are split into Rules, Status, and Add-ons for custom placement in System, In-Chat depths, or {{outlet}} macros.
+* Quick Presets: Apply Optimized or Simple injection layouts with one click.
 
 [ Settings ]
-- Dedicated API Model: Assign a lightweight model and OpenRouter provider routing for status updates inside Tracker Settings.
+* Dedicated API Model: Assign a lightweight model and OpenRouter provider routing for status updates inside Tracker Settings.
 
 [ Interface ]
-- Permanent Update Button: The manual Update button is now permanently docked in the header across all modes.
-- Relocated Menus: Prompt Settings and Tracker Settings have moved to the Function tab, with custom model options placed inside Tracker Settings.
+* Permanent Update Button: The manual Update button is now permanently docked in the header across all modes.
+* Relocated Menus: Prompt Settings and Tracker Settings have moved to the Function tab, with custom model options placed inside Tracker Settings.
 
 ---
 
